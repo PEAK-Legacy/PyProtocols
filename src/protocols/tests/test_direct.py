@@ -26,18 +26,18 @@ def a2(ob,p):
 
 
 
+class IPure(Interface):
+    # We use this for pickle/copy tests because the other protocols
+    # imply various dynamically created interfaces, and so any object
+    # registered with them won't be picklable
+    pass
 
+class Picklable:
+    # Pickling needs classes in top-level namespace
+    pass
 
-
-
-
-
-
-
-
-
-
-
+class NewStyle(object):
+    pass
 
 class BasicChecks(TestCase):
 
@@ -326,6 +326,47 @@ class AdviseType(AdviseClass):
 
 
 
+class AdviseInstance(AdviseFunction):
+
+    def setUp(self):
+        self.ob = Picklable()
+
+    def checkPickling(self):
+        from pickle import loads,dumps
+        adviseObject(self.ob, provides=[IPure])
+        newOb = loads(dumps(self.ob))
+        assert adapt(newOb,IPure,None) is newOb
+
+
+
+class AdviseNewInstance(AdviseInstance):
+
+    def setUp(self):
+        self.ob = NewStyle()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class AdviseMixinInstance(BasicChecks):
 
     def setUp(self):
@@ -370,7 +411,7 @@ class AdviseMixinMultiMeta2(ClassChecks):
 TestClasses = (
     AdviseFunction, AdviseModule, AdviseClass, AdviseType,
     AdviseMixinInstance, AdviseMixinClass, AdviseMixinMultiMeta1,
-    AdviseMixinMultiMeta2,
+    AdviseMixinMultiMeta2, AdviseInstance
 )
 
 def test_suite():

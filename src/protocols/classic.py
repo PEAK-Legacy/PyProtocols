@@ -150,17 +150,17 @@ class conformsRegistry(dict):
         # Return a bound method that adds the retrieved-from class to the
         return instancemethod(self.findImplementation, typ, type(typ))
 
+    def __getstate__(self):
+        return self.subject(), self.items()
 
-
-
-
-
-
-
-
-
-
-
+    def __setstate__(self,(subject,items)):
+        from weakref import ref
+        try:
+            self.subject = ref(subject)
+        except TypeError:
+            self.subject = lambda: subject
+        self.clear()
+        self.update(dict(items))
 
 class MiscObjectsAsOpenProvider(object):
 
