@@ -1,7 +1,8 @@
-"""Method combiners"""
+"""Method combining subclasses of Dispaatcher and GenericFunction"""
 
 from strategy import ordered_signatures
 from interfaces import AmbiguousMethod
+from functions import Dispatcher, GenericFunction
 
 
 
@@ -38,8 +39,7 @@ from interfaces import AmbiguousMethod
 
 
 
-
-class MapCombiner(object):
+class MapDispatcher(Dispatcher):
     """Abstract base class for method combiners that merge metadata
 
     To use this class, subclass it and override the 'getItems()' method
@@ -54,12 +54,6 @@ class MapCombiner(object):
 
     def shouldStop(self,signature,method):
         """Return truth if combining should stop at this precedence level"""
-
-    def __new__(klass,items):
-        """Return a dictionary with merged metadata from 'items'"""
-        self = object.__new__(klass)
-        self.__init__(items)
-        return self.combine(items)
 
     def combine(self,items):
         """Build a dictionary from a sequence of '(signature,method)' pairs"""
@@ -79,4 +73,10 @@ class MapCombiner(object):
             if should_stop:
                 break
         return d
-        
+
+
+
+
+
+
+

@@ -1,21 +1,26 @@
-================
-Method Combiners
-================
+=========================
+Custom Result Combination
+=========================
+
+Sometimes, the default strategy of selecting the "most-specific" method or
+result is inadequate for a particular task.  You may therefore wish to
+implement custom result combining strategies by subclassing ``Dispatcher`` or
+``GenericFunction``, and overriding the ``combine()`` method as appropriate.
 
     >>> from dispatch import strategy, functions, combiners
 
 
 
-Map Combiners
-=============
+Map Dispatchers
+===============
 
-Map combiners are typically used for class and attribute metadata, such as
-command line options associated with a class' attributes.  Map combiners merge
-the metadata that was defined for a class and its ancestors, detecting any
-ambiguities between specific metadata items defined in different base classes,
-or defined by multiple rules for the same class.  (Actually, they use normal
-implication precedence, but for simple metadata registries, this usually maps
-directly to the inheritance structure of the target classes.)
+Map dispatchers are typically used for class and attribute metadata, such as
+command line options associated with a class' attributes.  Map dispatchers
+merge the metadata that was defined for a class and its ancestors, detecting
+any ambiguities between specific metadata items defined in different base
+classes, or defined by multiple rules for the same class.  (Actually, they use
+normal implication precedence, but for simple metadata registries, this usually
+maps directly to the inheritance structure of the target classes.)
 
 In essence, one defines the metadata as a set of keys and values.  The map
 combiner builds a map of the "most specific" applicable values.  The keys and
@@ -68,82 +73,89 @@ and some with different keys.  And, we'll also create a rule that means
     >>> def r5(): pass
     >>> r5.stop = True      # "stop processing rules"
 
-Next, we'll need a ``MapCombiner`` subclass that can interpret this rule
+Next, we'll need a ``MapDispatcher`` subclass that can interpret this rule
 schema::
 
-    >>> class ExampleCombiner(combiners.MapCombiner):
+    >>> class ExampleDispatcher(combiners.MapDispatcher):
     ...     def getItems(self,signature,rule):
     ...         # get function attributes
     ...         return [kv for kv in rule.__dict__.items() if kv[0]<>'stop']
     ...     def shouldStop(self,signature,rule):
     ...         return getattr(rule,'stop',False)
 
-In the simplest possible case, creating an ``ExampleCombiner`` with no methods
-will return an empty dictionary::
+And we need an instance of it to use as a dispatcher, whose ``combine`` method
+we'll be testing::
 
-    >>> ExampleCombiner([])
+    >>> disp = ExampleDispatcher(['x'])
+    >>> combine = disp.combine
+
+In the simplest possible case, combining no results should return an empty
+dictionary::
+
+    >>> combine([])
     {}
 
-And supplying a single method will return a dictionary containing that rule's
+And supplying a single result will return a dictionary containing that rule's
 attributes::
 
-    >>> ExampleCombiner([(a,r1)])
+    >>> combine([(a,r1)])
     {'key_a': 1}
-    >>> ExampleCombiner([(a,r4)])
+    >>> combine([(a,r4)])
     {'key_a': 4, 'key_b': 42}
 
-When supplying more than one method, the one with higher precedence should
+When supplying more than one result, the one with higher precedence should
 take effect, regardless of the order in which they are supplied::
 
-    >>> ExampleCombiner([(b,r2),(a,r1)])    # most-specific first
+    >>> combine([(b,r2),(a,r1)])    # most-specific first
     {'key_a': 2}
-    >>> ExampleCombiner([(a,r1),(b,r2)])    # least-specific first
+    >>> combine([(a,r1),(b,r2)])    # least-specific first
     {'key_a': 2}
 
-And values for keys on lower-precedence methods should still "show through"
+And values for keys on lower-precedence rules should still "show through"
 if there is no higher-precedence value defined for a given key::
 
-    >>> ExampleCombiner([(b,r2),(a,r4)])
+    >>> combine([(b,r2),(a,r4)])
     {'key_a': 2, 'key_b': 42}
 
 But rules at the same precedence levels with the same keys should produce
 an error::
 
-    >>> ExampleCombiner([(b,r1),(c,r2)])
+    >>> combine([(b,r1),(c,r2)])
     Traceback (most recent call last):
     ...
     AmbiguousMethod...
 
 Unless of course the keys have the same values::
 
-    >>> ExampleCombiner([(b,r2),(c,r3)])
+    >>> combine([(b,r2),(c,r3)])
     {'key_a': 2}
-    >>> ExampleCombiner([(b,r2),(c,r3),(a,r4)])  # should still merge other key
+    >>> combine([(b,r2),(c,r3),(a,r4)])  # should still merge other key
     {'key_a': 2, 'key_b': 42}
 
 Or the conflicting key is already given a value with higher precedence::
 
-    >>> ExampleCombiner([(b,r1),(c,r2),(d,r4)])
+    >>> combine([(b,r1),(c,r2),(d,r4)])
     {'key_a': 4, 'key_b': 42}
 
 Or if a "stop" is requested at a higher precedence::
 
-    >>> ExampleCombiner([(b,r1),(c,r2),(d,r5)])
+    >>> combine([(b,r1),(c,r2),(d,r5)])
     {}
 
 Notice that once a "stop" takes effect, no lower-precedence rules are handled::
 
-    >>> ExampleCombiner([(c,r1),(b,r5),(a,r4)])
+    >>> combine([(c,r1),(b,r5),(a,r4)])
     {'key_a': 1}
 
-So, now that our combiner works, we should be able to use it to control a
-``Dispatcher``::
+So, now that we've verified that our ``combine()`` method works, we should be
+able to use our dispatcher as if it were a normal ``Dispatcher`` instance
+(but which provides appropriately-combined results)::
 
-    >>> disp = functions.Dispatcher(['x'], ExampleCombiner)
     >>> disp["x in A"] = r4
     >>> disp["x in B"] = r1
     >>> disp["x in C"] = r2
     >>> disp["x in D"] = r3
+
     >>> disp[A(),]
     {'key_a': 4, 'key_b': 42}
     >>> disp[B(),]

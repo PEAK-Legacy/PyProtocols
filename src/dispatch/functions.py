@@ -11,7 +11,7 @@ from types import FunctionType, ClassType, InstanceType
 ClassTypes = (ClassType, type)
 
 __all__ = [
-    'GenericFunction', 'NullTest', 'Dispatcher', 'DispatchNode'
+    'GenericFunction', 'NullTest', 'Dispatcher', 'DispatchNode',
 ]
 
 
@@ -208,13 +208,10 @@ class Dispatcher:
 
     protocols.advise(instancesProvide=[IDispatcher])
 
-    def __init__(self,args,method_combiner=None):
+    def __init__(self,args):
         self.args = args
         from dispatch.strategy import Argument
         self.argMap = dict([(name,Argument(name=name)) for name in args])
-        if method_combiner is None:
-            from strategy import single_best_method as method_combiner
-        self.method_combiner = method_combiner
         self.__lock = allocate_lock()
         self.clear()
 
@@ -225,6 +222,7 @@ class Dispatcher:
             self._clear()
         finally:
             self.__lock.release()
+
 
     def _clear(self):
         self.dirty = False
@@ -244,6 +242,8 @@ class Dispatcher:
         return parse_expr(expr_string,builder)
 
 
+
+
     def _build_dispatcher(self, state=None):
         if state is None:
             self._rebuild_indexes()
@@ -257,7 +257,7 @@ class Dispatcher:
             node = None
         elif not disp_ids:
             # No more tests possible, so make a leaf node
-            node = self.method_combiner(cases)
+            node = self.combine(cases)
         else:
             best_id, case_map, remaining_ids = self._best_split(cases,disp_ids)
             if best_id is None:
@@ -408,6 +408,11 @@ class Dispatcher:
 
 
 
+    def combine(self,cases):
+        from strategy import single_best_method
+        return single_best_method(cases)
+
+
     def _addCase(self,case):
         (signature,method) = case
         for disp_id, caselists in self.disp_indexes.items():
@@ -427,11 +432,6 @@ class Dispatcher:
 
         self.cases.append(case)
         self._dispatcher = None
-
-
-
-
-
 
 
 
@@ -539,7 +539,7 @@ class GenericFunction(Dispatcher):
 
     delegate = None
 
-    def __init__(self,func,method_combiner=None):
+    def __init__(self,func):
         self.delegate, args = _mkNormalizer(func, self)
         self.delegate.__dict__ = dict(
             [(k,getattr(self,k))
@@ -548,7 +548,7 @@ class GenericFunction(Dispatcher):
         self.delegate.__doc__ = self.__doc__ = func.__doc__
         protocols.adviseObject(self.delegate,[IGenericFunction])
         self.__name__ = func.__name__; self.__call__ = self.delegate
-        Dispatcher.__init__(self,args,method_combiner)
+        Dispatcher.__init__(self,args)
 
     # We can't be used as a method, but make pydoc think we're a callable
     __get__ = None

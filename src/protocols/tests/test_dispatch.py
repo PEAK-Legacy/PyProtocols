@@ -1079,8 +1079,8 @@ class GenericTests(TestCase):
             return next_method(ob1,ob2)+ \
                 "  One vehicle is a land vehicle, the other is a sea vehicle."
 
-        compare = GenericFunction(
-            lambda v1,v2:None, method_combiner = chained_methods)
+        [dispatch.generic(chained_methods)]
+        def compare(v1,v2): pass
         compare.addMethod([(Vehicle, Vehicle)], both_vehicles)
         compare.addMethod([(LandVehicle, LandVehicle)],both_land)
         compare.addMethod([(WaterVehicle, WaterVehicle)],both_sea)

@@ -73,12 +73,26 @@ def generic(combiner=None):
     Note that when using older Python versions, you must use
     '[dispatch.generic()]' instead of '@dispatch.generic()'.
     """
-    def callback(frm,name,value,old_locals):
-        return GenericFunction(value,combiner).delegate
+
+
+
+
+
+
+
+    if combiner is None:
+        def callback(frm,name,value,old_locals):
+            return GenericFunction(value).delegate
+    else:
+        def callback(frm,name,value,old_locals):
+            gf = GenericFunction(value)
+            gf.combine = combiner
+            return gf.delegate
 
     from dispatch.functions import GenericFunction
     from protocols.advice import add_assignment_advisor
     return add_assignment_advisor(callback)
+
 
 def as(*decorators):
     """Use Python 2.4 decorators w/Python 2.2+
@@ -109,18 +123,6 @@ def as(*decorators):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 def on(argument_name):
     """Decorate the following function as a single-dispatch generic function
 
@@ -134,7 +136,7 @@ def on(argument_name):
     dispatch argument has a '__conform__' method, it will attempt to use it,
     rather than simply dispatching based on class information the way
     predicate dispatch functions do.
-    
+
     The created generic function will use the documentation from the supplied
     function as its docstring.  And, it will dispatch methods based on the
     argument named by 'argument_name', and otherwise keeping the same argument
@@ -153,12 +155,12 @@ def on(argument_name):
             # do something to a 'y' that has been adapted to 'IFoo'
     """
 
-    def callback(frm,name,value,old_locals):       
+    def callback(frm,name,value,old_locals):
         return _mkGeneric(value,argument_name)
 
     from dispatch.functions import _mkGeneric
     from protocols.advice import add_assignment_advisor
     return add_assignment_advisor(callback)
-    
+
 
 
