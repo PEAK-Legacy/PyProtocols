@@ -164,7 +164,9 @@ class ProviderChecks(TestBase):
 
 class SimpleAdaptiveChecks:
 
-    """Simple adapter-oriented checks that Twisted can handle"""
+    """Simple adapter-oriented checks that Twisted can handle
+
+    (Well, it handles them as long as all the interfaces are Twisted)"""
 
     def checkDelayedImplication(self):
         self.declareObImplements([self.IA])
@@ -189,8 +191,6 @@ class SimpleAdaptiveChecks:
         )
 
         self.assertObProvidesABCD(IC,ID)
-
-
 
 
 

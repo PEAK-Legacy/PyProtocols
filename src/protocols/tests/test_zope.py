@@ -42,6 +42,24 @@ class InstanceChecks(ProviderChecks):
 TestClasses = makeClassTests(BasicChecks)
 TestClasses += makeInstanceTests(InstanceChecks,Picklable,NewStyle)
 
+class IB(protocols.Interface):
+    advise(protocolExtends = [IA])
+
+class BasicChecks(ImplementationChecks):
+    IA = IA
+    IB = IB
+    Interface = Interface
+    IPure = IPure
+
+class InstanceChecks(ProviderChecks):
+    IA = IA
+    IB = IB
+    Interface = Interface
+    IPure = IPure
+
+TestClasses += makeClassTests(BasicChecks)
+TestClasses += makeInstanceTests(InstanceChecks,Picklable,NewStyle)
+
 def test_suite():
     return TestSuite([makeSuite(t,'check') for t in TestClasses])
 
