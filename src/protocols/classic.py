@@ -1,14 +1,84 @@
 """Declaration support for "classic" classes, Zope Interfaces, etc."""
 
-# We have no API; executing the module is sufficient to register the adapters.
-__all__ = []
+__all__ = ['ProviderMixin']
+
+from types import FunctionType, ModuleType, InstanceType, ClassType
+
+from adapters import *
+from api import declareImplementation, advise, declareAdapterForObject
+from interfaces import *
+from new import instancemethod
+from advice import getMRO, metamethod
 
 
-from types import FunctionType, ModuleType, InstanceType
 
-from adapters import NO_ADAPTER_NEEDED, DOES_NOT_SUPPORT
-from api import declareImplementation, advise
-from interfaces import IAdaptingProtocol, IOpenProvider, IOpenProtocol
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class ProviderMixin:
+
+    __provided = ()
+
+    advise(
+        instancesProvide=[IOpenProvider, IImplicationListener]
+    )
+
+
+    def declareProvides(self,protocol,adapter=NO_ADAPTER_NEEDED,depth=1):
+        if not self.__provided:
+            self.__provided = {}
+        if updateWithSimplestAdapter(self.__provided,protocol,adapter,depth):
+            protocol.addImplicationListener(self)
+
+    declareProvides = metamethod(declareProvides)
+
+
+    def newProtocolImplied(self, srcProto, destProto, adapter, depth):
+
+        if srcProto not in self.__provided:
+            return
+
+        baseAdapter, d = self.__provided[srcProto]
+        adapter = composeAdapters(baseAdapter,srcProto,adapter)
+
+        declareAdapterForObject(
+            destProto, adapter, self, depth+d
+        )
+
+    newProtocolImplied = metamethod(newProtocolImplied)
+
+
+    def __conform__(self,protocol):
+        if protocol in self.__provided:
+            return self.__provided[protocol][0](self,protocol)
+
+    __conform__ = metamethod(__conform__)
+
+
 
 class conformsRegistry(dict):
 
@@ -16,24 +86,77 @@ class conformsRegistry(dict):
 
     def __call__(self, protocol):
 
+        # This only gets called for non-class objects
+
         if protocol in self:
-            return self[protocol](self.subject(),protocol)
+
+            subject = self.subject()
+
+            if subject is not None:
+                return self[protocol][0](subject,protocol)
 
 
-        # XXX do we need the rest of this any more?
+    def findImplementation(self, subject, protocol, checkSelf=True):
+
+        for cls in getMRO(subject):
+
+            conf = cls.__dict__.get('__conform__')
+
+            if conf is None:
+                continue
+
+            if not isinstance(conf,conformsRegistry):
+                raise TypeError(
+                    "Incompatible __conform__ in base class", conf, cls
+                )
+
+            if protocol in conf:
+                return conf[protocol][0](subject,protocol)
+
+
+
+
+
+
+
+
+
+    def newProtocolImplied(self, srcProto, destProto, adapter, depth):
 
         subject = self.subject()
 
-        try:
-            klass = subject.__class__
-            conform = klass.__conform__
+        if subject is None or srcProto not in self:
+            return
 
-        except AttributeError:
-            pass
+        baseAdapter, d = self[srcProto]
+        adapter = composeAdapters(baseAdapter,srcProto,adapter)
 
-        else:
-            if getattr(conform,'im_class',None) is klass:
-                return conform(subject,protocol)
+        declareAdapterForObject(
+            destProto, adapter, subject, depth+d
+        )
+
+
+    def __hash__(self):
+        # Need this because dictionaries aren't hashable, but we need to
+        # be referenceable by a weak-key dictionary
+        return id(self)
+
+
+    def __get__(self,ob,typ=None):
+        if ob is not None:
+            raise AttributeError(
+                "__conform__ registry does not pass to instances"
+            )
+        # Return a bound method that adds the retrieved-from class to the
+        return instancemethod(self.findImplementation, typ, type(typ))
+
+
+
+
+
+
+
+
 
 
 
@@ -45,33 +168,74 @@ class MiscObjectsAsOpenProvider(object):
 
     advise(
         instancesProvide=[IOpenProvider],
-        asAdapterForTypes=[FunctionType,ModuleType,InstanceType]
+        asAdapterForTypes=[FunctionType,ModuleType,InstanceType,ClassType,type]
     )
 
+
     def __init__(self,ob,proto):
+        for item in getMRO(ob):
+            try:
+                reg = item.__dict__.get('__conform__')
+            except AttributeError:
+                raise TypeError(
+                    "Only objects with dictionaries can use this adapter",
+                    ob
+                )
+            if reg is not None and not isinstance(reg,conformsRegistry):
+                raise TypeError(
+                    "Incompatible __conform__ on adapted object", ob, reg
+                )
 
-        reg = getattr(ob, '__conform__', None)
-
-        if reg is not None and not isinstance(reg,conformsRegistry):
-            raise TypeError(
-                "Incompatible __conform__ on adapted object", ob, proto
-            )
+        reg = ob.__dict__.get('__conform__')
 
         if reg is None:
-            reg = ob.__conform__ = conformsRegistry()
-            from weakref import ref
-            try:
-                r = ref(ob)
-            except TypeError:
-                r = lambda: ob
-            reg.subject = r
+            reg = ob.__conform__ = self.newRegistry(ob)
 
         self.ob = ob
         self.reg = reg
 
 
     def declareProvides(self, protocol, adapter=NO_ADAPTER_NEEDED, depth=1):
-        self.reg[protocol] = adapter
+        if updateWithSimplestAdapter(self.reg, protocol, adapter, depth):
+            protocol.addImplicationListener(self.reg)
+
+
+
+
+
+    def newRegistry(self,subject):
+
+        # Create a registry that's also set up for inheriting declarations
+
+        reg = conformsRegistry()
+        from weakref import ref
+
+        try:
+            r = ref(subject)
+        except TypeError:
+            r = lambda: subject
+
+        reg.subject = r
+
+        return reg
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

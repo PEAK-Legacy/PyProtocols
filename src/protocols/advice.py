@@ -1,10 +1,12 @@
+from __future__ import generators
 from new import instancemethod
 from types import ClassType, FunctionType
 import sys
 
 __all__ = [
     'addClassAdvisor', 'isClassAdvisor', 'metamethod', 'supermeta',
-    'minimalBases', 'determineMetaclass', 'getFrameInfo',
+    'minimalBases', 'determineMetaclass', 'getFrameInfo', 'getMRO',
+    'classicMRO',
 ]
 
 
@@ -13,28 +15,26 @@ def metamethod(func):
     return property(lambda ob: func.__get__(ob,ob.__class__))
 
 
+def classicMRO(ob, extendedClassic=False):
+    stack = []
+    push = stack.append
+    pop = stack.pop
+    push(ob)
+    while stack:
+        cls = pop(0)
+        yield cls
+        map(push,cls.__bases__)
 
+    if extendedClassic:
+        yield InstanceType
+        yield object
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+def getMRO(ob, extendedClassic=False):
+    if isinstance(ob,ClassType):
+        return classicMRO(ob,extendedClassic)
+    elif isinstance(ob,type):
+        return ob.__mro__
+    return ob,
 
 
 
@@ -48,7 +48,7 @@ def supermeta(typ,ob):
     if typ not in mro:
         starttype = ob
         mro = starttype.__mro__
-        
+
     mro = iter(mro)
     for cls in mro:
         if cls is typ:

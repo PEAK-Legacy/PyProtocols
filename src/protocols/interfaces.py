@@ -4,7 +4,7 @@ __all__ = [
     'Protocol', 'InterfaceClass', 'Interface',
     'IAdapterFactory', 'IProtocol',
     'IAdaptingProtocol', 'IOpenProtocol', 'IOpenProvider',
-    'IOpenImplementor', 'Attribute',
+    'IOpenImplementor', 'IImplicationListener', 'Attribute',
 ]
 
 import api
@@ -42,12 +42,12 @@ except ImportError:
 # Trivial interface implementation
 
 class Protocol:
-
     """Generic protocol w/type-based adapter registry"""
 
     def __init__(self):
         self.__adapters = {}
         self.__implies = {}
+        self.__listeners = None
         self.__lock = allocate_lock()
 
     def getImpliedProtocols(self):
@@ -67,18 +67,18 @@ class Protocol:
 
         # Always register implied protocol with classes, because they should
         # know if we break the implication link between two protocols
-
         for klass,(baseAdapter,d) in self.__adapters.items():
             api.declareAdapterForType(
                 proto,composeAdapters(baseAdapter,self,adapter),klass,depth+d
             )
 
+        if self.__listeners:
+            for listener in self.__listeners:
+                listener.newProtocolImplied(self, proto, adapter, depth)
+
         return adapter
 
     addImpliedProtocol = metamethod(addImpliedProtocol)
-
-
-
 
     def registerImplementation(self,klass,adapter=NO_ADAPTER_NEEDED,depth=1):
 
@@ -154,13 +154,54 @@ class Protocol:
         # Alas, we can't cache failed lookups until we have a way to clear them
         # XXX declareAdapterForType(self, DOES_NOT_SUPPORT, typ, 99999)
 
-    # Wrapping this in metamethod should only be necessary if you use a
-    # Protocol as a metaclass for another protocol.  Which is probably a
-    # completely insane thing to do, but it could happen by accident, if
-    # someone includes a protocol (or subclass of a protocol) in the bases
-    # of a metaclass.  So we'll wrap it, just in case.
-
     __adapt__ = metamethod(__adapt__)
+
+
+
+
+
+
+
+    def addImplicationListener(self, listener):
+
+        if self.__listeners is None:
+            from weakref import WeakKeyDictionary
+            self.__listeners = WeakKeyDictionary()
+
+        self.__listeners[listener] = 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 class InterfaceClass(Protocol, type):
 
@@ -316,4 +357,13 @@ class IOpenProtocol(IAdaptingProtocol):
 
     def registerObject(ob, adapter=NO_ADAPTER_NEEDED, depth=1):
         """'adapter' provides protocol for 'ob' directly"""
+
+    def addImplicationListener(listener):
+        """Notify 'listener' whenever protocol has new implied protocol"""
+
+
+class IImplicationListener(Interface):
+
+    def newProtocolImplied(srcProto, destProto, adapter, depth):
+        """'srcProto' now implies 'destProto' via 'adapter' at 'depth'"""
 
