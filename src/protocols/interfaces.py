@@ -6,7 +6,7 @@ __all__ = [
     'Protocol', 'InterfaceClass', 'Interface',
     'IAdapterFactory', 'IProtocol',
     'IAdaptingProtocol', 'IOpenProtocol', 'IOpenProvider',
-    'IOpenImplementor', 'IImplicationListener', 'Attribute',
+    'IOpenImplementor', 'IImplicationListener', 'Attribute', 'Variation'
 ]
 
 import api
@@ -239,6 +239,47 @@ class InterfaceClass(Protocol, type):
 
 class Interface(object):
     __metaclass__ = InterfaceClass
+
+
+
+
+
+class Variation(Protocol):
+
+    """A variation of a base protocol - "inherits" the base's adapters
+
+    See the 'LocalProtocol' example in the reference manual for more info.
+    """
+
+
+    def __init__(self, baseProtocol, context = None):
+
+        self.baseProtocol = baseProtocol
+        self.context = context
+
+        # Note: Protocol is a ``classic'' class, so we don't use super()
+        Protocol.__init__(self)
+
+        declareAdapterForProtocol(self,NO_ADAPTER_NEEDED,baseProtocol)
+
+
+    def __repr__(self):
+
+        if self.context is None:
+            return "Variation(%r)" % self.baseProtocol
+
+        return "Variation(%r,%r)" % self.baseProtocol, self.context
+
+
+
+
+
+
+
+
+
+
+
 
 
 
