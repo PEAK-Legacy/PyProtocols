@@ -162,7 +162,7 @@ def getFrameInfo(frame):
 
 
 
-def addClassAdvisor(callback, depth=2):
+def addClassAdvisor(callback, depth=2,frame=None):
 
     """Set up 'callback' to be passed the containing class upon creation
 
@@ -187,7 +187,7 @@ def addClassAdvisor(callback, depth=2):
     class will be executed.  Be sure that classes using "advising" functions
     declare any '__metaclass__' *first*, to ensure all callbacks are run."""
 
-    frame = sys._getframe(depth)
+    frame = frame or sys._getframe(depth)
     kind, module, caller_locals, caller_globals = getFrameInfo(frame)
 
     if kind != "class":
@@ -244,7 +244,7 @@ def isClassAdvisor(ob):
 
 
 
-def add_assignment_advisor(callback,depth=2):
+def add_assignment_advisor(callback,depth=2,frame=None):
     """Invoke 'callback(frame,name,value,old_locals)' on next assign in 'frame'
 
     The frame monitored is determined by the 'depth' argument, which gets
@@ -262,7 +262,7 @@ def add_assignment_advisor(callback,depth=2):
     'None' or incorrect, if the 'value' is not the original function (e.g.
     when multiple decorators are used).
     """
-    frame = sys._getframe(depth)
+    frame = frame or sys._getframe(depth)
     oldtrace = [frame.f_trace]
     old_locals = frame.f_locals.copy()
 

@@ -39,7 +39,6 @@ def ping(log, value):
 
 
 
-
 class SuperTest(TestCase):
 
     def checkMetaSuper(self):
@@ -132,7 +131,7 @@ class DecoratorTests(TestCase):
             if k in f.f_locals:
                 del f.f_locals[k]   # simulate old-style advisor
 
-        add_assignment_advisor(track,1)
+        add_assignment_advisor(track,frame=sys._getframe())
         test_var = 1
         self.assertEqual(log, [(sys._getframe(),'test_var',1)])
         log = []
