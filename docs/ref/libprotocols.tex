@@ -909,11 +909,10 @@ you want to subclass an abstract base for implementation using a different
 metaclass, you may need to create a third metaclass that combines
 \class{protocols.AbstractBaseMeta} with your desired metaclass.})
 
-Subclassing a subclass of \class{Interface} creates a new \class{Interface}
-that implies the first interface.  This means that any object that supports
-the second interface, is considered to implicitly support the first
-interface.  (And the same relationship holds true for \class{AbstractBase}
-subclasses that are subclassed.)  For example:
+Subclassing a subclass of \class{Interface} (or \class{AbstractBase}) creates a
+new interface (or ABC) that implies the first interface (or ABC).  This means
+that any object that supports the second interface (or ABC), is considered to
+implicitly support the first interface (or ABC).  For example:
 
 \begin{verbatim%
 }class IReadWriteMapping(IReadMapping):
@@ -940,6 +939,7 @@ As developers reading the documentation of these interfaces, it is obvious to
 us that \code{IReadWriteMapping} implies \code{IReadMapping}, because we
 understand what they do.  But there is no way for Python to know this, unless
 we explicitly state it, like this:
+
 
 \begin{verbatim%
 }import protocols

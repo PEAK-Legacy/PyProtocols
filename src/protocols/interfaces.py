@@ -80,16 +80,6 @@ class Protocol:
 
 
 
-    def __call__(self, ob, default=api._marker, factory=api.IMPLEMENTATION_ERROR):
-        """Adapt to this protocol"""
-        return api.adapt(ob,self,default,factory)
-
-    try:
-        from _speedups import Protocol__call__ as __call__
-    except ImportError:
-        pass
-
-
     def addImpliedProtocol(self,proto,adapter=NO_ADAPTER_NEEDED,depth=1):
 
         self.__lock.acquire()
@@ -116,6 +106,16 @@ class Protocol:
         return adapter
 
     addImpliedProtocol = metamethod(addImpliedProtocol)
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -203,6 +203,47 @@ class Protocol:
 
     addImplicationListener = metamethod(addImplicationListener)
 
+    def __call__(self, ob, default=api._marker, factory=api.IMPLEMENTATION_ERROR):
+        """Adapt to this protocol"""
+        return api.adapt(ob,self,default,factory)
+
+
+# Use faster __call__ method, if possible
+# XXX it could be even faster if the __call__ were in the tp_call slot
+# XXX directly, but Pyrex doesn't have a way to do that AFAIK.
+
+try:
+    from _speedups import Protocol__call__
+except ImportError:
+    pass
+else:
+    from new import instancemethod
+    Protocol.__call__ = instancemethod(Protocol__call__, None, Protocol)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class AbstractBaseMeta(Protocol, type):
 
     """Metaclass for 'AbstractBase' - a protocol that's also a class
@@ -217,7 +258,7 @@ class AbstractBaseMeta(Protocol, type):
         Protocol.__init__(self)
 
         for b in __bases__:
-            if isinstance(b,self.__class__) and '__metaclass__' not in b.__dict__:
+            if isinstance(b,AbstractBaseMeta) and b.__bases__<>(object,):
                 self.addImpliedProtocol(b)
 
 
@@ -257,7 +298,7 @@ class InterfaceClass(AbstractBaseMeta):
     def getBases(self):
         return [
             b for b in self.__bases__
-                if isinstance(b,Protocol) and b is not Interface
+                if isinstance(b,AbstractBaseMeta) and b.__bases__<>(object,)
         ]
 
 

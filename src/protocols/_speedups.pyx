@@ -59,7 +59,6 @@ cdef extern from "Python.h":
 
 cdef object _marker, __conform, __adapt, __mro, __ECType
 from sys import exc_info
-from new import instancemethod
 
 
 try:
@@ -73,6 +72,7 @@ __conform  = PyString_InternFromString("__conform__")
 __adapt    = PyString_InternFromString("__adapt__")
 __class    = PyString_InternFromString("__class__")
 __mro      = PyString_InternFromString("__mro__")
+
 
 
 
@@ -200,7 +200,7 @@ def Protocol__call__(self, ob, default=_marker, factory=IMPLEMENTATION_ERROR):
     """Adapt to this protocol"""
     return adapt(ob,self,default,factory)
 
-Protocol__call__ = instancemethod(Protocol__call__,None,None)
+
 
 
 cdef buildClassicMRO(PyClassObject *cls, PyListObject *list):
