@@ -219,6 +219,30 @@ class TestTests(TestCase):
             [(Min,27),(Min,99),(27,Max),(53,56),(53,Max)]
         )
 
+        class X:
+            """Ensure rich comparisons work correctly with classic classes"""
+
+        x = X()
+        for v1,v2 in [(Min,x),(x,Max)]:
+            self.failUnless(v1 < v2)
+            self.failUnless(v1 <= v2)
+            self.failIf(v1 == v2)
+            self.failUnless(v1 != v2)
+            self.failUnless(v2 > v1)
+            self.failUnless(v2 >= v2)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def testInequalities(self):
         self.assertRaises(ValueError, Inequality, '', 1)
@@ -242,6 +266,23 @@ class TestTests(TestCase):
 
         t4 = Inequality('<',"abc")
         self.failUnless(("a","a") in t4); self.failIf(("b","b") in t4)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     def testInequalitySeeds(self):

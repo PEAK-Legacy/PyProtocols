@@ -219,8 +219,29 @@ class _ExtremeType(object):     # Courtesy of PEP 326
     def __repr__(self):
         return self._rep
 
+    def __lt__(self,other):
+        return self.__cmp__(other)<0
+
+    def __le__(self,other):
+        return self.__cmp__(other)<=0
+
+    def __gt__(self,other):
+        return self.__cmp__(other)>0
+
+    def __eq__(self,other):
+        return self.__cmp__(other)==0
+
+    def __ge__(self,other):
+        return self.__cmp__(other)>=0
+
+    def __ne__(self,other):
+        return self.__cmp__(other)<>0
+
 Max = _ExtremeType(1, "Max")
 Min = _ExtremeType(-1, "Min")
+
+
+
 
 
 def dispatch_by_inequalities(ob,table):
@@ -241,6 +262,26 @@ def dispatch_by_inequalities(ob,table):
                 lo = mid+1
             else:
                 return table[ranges[mid]]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
