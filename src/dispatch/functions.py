@@ -384,8 +384,9 @@ class GenericFunction:
 
     def _rebuild_indexes(self):
         if self.dirty:
-            cases = self.cases
-            self._clear()
+            cases, self.cases = self.cases, []
+            self.dirty = False
+            for ind in self.disp_indexes.values(): ind.clear()
             map(self._addCase, cases)
 
 
@@ -397,7 +398,6 @@ class GenericFunction:
     def testChanged(self):
         self.dirty = True
         self._dispatcher = None
-
 
 
 

@@ -285,8 +285,6 @@ class TestTests(TestCase):
 
 
 
-
-
     def testInequalityDispatch(self):
         classify = GenericFunction(lambda age:None)
         classify[(Inequality('<',2),)]   = lambda age:"infant"
@@ -1138,14 +1136,14 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
         def w(f1,f1x,f2,ymatches=F()):
             return g(f1,f1x,f2,tf[not isinstance(f1x,B)],ymatches)
 
-        self.assertEqual( w(A(),A(),C(),T()), "m1")
-        self.assertEqual( w(B(),B(),C()),     "m2")
-        self.assertEqual( w(C(),B(),B()),     "m2")
-        self.assertEqual( w(C(),C(),C()),     "m3")
-        self.assertEqual( w(C(),A(),A()),     "m4")
-        self.assertEqual( g(T(),None,None,None,None), "m5")
-
-
+        for time in 1,2:
+            self.assertEqual( w(A(),A(),C(),T()), "m1")
+            self.assertEqual( w(B(),B(),C()),     "m2")
+            self.assertEqual( w(C(),B(),B()),     "m2")
+            self.assertEqual( w(C(),C(),C()),     "m3")
+            self.assertEqual( w(C(),A(),A()),     "m4")
+            self.assertEqual( g(T(),None,None,None,None), "m5")
+            g.testChanged()
 
 
     def testInstanceMethods(self):
