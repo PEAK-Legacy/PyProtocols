@@ -164,10 +164,11 @@ def setup(__gfProtocol, __gfDefaults):
 
 # Bootstrap SimpleGeneric declaration helper function -- itself a SimpleGeneric
 
-[dispatch.on('ob')]
+#[dispatch.on('ob')]
 def declarePredicate(ob,proto,factory):
     """Declare a SimpleGeneric dispatch predicate"""
-    
+
+declarePredicate = _mkGeneric(declarePredicate,'ob')
 proto = declarePredicate.protocol
 
 def declareForType(typ,proto,factory):
@@ -187,7 +188,6 @@ declareForProto(protocols.IOpenProtocol,proto,
 
 declareForProto(protocols.IBasicSequence,proto,
     lambda ob:(ob,declareForSequence))
-
 
 
 
