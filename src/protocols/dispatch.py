@@ -55,7 +55,7 @@ __all__ = [
     'GenericFunction', 'chained_methods', 'ClassTerm', 'Signature',
     'PositionalSignature', 'most_specific_signatures', 'ordered_signatures',
     'dispatch_by_mro', 'next_method', 'Argument', 'IDispatchableExpression',
-    'IGenericFunction', 'Min', 'Max', 'Inequality',
+    'IGenericFunction', 'Min', 'Max', 'Inequality', 'IDispatchTable',
 ]
 
 
@@ -122,15 +122,44 @@ class ITerm(Interface):
 
 
 class IDispatchFunction(Interface):
+
     """Test to be applied to an expression to navigate a dispatch node"""
 
     def __call__(ob,table):
         """Return entry from 'table' that matches 'ob' ('None' if not found)
 
-        'table' is a dictionary mapping term seeds to dispatch nodes.  The
-        dispatch function should return the appropriate entry from the
+        'table' is an 'IDispatchTable' mapping term seeds to dispatch nodes.
+        The dispatch function should return the appropriate entry from the
         dictionary.
         """
+
+
+class IDispatchTable(Interface):
+
+    """A dispatch node for dispatch functions to search"""
+
+    def __contains__(key):
+        """True if 'key' is in table"""
+
+    def __getitem__(key):
+        """Return dispatch node for 'key', or raise 'KeyError'"""
+
+    def reseed(key):
+        """Add 'key' to dispatch table and return the node it should have"""
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class ISignature(Interface):
@@ -155,18 +184,23 @@ class IDispatchPredicate(Interface):
     protocols.advise(protocolIsSubsetOf = [protocols.sequenceOf(ISignature)])
 
 
-
-
-
-
-
-
-
 class IDispatchableExpression(Interface):
     """Expression definition suitable for dispatching"""
 
     def asFuncAndIds(generic):
         """Return '(func,idtuple)' pair for expression computation"""
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class IGenericFunction(Interface):
@@ -203,12 +237,52 @@ class IGenericFunction(Interface):
 
 
 
+
+
+
+
+
+
+
 def dispatch_by_mro(ob,table):
+
     """Lookup '__class__' of 'ob' in 'table' using its MRO order"""
 
-    for key in getMRO(ob.__class__,True):
-        if key in table:
-            return table[key]
+    klass = ob.__class__
+
+    while True:
+        if klass in table:
+            return table[klass]
+        try:
+            klass, = klass.__bases__
+        except ValueError:
+            if klass.__bases__:
+                # Fixup for multiple inheritance
+                return table.reseed(klass)
+            else:
+                break
+
+    if isinstance(ob,InstanceType) and InstanceType in table:
+        return table[InstanceType]
+
+    if klass is not object and object in table:
+        return table[object]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class ClassTerm(Adapter):
@@ -239,6 +313,14 @@ class ClassTerm(Adapter):
 
     def subscribe(self,listener): pass
     def unsubscribe(self,listener): pass
+
+
+
+
+
+
+
+
 
 
 
@@ -736,6 +818,47 @@ class Argument(object):
 
 
 
+class DispatchNode(dict):
+
+    """A mapping w/lazily population and supporting 'reseed()' operations"""
+
+    protocols.advise(instancesProvide=[IDispatchTable])
+
+    __slots__ = 'expr_id','contents','reseed'
+
+    def __init__(self, best_id, contents, reseed):
+        self.reseed = reseed
+        self.expr_id = best_id
+        self.contents = contents
+        dict.__init__(self)
+
+    def build(self):
+        if self.contents:
+            self.update(dict(self.contents()))
+            self.contents = None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class GenericFunction:
 
     """Extensible multi-dispatch generic function
@@ -777,20 +900,13 @@ class GenericFunction:
 
 
 
-    def _build_dispatcher(self, cases=None, disp_ids=None, memo=None):
-
-        if memo is None:
-            memo = {}
-
-        if cases is None:
+    def _build_dispatcher(self, state=None):
+        if state is None:
             self._rebuild_indexes()
-            cases = self.cases
-
-        if disp_ids is None:
-            disp_ids = tuple(self.disp_indexes)
+            state = self.cases, tuple(self.disp_indexes), {}
+        (cases,disp_ids,memo) = state
 
         key = (tuple(cases), disp_ids)
-
         if key in memo:
             return memo[key]
         elif not cases:
@@ -800,23 +916,30 @@ class GenericFunction:
             node = self.method_combiner(cases)
         else:
             best_id, case_map, remaining_ids = self._best_split(cases,disp_ids)
-
             if best_id is None:
                 # None of our current cases had any meaningful tests on the
                 # "best" expression, so don't bother building a dispatch node.
                 # Instead, try again with the current expression removed.
-                node = self._build_dispatcher(cases, remaining_ids, memo)
+                node = self._build_dispatcher((cases, remaining_ids, memo))
             else:
                 def dispatch_table():
                     build = self._build_dispatcher
                     for key,subcases in case_map.items():
-                        yield key,build(subcases,remaining_ids,memo)
-
-                node = best_id, {}, dispatch_table()
-
+                        yield key,build((subcases,remaining_ids,memo))
+                def reseed(key):
+                    self.disp_indexes[best_id][key] = [
+                        (s,m) for s,m in self.cases if key in s.get(best_id)
+                    ]
+                    case_map[key] = [
+                        (s,m) for s,m in cases if key in s.get(best_id)
+                    ]
+                    node[key] = retval = self._build_dispatcher(
+                        (case_map[key], remaining_ids, memo)
+                    )
+                    return retval
+                node = DispatchNode(best_id, dispatch_table, reseed)
         memo[key] = node
         return node
-
 
     def __call__(self,*__args,**__kw):
 
@@ -834,13 +957,13 @@ class GenericFunction:
 
         while node is not None:
 
-            if type(node) is tuple:
-                (expr, dispatch_function), table, contents = node
+            if type(node) is DispatchNode:
+                (expr, dispatch_function) = node.expr_id
 
-                if not table:
-                    table.update(dict(contents))
+                if node.contents:
+                    node.build()
 
-                node = dispatch_function(get(expr), table)         # XXX
+                node = dispatch_function(get(expr), node)         # XXX
 
             else:
                 return node(*__args,**__kw)

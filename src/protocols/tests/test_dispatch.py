@@ -373,7 +373,6 @@ class GenericTests(TestCase):
         m = GenericFunction(args=['v'])
         m[(LandVehicle,)] = lambda v: "land"
         m[(WaterVehicle,)] = lambda v: "water"
-
         self.assertEquals(m(Hummer()), "land")
         self.assertEquals(m(Speedboat()), "water")
         self.assertRaises(NoApplicableMethods, m, GasPowered())
@@ -402,8 +401,11 @@ class GenericTests(TestCase):
         declareImplementation(Tricycle,[Wheeled])
         self.assertEqual(roll(Tricycle()),"We're rolling")
 
-
-
+    def testMRO(self):
+        t = GenericFunction(args=['vehicle','num'])
+        t[Signature(vehicle=HumanPowered,num=Inequality('<',10))]=lambda v,n:False
+        t[Signature(vehicle=WaterVehicle,num=Inequality('<',5))]=lambda v,n:True
+        self.assertRaises(AmbiguousMethod, t, PaddleBoat(), 4)
 
 
 
