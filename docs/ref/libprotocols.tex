@@ -451,6 +451,12 @@ is of a different type.
 
 \subsubsection{Replacing Introspection with Adaptation}
 
+\begin{quotation}
+To summarize: don't type check.
+
+\hfill --- Alex Martelli, on \newsgroup{comp.lang.python}
+\end{quotation}
+
 Component adaptation is intended to completely replace all non-cooperative
 introspection techniques, such as \function{type()}, \function{isinstance()},
 \function{hasattr()}, and even interface checks.  Such introspection
@@ -459,7 +465,7 @@ extension by end users.  It often makes code maintenance more difficult as
 well, since such checks are often performed in more than one place, and
 must be kept in sync whenever a new interface or type must be checked.
 
-The common use cases for such introspection are:
+Some common use cases for such introspection are:
 
 \begin{itemize}
 
@@ -497,17 +503,11 @@ process.  But first, we will need to cover how protocols and interfaces can
 be defined, declared, and adapted, using the API provided by the
 \module{protocols} package.
 
+\begin{seealso}
 
-
-
-
-
-
-
-
-
-
-
+\seetitle[http://www.canonical.org/~kragen/isinstance/]{isinstance() Considered
+Harmful}{A brief critique of common justifications for using introspection}
+\end{seealso}
 
 
 
