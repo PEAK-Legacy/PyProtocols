@@ -43,7 +43,7 @@ from __future__ import generators
 from UserDict import UserDict
 from protocols import Interface, Attribute, Protocol, Adapter, StickyAdapter
 from protocols.advice import getMRO
-import protocols, operator
+import protocols, operator, inspect
 from types import ClassType, InstanceType, FunctionType, NoneType
 ClassTypes = (ClassType, type)
 from sys import _getframe
@@ -1073,7 +1073,6 @@ class GenericFunction:
         self.disp_indexes.setdefault(disp,{})
         return expr
 
-
     def getExpressionId(self,expr):
         """Replace 'expr' with a local expression ID number"""
 
@@ -1099,27 +1098,21 @@ class GenericFunction:
         builder = TestBuilder(self.args,local_dict,global_dict,__builtins__)
         return parse_expr(expr_string,builder)
 
+    def from_function(klass,func):
+        # XXX nested args, var, kw, docstring...
+        return klass(inspect.getargspec(func)[0])
+
+    from_function = classmethod(from_function)
 
 
-
-
-
-
-defmethod = GenericFunction(['gf','cond','func','local_dict','global_dict'])
-
-def defmethod_simple(gf,cond,func,local_dict=None,global_dict=None):
+def dm_simple(gf,cond,func,local_dict=None,global_dict=None):
     """Add a method to an existing GF, using a predicate"""
     gf = IGenericFunction(gf)
     gf.addMethod(cond,func)
     return gf
 
-defmethod[(IGenericFunction,IDispatchPredicate)] = defmethod_simple
 
-# from this point forward, we could use 'when' if it was available...
-
-
-#[when('gf in IGenericFunction and cond in str')]
-def defmethod_string(gf,cond,func,local_dict=None,global_dict=None):
+def dm_string(gf,cond,func,local_dict=None,global_dict=None):
     """Add a method to an existing GF, using a string condition"""
 
     if global_dict is None:
@@ -1130,17 +1123,24 @@ def defmethod_string(gf,cond,func,local_dict=None,global_dict=None):
     cond = gf.parse(cond,local_dict,global_dict)
     return defmethod(gf,cond,func)
 
-defmethod[(IGenericFunction,str)] = defmethod_string
 
-
-#[when('gf in NoneType and func in FunctionType')]
-def defmethod_create(gf,cond,func,local_dict=None,global_dict=None):
+def dm_create(gf,cond,func,local_dict=None,global_dict=None):
     """Create a new generic function, using function to get args info"""
-    import inspect  # XXX nested args, var, kw, docstring...
-    gf = GenericFunction(inspect.getargspec(func)[0])
-    return defmethod(gf,cond,func,local_dict,global_dict)
+    return defmethod(
+        GenericFunction.from_function(func), cond, func, local_dict,global_dict
+    )
 
-defmethod[(NoneType,NullTest,FunctionType)] = defmethod_create
+
+defmethod = GenericFunction.from_function(dm_simple)
+
+dm_simple(defmethod,
+    defmethod.parse("gf in IGenericFunction and cond in IDispatchPredicate",
+        locals(),globals()),
+    dm_simple)
+
+dm_string(defmethod, "gf in IGenericFunction and cond in str", dm_string)
+
+defmethod(defmethod, "gf is None and func in FunctionType", dm_create)
 
 
 

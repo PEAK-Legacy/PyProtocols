@@ -664,7 +664,7 @@ class ExprBuilderTests(TestCase):
         for name in self.namespaces[0]:
             if name not in self.arguments:
                 self.assertEqual(
-                    self.builder.Name(name), Var(name,self.namespaces[0]), name
+                    self.builder.Name(name), Var(name,*self.namespaces), name
                 )
 
         # check globals

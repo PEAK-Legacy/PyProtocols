@@ -51,12 +51,12 @@ class ExprBuilder:
     def Name(self,name):
         if name in self.arguments:
             return Argument(name=name)
-        elif name in self.namespaces[0]:
-            return Var(name,self.namespaces[0])
+
         if self.bind_globals:
             for ns in self.namespaces[1:]:
                 if name in ns:
                     return Const(ns[name])
+
         return Var(name,*self.namespaces)
 
     def Const(self,value):
