@@ -244,6 +244,170 @@ class MiscObjectsAsOpenProvider(object):
 
 
 
+# Twisted uses an approach to __adapt__ that is largely incompatible with
+# PEP 246, so we have to jump through some twisty hoops to convince it to work
+# for our purposes, without breaking Twisted's test suite.
+
+class TwistedAdaptMethod(object):
+
+    """__adapt__ implementation for Twisted interfaces"""
+
+    __slots__ = 'iface'
+
+
+    def __init__(self,iface):
+        self.iface = iface
+
+
+    def __call__(self, obj):
+
+        # This is the __adapt__ method that you get
+        # for ISomething.__adapt__()...
+
+        if TwistedImplements(obj, self.iface):
+            return obj
+
+
+    def im_func(self, ob, default):
+
+        # And this is what MetaInterface.__call__ calls when
+        # it goes after __adapt__.im_func!
+
+        meth = self.iface.__dict__.get('__adapt__')
+
+        if meth is None:
+            return default
+
+        return meth(ob,default)
+
+
+
+
+
+
+# Monkeypatch Twisted Interfaces
+
+try:
+    from twisted.python.components import \
+        implements as TwistedImplements, \
+        MetaInterface as TwistedInterfaceClass, \
+        getInterfaces as TwistedGetInterfaces
+
+except ImportError:
+    TwistedInterfaceTypes = []
+
+else:
+    # Force all Twisted interfaces to have an __adapt__ method
+    TwistedInterfaceClass.__adapt__ = property(lambda s: TwistedAdaptMethod(s))
+    TwistedInterfaceTypes = [TwistedInterfaceClass]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class TwistedInterfaceAsProtocol(object):
+
+    __slots__ = 'iface'
+
+    advise(
+        instancesProvide=[IOpenProtocol],
+        asAdapterForTypes=TwistedInterfaceTypes,
+    )
+
+
+    def __init__(self, iface, proto):
+        self.iface = iface
+
+    def __adapt__(self, obj):
+        return self.iface.__adapt__(obj)
+
+
+    def registerImplementation(self,klass,adapter=NO_ADAPTER_NEEDED,depth=1):
+
+        oldImplements = TwistedGetInterfaces(klass)
+
+        if adapter is NO_ADAPTER_NEEDED:
+            klass.__implements__ = self.iface, tuple(oldImplements)
+
+        elif adapter is DOES_NOT_SUPPORT:
+            if self.iface in oldImplements:
+                oldImplements.remove(self.iface)
+                klass.__implements__ = tuple(oldImplements)
+
+        else:
+            raise TypeError(
+                "Twisted interfaces can only declare support, not adapters",
+                self.iface, klass, adapter
+            )
+
+
+
+
+
+
+
+    def addImpliedProtocol(self, proto, adapter=NO_ADAPTER_NEEDED, depth=1):
+
+        iface = self.iface
+        self.iface.adaptWith(lambda o: adapter(o, iface), proto)
+
+        # XXX We can't notify others unless we have a registry in iface
+
+        # XXX Do we need to recurse, or is adding the protocol sufficient?
+
+        # XXX What are Twisted's adapter override semantics?
+        
+        # XXX Note that only implication between Twisted protocols is
+        # XXX supportable!
+
+
+    def registerObject(self, ob, adapter=NO_ADAPTER_NEEDED, depth=1):
+
+        oldImplements = TwistedGetInterfaces(ob)
+
+        if adapter is NO_ADAPTER_NEEDED:
+            ob.__implements__ = self.iface, tuple(oldImplements)
+
+        elif adapter is DOES_NOT_SUPPORT:
+            if self.iface in oldImplements:
+                oldImplements.remove(self.iface)
+                ob.__implements__ = tuple(oldImplements)
+
+        else:
+            raise TypeError(
+                "Twisted interfaces can only declare support, not adapters",
+                self.iface, ob, adapter
+            )
+        
+
+    def addImplicationListener(self, listener):
+        pass    # XXX We need a registry, since adaptation is possible
+
+
+
+
+
 # Monkeypatch Zope Interfaces
 
 def __adapt__(self, obj):
@@ -272,8 +436,6 @@ except ImportError:
 if ZopeInterface is not None:
 
     ZopeInterface.__class__.__adapt__ = __adapt__
-    ZopeInterface.__class__._doFlatten = staticmethod(ZopeFlatten)
-    ZopeInterface.__class__._doSetImplements = staticmethod(ZopeImplements)
     ZopeInterfaceTypes = [ZopeInterface.__class__]
 
     declareImplementation(
@@ -284,6 +446,8 @@ else:
     ZopeInterfaceTypes = []
 
 del ZopeInterface, __adapt__
+
+
 
 # Adapter for Zope X3 Interfaces
 
@@ -334,7 +498,7 @@ class ZopeInterfaceAsProtocol(object):
         )
 
 
-    def registerObject(ob,adapter=NO_ADAPTER_NEEDED):
+    def registerObject(self, ob, adapter=NO_ADAPTER_NEEDED, depth=1):
 
         if isinstance(ob,(type,ClassType)):
             ob.__class_implements__ = (
