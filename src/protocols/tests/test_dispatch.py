@@ -129,7 +129,8 @@ class TestTests(TestCase):
         d4 = {a0:ITest(LandVehicle), a1:ITest(LandVehicle)}
 
         for d in d1,d2,d3,d4:
-            self.assertEqual( dict(Signature(d.items()).items()), d )
+            self.assertEqual( dict(Signature(d.items()).items()),
+                dict([((k,v.dispatch_function),v) for k,v in d.items()]) )
 
         s1 = Signature(d1.items())
         s2 = Signature(d2.items())
@@ -160,7 +161,6 @@ class TestTests(TestCase):
         self.assertEqual( ordered_signatures([(s1,0),(s2,0)]),
             [[(s2,0)],[(s1,0)]]
         )
-
 
     def testMinMax(self):
         self.failUnless(Min < Max)
@@ -405,6 +405,88 @@ class TestTests(TestCase):
         self.failIf(greater(1,10))
         self.failIf(greater(1,1))
         self.failUnless(greater(2,1))
+
+
+
+    def testSignatureArithmetic(self):
+
+        x_gt_10 = Signature(x=Inequality('>',10))
+        x_lt_20 = Signature(x=Inequality('<',20))
+        y_in_LandVehicle = Signature(y=LandVehicle)
+        empty = Signature()
+
+        self.assertEqual((x_gt_10 & x_lt_20),
+            Signature(x=AndTest(Inequality('>',10),Inequality('<',20)))
+        )
+
+        self.assertEqual((x_gt_10 & y_in_LandVehicle),
+            Signature(x=Inequality('>',10),y=LandVehicle)
+        )
+
+        self.assertEqual((x_gt_10 & x_gt_10), x_gt_10)
+        self.assertEqual((x_gt_10 & empty), x_gt_10)
+        self.assertEqual((empty & x_gt_10), x_gt_10)
+
+        self.assertEqual((x_gt_10 | empty), empty)
+        self.assertEqual((empty | x_gt_10), empty)
+        self.assertEqual((x_gt_10 | x_lt_20),
+            Signature(x=OrTest(Inequality('>',10),Inequality('<',20)))
+        )
+        self.assertEqual((x_gt_10 | y_in_LandVehicle),
+            Predicate([x_gt_10,y_in_LandVehicle])
+        )
+
+        # sig | pred
+        self.assertEqual((x_gt_10 | Predicate([y_in_LandVehicle])),
+            Predicate([x_gt_10,y_in_LandVehicle])
+        )
+        # sig & pred
+        self.assertEqual((x_gt_10 & Predicate([y_in_LandVehicle])),
+            Predicate([x_gt_10 & y_in_LandVehicle])
+        )
+
+
+
+
+
+        # pred | pred
+        self.assertEqual((Predicate([x_gt_10]) | Predicate([y_in_LandVehicle])),
+            Predicate([x_gt_10, y_in_LandVehicle])
+        )
+
+        # pred & pred
+        self.assertEqual((Predicate([x_gt_10]) & Predicate([y_in_LandVehicle])),
+            Predicate([x_gt_10 & y_in_LandVehicle])
+        )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -693,21 +775,6 @@ class ExpressionTests(TestCase):
         self.failUnless(and_eq_None(1,None))
         self.failIf(and_eq_None(0,1))
         self.failIf(and_eq_None(1,0))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 class GenericTests(TestCase):

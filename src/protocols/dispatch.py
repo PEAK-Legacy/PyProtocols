@@ -170,7 +170,7 @@ class ISignature(Interface):
     """
 
     def items():
-        """Iterable of all '(id,test)' pairs for this signature"""
+        """Iterable of all '((id,disp_func),test)' pairs for this signature"""
 
     def get(expr_id):
         """Return this signature's 'ITest' for 'expr_id'"""
@@ -181,7 +181,6 @@ class ISignature(Interface):
 
 class IDispatchPredicate(Interface):
     """Sequence of signatures"""
-    protocols.advise(protocolIsSubsetOf = [protocols.sequenceOf(ISignature)])
 
 
 class IDispatchableExpression(Interface):
@@ -189,6 +188,7 @@ class IDispatchableExpression(Interface):
 
     def asFuncAndIds(generic):
         """Return '(func,idtuple)' pair for expression computation"""
+
 
 
 
@@ -314,11 +314,11 @@ class ClassTest(Adapter):
     def subscribe(self,listener): pass
     def unsubscribe(self,listener): pass
 
+    def __eq__(self,other):
+        return type(self) is type(other) and self.subject is other.subject
 
-
-
-
-
+    def __ne__(self,other):
+        return not self.__eq__(other)
 
 
 
@@ -1023,13 +1023,14 @@ class GenericFunction:
         return best_id, best_map, tuple(remaining_ids)
 
 
-    def _dispatch_id(self,expr,test):
+    def _dispatch_id(self,(expr,disp_func),test):
         """Replace expr/test with a local key"""
 
         test.subscribe(self)
-        dispid = self.getExpressionId(expr), test.dispatch_function
-        self.disp_indexes.setdefault(dispid,{})
-        return dispid
+        expr = self.getExpressionId(expr)
+        disp = expr, test.dispatch_function
+        self.disp_indexes.setdefault(disp,{})
+        return expr
 
 
     def getExpressionId(self,expr):
@@ -1049,7 +1050,6 @@ class GenericFunction:
                 self.expr_map[expr] = self.expr_map[expr_def] = expr_id
                 self.expr_defs.append(expr_def)
                 return expr_id
-
 
 
 

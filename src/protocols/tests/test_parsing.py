@@ -695,8 +695,49 @@ class ExprBuilderTests(TestCase):
 
 
 
+class PredicateTests(TestCase):
+
+    def testSimplePreds(self):
+
+        def defmethod(gf,cond,func):
+            namespaces = locals(),globals(),__builtins__
+            builder    = TestBuilder(gf.args,*namespaces)
+            gf.addMethod(parse_expr(cond,builder), func)
+
+        from protocols.dispatch import GenericFunction,Min,Max
+
+        classify = GenericFunction(args=['age'])
+        defmethod(classify,'not not age<2',  lambda age:"infant")
+        defmethod(classify,'age<13', lambda age:"preteen")
+        defmethod(classify,'age<5',  lambda age:"preschooler")
+        defmethod(classify,'age<20', lambda age:"teenager")
+        defmethod(classify,'not age<20',lambda age:"adult")
+        defmethod(classify,'age>=55',lambda age:"senior")
+        defmethod(classify,'age==16',lambda age:"sweet sixteen")
+
+        self.assertEqual(classify(25),"adult")
+        self.assertEqual(classify(17),"teenager")
+        self.assertEqual(classify(13),"teenager")
+        self.assertEqual(classify(12.99),"preteen")
+        self.assertEqual(classify(0),"infant")
+        self.assertEqual(classify(4),"preschooler")
+        self.assertEqual(classify(55),"senior")
+        self.assertEqual(classify(54.9),"adult")
+        self.assertEqual(classify(14.5),"teenager")
+        self.assertEqual(classify(16),"sweet sixteen")
+        self.assertEqual(classify(16.5),"teenager")
+        self.assertEqual(classify(99),"senior")
+        self.assertEqual(classify(Min),"infant")
+        self.assertEqual(classify(Max),"senior")
+
+
+
+
+
+
+
 TestClasses = (
-    EventTests, ExprBuilderTests,
+    EventTests, ExprBuilderTests, PredicateTests,
 )
 
 def test_suite():

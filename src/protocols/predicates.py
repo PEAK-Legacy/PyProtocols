@@ -6,7 +6,7 @@ __all__ = [
     'Call', 'Argument', 'Signature', 'PositionalSignature',
     'AndTest', 'OrTest', 'NotTest', 'TruthTest', 'ExprBuilder',
     'Const', 'Getattr', 'Tuple', 'Var', 'dispatch_by_truth',
-    'OrExpr', 'AndExpr',
+    'OrExpr', 'AndExpr', 'Predicate', 'TestBuilder',
 ]
 
 
@@ -29,10 +29,10 @@ def add_dict(d1,d2):
 
 
 # XXX Inequality needs to support is/in/not, including 'in typeOrProto'
-# XXX Need and/or of Predicate/Signature
 # XXX Order-preserving signatures
 # XXX Need ordering constraints
 # XXX var, let, ???
+
 
 
 
@@ -522,10 +522,10 @@ class Argument(ExprBase):
             return generic.argByPos(self.pos)
 
 
-
-
-
-
+    def __repr__(self):
+        if self.name:
+            return self.name
+        return 'Argument(%r)' % self.pos
 
 
 
@@ -535,20 +535,25 @@ class MultiTest(object):
     """Abstract base for boolean combinations of tests"""
 
     protocols.advise(instancesProvide=[ITest])
+    elim_single = True
 
-    def __init__(self,*tests):
+    def __new__(klass,*tests):
         tests, alltests = map(ITest,tests), []
         df = tests[0].dispatch_function
         for t in tests:
             if t.dispatch_function is not df:
                 raise ValueError("Mismatched dispatch types", tests)
-            # XXX don't insert duplicate tests
-            if t.__class__ is self.__class__:
-                alltests.extend(t.tests)    # flatten nested tests
-            else:
+            if t.__class__ is klass and klass.elim_single:
+                # flatten nested tests
+                alltests.extend([t for t in t.tests if t not in alltests])
+            elif t not in alltests:
                 alltests.append(t)
+        if klass.elim_single and len(alltests)==1:
+            return alltests[0]
+        self = object.__new__(klass)
         self.dispatch_function = df
         self.tests = tuple(alltests)
+        return self
 
     def seeds(self,table):
         seeds, mytable = {}, table.copy()
@@ -569,8 +574,6 @@ class MultiTest(object):
 
     def __contains__(self,key):
         raise NotImplementedError
-
-
 
     def __eq__(self,other):
         return other.__class__ is self.__class__ and self.tests==other.tests
@@ -601,7 +604,6 @@ class AndTest(MultiTest):
                 return False
         return True
 
-
 class OrTest(MultiTest):
     """At least one test must return true for expression"""
 
@@ -611,9 +613,9 @@ class OrTest(MultiTest):
                 return True
         return False
 
-
-
 class NotTest(MultiTest):
+
+    elim_single = False
 
     def __new__(klass, test):
         test = ITest(test)
@@ -625,7 +627,7 @@ class NotTest(MultiTest):
             return OrTest(*map(NotTest, test.tests))
         elif isinstance(test,TruthTest):
             return TruthTest(not test.truth)
-        return super(NotTest,klass).__new__(klass)
+        return super(NotTest,klass).__new__(klass,test)
 
     def __init__(self, test):
         test = self.test = ITest(test)
@@ -634,8 +636,6 @@ class NotTest(MultiTest):
 
     def __contains__(self,key):
         return key not in self.test
-
-
 
 
 
@@ -707,17 +707,18 @@ class TestBuilder:
     def mkOp(name):
         op = getattr(ExprBuilder,name)
         def method(self,*args):
+            print self,name,op
             return Signature([(op(self.expr_builder,*args), self.mode)])
         return method
 
     for opname in dir(ExprBuilder):
-        if opname[0]==opname[0].upper():
+        if opname[0].isalpha() and opname[0]==opname[0].upper():
             locals()[opname] = mkOp(opname)
 
     def Not(self,expr):
         try:
             self.__class__ = NotBuilder
-            return build(self.not_builder,expr)
+            return build(self,expr)
         finally:
             self.__class__ = TestBuilder
 
@@ -732,7 +733,6 @@ class TestBuilder:
             return Signature(
                 [(Call(self._cmp_ops[op], left, right), TruthTest(True))]
             )
-
 
 
 
@@ -784,7 +784,7 @@ class NotBuilder(TestBuilder):
     def Not(self,expr):
         try:
             self.__class__ = TestBuilder
-            return build(self.not_builder,expr)
+            return build(self,expr)
         finally:
             self.__class__ = NotBuilder
 
@@ -818,19 +818,69 @@ class NotBuilder(TestBuilder):
 
 
 
+class Predicate(object):
+    """A set of alternative signatures in disjunctive normal form"""
+
+    protocols.advise(
+        instancesProvide=[IDispatchPredicate],
+        asAdapterForProtocols = [protocols.sequenceOf(ISignature)],
+    )
+
+    def __init__(self,items):
+        self.items = all = []
+        for item in map(ISignature,items):
+            if item not in all:
+                all.append(item)
+
+    def __iter__(self):
+        return iter(self.items)
+
+    def __and__(self,other):
+        return Predicate([ (a & b) for a in self for b in other ])
+
+    def __or__(self,other):
+
+        sig = ISignature(other,None)
+
+        if sig is not None:
+            if len(self.items)==1:
+                return self.items[0] | sig
+            return Predicate(self.items+[sig])
+
+        return Predicate(list(self)+list(other))
+
+    def __eq__(self,other):
+        return self is other or self.items==list(other)
+
+    def __ne__(self,other):
+        return not self.__eq__(other)
+
+    def __repr__(self):
+        return `self.items`
+
+
+protocols.declareAdapter(
+    lambda ob: Predicate([ob]), [IDispatchPredicate], forProtocols=[ISignature]
+)
+
 class Signature(object):
 
-    """Simple 'ISignature' implementation"""
+    """A set of tests (in conjunctive normal form) applied to expressions"""
 
     protocols.advise(instancesProvide=[ISignature])
 
     __slots__ = 'data'
 
     def __init__(self, __id_to_test=(), **kw):
-        self.data = dict(__id_to_test)
-        if kw:
-            for k,v in kw.items():
-                self.data[Argument(name=k)] = ITest(v)
+        items = list(__id_to_test)+[(Argument(name=k),v) for k,v in kw.items()]
+        self.data = data = {}
+        for k,v in items:
+            v = ITest(v)
+            k = k,v.dispatch_function
+            if k in data:
+                data[k] = AndTest(data[k],v)
+            else:
+                data[k] = v
 
     def implies(self,otherSig):
         otherSig = ISignature(otherSig)
@@ -850,13 +900,70 @@ class Signature(object):
             [('%r=%r' % (k,v)) for k,v in self.data.items()]
         ),)
 
+    def __and__(self,other):
+        me = self.data.items()
+        if not me:
+            return other
+
+        if IDispatchPredicate(other) is other:
+            return Predicate([self]) & other
+
+        they = ISignature(other).items()
+        if not they:
+            return self
+
+        return Signature(
+            [(k,v) for (k,d),v in me] +[(k,v) for (k,d),v in they]
+        )
+
+
+    def __or__(self,other):
+
+        me = self.data.items()
+        if not me:
+            return self  # Always true
+
+        if IDispatchPredicate(other) is other:
+            return Predicate([self]) | other
+
+        they = ISignature(other).items()
+        if not they:
+            return other  # Always true
+
+        if len(me)==1 and len(they)==1 and me[0][0]==they[0][0]:
+            return Signature([
+                (me[0][0][0],
+                    OrTest(me[0][1],they[0][1])
+                )
+            ])
+        return Predicate([self,other])
 
 
 
 
+    def __eq__(self,other):
+
+        if other is self:
+            return True
+
+        other = ISignature(other,None)
+
+        if other is None or other is NullTest:
+            return False
+
+        for k,v in self.items():
+            if v!=other.get(k):
+                return False
+
+        for k,v in other.items():
+            if v!=self.get(k):
+                return False
+
+        return True
 
 
-
+    def __ne__(self,other):
+        return not self.__eq__(other)
 
 
 class PositionalSignature(Signature):
@@ -870,31 +977,6 @@ class PositionalSignature(Signature):
 
     def __init__(self,tests,proto=None):
         Signature.__init__(self, zip(map(Argument,range(len(tests))), tests))
-
-    def __repr__(self):
-        return 'PositionalSignature%r' % (tuple(
-            [`self.data[k]` for k in range(len(self.data))]
-        ),)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
