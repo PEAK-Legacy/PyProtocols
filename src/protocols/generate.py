@@ -24,6 +24,20 @@ class URIProtocol(Protocol):
     def __repr__(self):
         return "URIProtocol(%r)" % self.URI
 
+    def __reduce__(self):
+        return protocolForURI, (self.URI,)
+
+
+
+
+
+
+
+
+
+
+
+
 
 class TypeSubset(Protocol):
 
@@ -36,6 +50,33 @@ class TypeSubset(Protocol):
 
     def __repr__(self):
         return "TypeSubset(%r,%r)" % (self.baseType,self.methods)
+
+    def __reduce__(self):
+        return protocolForType, (self.baseType, self.methods, False)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -64,8 +105,8 @@ class WeakSubset(TypeSubset,object):
     def __repr__(self):
         return "WeakSubset(%r,%r)" % (self.baseType,self.methods)
 
-
-
+    def __reduce__(self):
+        return protocolForType, (self.baseType, self.methods, True)
 
 
 
@@ -91,6 +132,9 @@ class SequenceProtocol(Protocol):
     def __repr__(self):
         return "sequenceOf(%r)" % self.baseProtocol
 
+    def __reduce__(self):
+        return sequenceOf, (self.baseProtocol,)
+
 
 class IBasicSequence(Interface):
 
@@ -107,6 +151,17 @@ declareAdapter(
 )
 
 
+
+
+
+
+
+
+
+
+
+
+
 def ADAPT_SEQUENCE(ob, proto):
 
     """Convert iterable 'ob' into list of objects implementing 'proto'"""
@@ -120,6 +175,33 @@ def ADAPT_SEQUENCE(ob, proto):
             return None     # can't adapt unless all members adapt
         out.append(item)
     return out
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 __registryLock = allocate_lock()
 
