@@ -197,11 +197,11 @@ def advise(**kw):
     asAdapterForProtocols = kw.setdefault('asAdapterForProtocols',())
     protocolExtends = kw.setdefault('protocolExtends',())
     protocolIsSubsetOf = kw.setdefault('protocolIsSubsetOf',())
+    factoryMethod = kw.setdefault('factoryMethod',None)
 
     map(kw.__delitem__,"classProvides classDoesNotProvide instancesProvide"
         " instancesDoNotProvide asAdapterForTypes asAdapterForProtocols"
-        " protocolExtends protocolIsSubsetOf".split())
-
+        " protocolExtends protocolIsSubsetOf factoryMethod".split())
 
     for k in kw:
         raise TypeError(
@@ -226,8 +226,17 @@ def advise(**kw):
                     "When declaring an adapter, you must specify what"
                     " its instances will provide."
                 )
-            declareAdapter(klass, instancesProvide,
+            if factoryMethod:
+                factory = getattr(klass,factoryMethod)
+            else:
+                factory = klass
+
+            declareAdapter(factory, instancesProvide,
                 forTypes=asAdapterForTypes, forProtocols=asAdapterForProtocols
+            )
+        elif factoryMethod:
+            raise TypeError(
+                "'factoryMethod' is only used when declaring an adapter type"
             )
 
         if protocolExtends:
@@ -243,4 +252,36 @@ def advise(**kw):
         return klass
 
     addClassAdvisor(callback)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
