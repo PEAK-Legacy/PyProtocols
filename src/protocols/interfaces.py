@@ -188,9 +188,7 @@ class Protocol:
         pass
     __adapt__ = metamethod(__adapt__)
 
-
     def addImplicationListener(self, listener):
-
         self.__lock.acquire()
 
         try:
@@ -202,6 +200,8 @@ class Protocol:
 
         finally:
             self.__lock.release()
+
+    addImplicationListener = metamethod(addImplicationListener)
 
 class InterfaceClass(Protocol, type):
 
