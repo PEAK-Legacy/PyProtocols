@@ -148,14 +148,14 @@ class APITests(TestCase):
         a = I(t)
         assert adapt(t, I) is a
         assert a.subject is t
-        assert a.protocol is I
 
         n = T()
         a2 = I(n)
         assert a2 is not a
         assert a2.subject is n
-        assert a2.protocol is I
         assert adapt(n, I) is a2
+
+
 
 
 

@@ -53,20 +53,20 @@ class StickyAdapter(object):
 
     attachForProtocols = ()
 
-    def __init__(self, ob, proto):
+    def __init__(self, ob):
 
         self.subject = ob
-        self.protocol = proto
 
         # Declare this instance as a per-instance adaptation for the
-        # given protocol
+        # given protocols
 
         provides = list(self.attachForProtocols)
-        if proto is not None and proto not in provides:
-            provides.append(proto)
 
         from protocols.api import declareAdapter
         declareAdapter(lambda s: self, provides, forObjects=[ob])
+
+
+
 
 
 

@@ -543,9 +543,9 @@ class ProtocolTest(StickyAdapter):
     attachForProtocols = (ITest,)
     dispatch_function  = staticmethod(dispatch_by_mro)
 
-    def __init__(self,ob,proto=None):
+    def __init__(self,ob):
         self.notifier = _Notifier(ob)
-        StickyAdapter.__init__(self,ob,proto)
+        StickyAdapter.__init__(self,ob)
 
     def subscribe(self,listener):
         self.notifier.subscribe(listener)

@@ -51,8 +51,8 @@ class ZopeInterfaceAsProtocol(StickyAdapter, Protocol):
     attachToProtocols = IOpenProtocol,
 
 
-    def __init__(self, ob, proto):
-        StickyAdapter.__init__(self,ob,proto)
+    def __init__(self, ob):
+        StickyAdapter.__init__(self,ob)
         Protocol.__init__(self)
 
 

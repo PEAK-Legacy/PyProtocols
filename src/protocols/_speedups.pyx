@@ -121,7 +121,7 @@ cdef class metamethod:
 
 
 
-cdef object _adapt(obj, protocol, default, factory):
+cdef object _adapt(obj, protocol, default):
 
     # We use nested 'if' blocks here because using 'and' causes Pyrex to
     # convert the return values to Python ints, and then back to booleans!
@@ -180,27 +180,27 @@ cdef object _adapt(obj, protocol, default, factory):
         raise
 
     if default is _marker:
-        if factory is not _marker:
-            from warnings import warn
-            warn("The 'factory' argument to 'adapt()' will be removed in 1.0",
-                DeprecationWarning, 1)
-            return factory(obj, protocol)
         raise AdaptationFailure("Can't adapt", obj, protocol)
 
     return default
 
 
-def adapt(obj, protocol, default=_marker, factory=_marker):
+def adapt(obj, protocol, default=_marker):
     """PEP 246-alike: Adapt 'obj' to 'protocol', return 'default'
 
     If 'default' is not supplied and no implementation is found,
     raise 'AdaptationFailure'."""
 
-    return _adapt(obj,protocol,default,factory)
+    return _adapt(obj,protocol,default)
 
 def Protocol__call__(self, ob, default=_marker):
     """Adapt to this protocol"""
-    return _adapt(ob,self,default,_marker)
+    return _adapt(ob,self,default)
+
+
+
+
+
 
 
 cdef buildClassicMRO(PyClassObject *cls, PyListObject *list):

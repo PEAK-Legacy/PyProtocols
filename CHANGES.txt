@@ -1,3 +1,23 @@
+Fixes and changes since PyProtocols 0.9.3
+
+ - There is a new 'protocols.advice.add_assignment_advisor' function that
+   allows you to implement PEP 318-like decorators in Python 2.2 and 2.3.
+   There is also a convenience function, 'as', that lets you use PEP 318-style
+   decorators directly.  (DOCS NEEDED)
+
+ - 'StickyAdapter' is now a one-argument adapter factory; as a result, the
+   'protocol' attribute is now completely gone, and you *must* use the
+   'attachForProtocols' attribute in order to get any actual "stickiness".
+   See the reference manual for details on the 'attachForProtocols' attribute.
+
+ - 'adapt()' no longer supports the 'factory' argument that was deprecated in
+   0.9.3.
+
+ - Using two-argument adapter factories now produces a DeprecationWarning;
+   please update your code, since support for them will be gone entirely in
+   version 1.1.
+
+
 Fixes and changes since PyProtocols 0.9.2
 
  - Adapter factories are now only called with one argument: the object to

@@ -1,13 +1,12 @@
-Upgrading to PyProtocols 0.9.3
+Upgrading from older versions of PyProtocols
 
  Due to some features added in PyProtocols 0.9.3, some programs may have
  compatibility issues upon upgrading.  The changes affect only a handful of
  features that are very infrequently used, so if you don't know what the
  following features are, you have nothing to worry about:
 
- * The 'protocol' attribute of 'Adapter' and 'StickyAdapter' objects is now
-   deprecated, and a 'DeprecationWarning' will be issued whenever the attribute
-   is read.
+ * The 'protocol' attribute of 'Adapter' and 'StickyAdapter' objects was
+   deprecated in 0.9.3, and removed in 1.0a0.
 
  * If you use the "ABC" (abstract base class) style of interfaces, you *must*
    define an __init__ method in either the ABC itself, or in any of its
@@ -21,26 +20,13 @@ Upgrading to PyProtocols 0.9.3
    adapt.  For backward compatibility, any adapter factories that require
    more than one argument are wrapped in a converter.  It's highly recommended
    that you transition to one-argument adapters as soon as practical, since
-   using two-argument adapters will cause deprecation warnings in PyProtocols
-   version 1.0  (and they cause PendingDeprecationWarnings in 0.9.3).  This
+   using two-argument adapter factories is deprecated and will cause
+   deprecation warnings to appear on 'sys.stderr' at runtime.  (And, by version
+   1.1, support for two-argument adapters will be removed completely.)  This
    change was made for symmetry with Zope and Twisted adapters, as well as
    Pythonic adapter factories like 'int'.
 
-
-Preparing for PyProtocols 1.0
-
- In addition to accomodating the changes above, you might also want to look at
- the following items which will be affected in PyProtocols 1.0:
- 
- * 'StickyAdapter' subclasses should define an 'attachForProtocols' attribute,
-   or they will stop working correctly in 1.0.  See the reference manual
+ * 'StickyAdapter' subclasses must define an 'attachForProtocols' attribute,
+   or they will stop working correctly.  See the reference manual
    for details on the 'attachForProtocols' attribute.
-
- * Don't use the 'factory' parameter to 'adapt()'; it'll be gone in 1.0.
-
- * Don't use the 'protocol' attribute of 'Adapter' and 'StickyAdapter' objects,
-   as the attribute will be gone in 1.0.
-
- * Don't use two-argument adapter functions: they'll be fully deprecated in 1.0
-   and gone by 1.1.
 
