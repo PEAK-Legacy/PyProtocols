@@ -4,6 +4,7 @@ from unittest import TestCase, makeSuite, TestSuite
 from protocols.ast_builder import *
 
 class StringBuilder:
+
     """Simple parse event receiver to test the AST build functions"""
 
     def Name(self,name):
@@ -27,16 +28,15 @@ class StringBuilder:
             '%s:%s' % (build(self,k),build(self,v)) for k,v in items
         ])
 
-    def CallFunc(self, func, args, kw, star_node, dstar_node):
-        return 'Call(%s,%s,%s,%s,%s)' % (
-            build(self,func), self.Tuple(args), self.Dict(kw),
-            `star_node`, `dstar_node`
-        )
-
     def Sliceobj(self,start,stop,stride):
         return 'Sliceobj(%s,%s,%s)' % (
             build(self,start),build(self,stop),build(self,stride)
         )
+
+
+
+
+
 
 
     def mkBinOp(op):
@@ -80,41 +80,82 @@ class StringBuilder:
     Subscript  = mkBinOp('Getitem')
 
 
+    def CallFunc(self, func, args, kw, star_node, dstar_node):
+        if star_node:
+            star_node=build(self,star_node)
+        else:
+            star_node = 'None'
+        if dstar_node:
+            dstar_node=build(self,dstar_node)
+        else:
+            dstar_node = 'None'
+        return 'Call(%s,%s,%s,%s,%s)' % (
+            build(self,func),self.Tuple(args),self.Dict(kw),star_node,dstar_node
+        )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 sb = StringBuilder()
+pe = lambda s: parse_expr(s,sb)
 
 class EventTests(TestCase):
 
     """Test that AST builder supports all syntax and issues correct events"""
 
     def testTokens(self):
-        self.assertEqual(parse_expr("a",sb), "a")
-        self.assertEqual(parse_expr("b",sb), "b")
-        self.assertEqual(parse_expr("123",sb), "123")
-        self.assertEqual(parse_expr("'xyz'",sb), "'xyz'")
-        self.assertEqual(parse_expr("'abc' 'xyz'",sb), "'abcxyz'")
+        self.assertEqual(pe("a"), "a")
+        self.assertEqual(pe("b"), "b")
+        self.assertEqual(pe("123"), "123")
+        self.assertEqual(pe("'xyz'"), "'xyz'")
+        self.assertEqual(pe("'abc' 'xyz'"), "'abcxyz'")
 
     def testSimpleBinaries(self):
-        self.assertEqual(parse_expr("a+b",sb), "Add(a,b)")
-        self.assertEqual(parse_expr("b-a",sb), "Sub(b,a)")
-        self.assertEqual(parse_expr("c*d",sb), "Mul(c,d)")
-        self.assertEqual(parse_expr("c/d",sb), "Div(c,d)")
-        self.assertEqual(parse_expr("c%d",sb), "Mod(c,d)")
-        self.assertEqual(parse_expr("c//d",sb), "FloorDiv(c,d)")
-        self.assertEqual(parse_expr("a<<b",sb), "LeftShift(a,b)")
-        self.assertEqual(parse_expr("a>>b",sb), "RightShift(a,b)")
-        self.assertEqual(parse_expr("a**b",sb), "Power(a,b)")
-        self.assertEqual(parse_expr("a.b",sb),  "Getattr(a,'b')")
-        self.assertEqual(parse_expr("a|b",sb),  "Bitor(a,b)")
-        self.assertEqual(parse_expr("a&b",sb),  "Bitand(a,b)")
-        self.assertEqual(parse_expr("a^b",sb),  "Bitxor(a,b)")
+        self.assertEqual(pe("a+b"), "Add(a,b)")
+        self.assertEqual(pe("b-a"), "Sub(b,a)")
+        self.assertEqual(pe("c*d"), "Mul(c,d)")
+        self.assertEqual(pe("c/d"), "Div(c,d)")
+        self.assertEqual(pe("c%d"), "Mod(c,d)")
+        self.assertEqual(pe("c//d"), "FloorDiv(c,d)")
+        self.assertEqual(pe("a<<b"), "LeftShift(a,b)")
+        self.assertEqual(pe("a>>b"), "RightShift(a,b)")
+        self.assertEqual(pe("a**b"), "Power(a,b)")
+        self.assertEqual(pe("a.b"),  "Getattr(a,'b')")
+        self.assertEqual(pe("a|b"),  "Bitor(a,b)")
+        self.assertEqual(pe("a&b"),  "Bitand(a,b)")
+        self.assertEqual(pe("a^b"),  "Bitxor(a,b)")
 
     def testSimpleUnaries(self):
-        self.assertEqual(parse_expr("~a",sb), "Invert(a)")
-        self.assertEqual(parse_expr("+a",sb), "Plus(a)")
-        self.assertEqual(parse_expr("-a",sb), "Minus(a)")
-        self.assertEqual(parse_expr("not a",sb), "Not(a)")
-        self.assertEqual(parse_expr("`a`",sb), "repr(a)")
-
+        self.assertEqual(pe("~a"), "Invert(a)")
+        self.assertEqual(pe("+a"), "Plus(a)")
+        self.assertEqual(pe("-a"), "Minus(a)")
+        self.assertEqual(pe("not a"), "Not(a)")
+        self.assertEqual(pe("`a`"), "repr(a)")
 
 
 
@@ -122,38 +163,120 @@ class EventTests(TestCase):
 
 
     def testSequences(self):
-        self.assertEqual(parse_expr("a,",sb), "Tuple(a)")
-        self.assertEqual(parse_expr("a,b",sb), "Tuple(a,b)")
-        self.assertEqual(parse_expr("a,b,c",sb), "Tuple(a,b,c)")
-        self.assertEqual(parse_expr("a,b,c,",sb), "Tuple(a,b,c)")
+        self.assertEqual(pe("a,"), "Tuple(a)")
+        self.assertEqual(pe("a,b"), "Tuple(a,b)")
+        self.assertEqual(pe("a,b,c"), "Tuple(a,b,c)")
+        self.assertEqual(pe("a,b,c,"), "Tuple(a,b,c)")
 
-        self.assertEqual(parse_expr("()",sb), "Tuple()")
-        self.assertEqual(parse_expr("(a)",sb), "a")
-        self.assertEqual(parse_expr("(a,)",sb), "Tuple(a)")
-        self.assertEqual(parse_expr("(a,b)",sb), "Tuple(a,b)")
-        self.assertEqual(parse_expr("(a,b,)",sb), "Tuple(a,b)")
-        self.assertEqual(parse_expr("(a,b,c)",sb), "Tuple(a,b,c)")
-        self.assertEqual(parse_expr("(a,b,c,)",sb), "Tuple(a,b,c)")
+        self.assertEqual(pe("()"), "Tuple()")
+        self.assertEqual(pe("(a)"), "a")
+        self.assertEqual(pe("(a,)"), "Tuple(a)")
+        self.assertEqual(pe("(a,b)"), "Tuple(a,b)")
+        self.assertEqual(pe("(a,b,)"), "Tuple(a,b)")
+        self.assertEqual(pe("(a,b,c)"), "Tuple(a,b,c)")
+        self.assertEqual(pe("(a,b,c,)"), "Tuple(a,b,c)")
 
-        self.assertEqual(parse_expr("[]",sb), "List()")
-        self.assertEqual(parse_expr("[a]",sb), "List(a)")
-        self.assertEqual(parse_expr("[a,]",sb), "List(a)")
-        self.assertEqual(parse_expr("[a,b]",sb), "List(a,b)")
-        self.assertEqual(parse_expr("[a,b,]",sb), "List(a,b)")
-        self.assertEqual(parse_expr("[a,b,c]",sb), "List(a,b,c)")
-        self.assertEqual(parse_expr("[a,b,c,]",sb), "List(a,b,c)")
+        self.assertEqual(pe("[]"), "List()")
+        self.assertEqual(pe("[a]"), "List(a)")
+        self.assertEqual(pe("[a,]"), "List(a)")
+        self.assertEqual(pe("[a,b]"), "List(a,b)")
+        self.assertEqual(pe("[a,b,]"), "List(a,b)")
+        self.assertEqual(pe("[a,b,c]"), "List(a,b,c)")
+        self.assertEqual(pe("[a,b,c,]"), "List(a,b,c)")
 
-        self.assertEqual(parse_expr("{}",sb), "{}")
-        self.assertEqual(parse_expr("{a:b}",sb), "{a:b}")
-        self.assertEqual(parse_expr("{a:b,}",sb), "{a:b}")
-        self.assertEqual(parse_expr("{a:b,c:d}",sb), "{a:b,c:d}")
-        self.assertEqual(parse_expr("{a:b,c:d,1:2}",sb), "{a:b,c:d,1:2}")
-        self.assertEqual(parse_expr("{a:b,c:d,1:2,}",sb), "{a:b,c:d,1:2}")
+        self.assertEqual(pe("{}"), "{}")
+        self.assertEqual(pe("{a:b}"), "{a:b}")
+        self.assertEqual(pe("{a:b,}"), "{a:b}")
+        self.assertEqual(pe("{a:b,c:d}"), "{a:b,c:d}")
+        self.assertEqual(pe("{a:b,c:d,1:2}"), "{a:b,c:d,1:2}")
+        self.assertEqual(pe("{a:b,c:d,1:2,}"), "{a:b,c:d,1:2}")
 
         self.assertEqual(
-            parse_expr("{(a,b):c+d,e:[f,g]}",sb),
+            pe("{(a,b):c+d,e:[f,g]}"),
             "{Tuple(a,b):Add(c,d),e:List(f,g)}"
         )
+
+
+
+
+
+
+
+
+    def testCalls(self):
+
+        self.assertEqual(pe("a()"),    "Call(a,Tuple(),{},None,None)")
+        self.assertEqual(pe("a(1,2)"), "Call(a,Tuple(1,2),{},None,None)")
+        self.assertEqual(pe("a(1,2,)"), "Call(a,Tuple(1,2),{},None,None)")
+        self.assertEqual(pe("a(b=3)"), "Call(a,Tuple(),{'b':3},None,None)")
+        self.assertEqual(pe("a(1,2,b=3)"),
+            "Call(a,Tuple(1,2),{'b':3},None,None)"
+        )
+
+        self.assertEqual(pe("a(*x)"),    "Call(a,Tuple(),{},x,None)")
+        self.assertEqual(pe("a(1,*x)"),    "Call(a,Tuple(1),{},x,None)")
+        self.assertEqual(pe("a(b=3,*x)"), "Call(a,Tuple(),{'b':3},x,None)")
+        self.assertEqual(pe("a(1,2,b=3,*x)"),
+            "Call(a,Tuple(1,2),{'b':3},x,None)"
+        )
+
+        self.assertEqual(pe("a(**y)"),    "Call(a,Tuple(),{},None,y)")
+        self.assertEqual(pe("a(1,**y)"),    "Call(a,Tuple(1),{},None,y)")
+        self.assertEqual(pe("a(b=3,**y)"), "Call(a,Tuple(),{'b':3},None,y)")
+        self.assertEqual(pe("a(1,2,b=3,**y)"),
+            "Call(a,Tuple(1,2),{'b':3},None,y)"
+        )
+
+        self.assertEqual(pe("a(*x,**y)"),    "Call(a,Tuple(),{},x,y)")
+        self.assertEqual(pe("a(1,*x,**y)"),    "Call(a,Tuple(1),{},x,y)")
+        self.assertEqual(pe("a(b=3,*x,**y)"), "Call(a,Tuple(),{'b':3},x,y)")
+        self.assertEqual(pe("a(1,2,b=3,*x,**y)"),
+            "Call(a,Tuple(1,2),{'b':3},x,y)"
+        )
+
+        self.assertRaises(SyntaxError, pe, "a(1=2)")    # expr as kw
+        self.assertRaises(SyntaxError, pe, "a(b=2,c)")  # kw before positional
+
+
+
+
+
+
+
+
+    def testSubscripts(self):
+        self.assertEqual(pe("a[1]"),   "Getitem(a,1)")
+        self.assertEqual(pe("a[2,3]"), "Getitem(a,Tuple(2,3))")
+        self.assertEqual(pe("a[...]"), "Getitem(a,Ellipsis)")
+
+        # 2-element slices (getslice)
+        self.assertEqual(pe("a[:]"),   "Getitem(a,Slice(None,None))")
+        self.assertEqual(pe("a[1:2]"), "Getitem(a,Slice(1,2))")
+        self.assertEqual(pe("a[1:]"),  "Getitem(a,Slice(1,None))")
+        self.assertEqual(pe("a[:2]"),  "Getitem(a,Slice(None,2))")
+
+        # 3-part slice objects (getitem(slice())
+        self.assertEqual(pe("a[::]"),   "Getitem(a,Sliceobj(None,None,None))")
+        self.assertEqual(pe("a[1::]"),  "Getitem(a,Sliceobj(1,None,None))")
+        self.assertEqual(pe("a[:2:]"),  "Getitem(a,Sliceobj(None,2,None))")
+        self.assertEqual(pe("a[1:2:]"), "Getitem(a,Sliceobj(1,2,None))")
+        self.assertEqual(pe("a[::3]"),  "Getitem(a,Sliceobj(None,None,3))")
+        self.assertEqual(pe("a[1::3]"), "Getitem(a,Sliceobj(1,None,3))")
+        self.assertEqual(pe("a[:2:3]"), "Getitem(a,Sliceobj(None,2,3))")
+        self.assertEqual(pe("a[1:2:3]"),"Getitem(a,Sliceobj(1,2,3))")
+
+
+    # TODO: and, or, associativity, comparisons
+
+
+
+
+
+
+
+
+
+
 
 
 

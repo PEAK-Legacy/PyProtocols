@@ -22,8 +22,6 @@ for tok in tok_name:
 
 
 ops = {
-    # Note: these ops may receive a left-hand argument that is already
-    # processed, and should not have 'build' re-called on them.
     token.LEFTSHIFT: 'LeftShift',
     token.RIGHTSHIFT: 'RightShift',
     token.PLUS: 'Add',
@@ -39,6 +37,8 @@ def left_assoc(builder, nodelist):
 
 
 
+
+
 def curry(f,*args):
     for arg in args:
         f = instancemethod(f,arg,type(arg))
@@ -50,8 +50,15 @@ def com_binary(opname, builder,nodelist):
     items = [nodelist[i] for i in range(1,len(nodelist),2)]
     return getattr(builder,opname)(items)
 
-# testlist: expr (',' expr)* [',']
-testlist = curry(com_binary, 'Tuple')
+# testlist: test (',' test)* [',']
+# subscriptlist: subscript (',' subscript)* [',']
+testlist = subscriptlist = curry(com_binary, 'Tuple')
+
+'''# test: and_test ('or' and_test)* | lambdef
+test = curry(com_binary, 'Or')
+
+# and_test: not_test ('and' not_test)*
+and_test = curry(com_binary, 'And')'''
 
 # not_test: 'not' not_test | comparison
 def not_test(builder, nodelist):
@@ -67,16 +74,9 @@ xor_expr = curry(com_binary, 'Bitxor')
 and_expr = curry(com_binary, 'Bitand')
 
 # shift_expr: arith_expr ('<<'|'>>' arith_expr)*
-shift_expr = left_assoc
-
 # arith_expr: term (('+'|'-') term)*
-arith_expr = left_assoc
-
 # term: factor (('*'|'/'|'%'|'//') factor)*
-term = left_assoc
-
-
-
+shift_expr = arith_expr = term = left_assoc
 
 
 
@@ -121,8 +121,9 @@ def factor(builder, nodelist):
 
 
 
+# power: atom trailer* ['**' factor]
+
 def power(builder, nodelist):
-    # power: atom trailer* ['**' factor]
     if nodelist[-2][0]==token.DOUBLESTAR:
         return builder.Power(nodelist[:-2], nodelist[-1])
 
@@ -130,28 +131,27 @@ def power(builder, nodelist):
     nodelist = nodelist[:-1]
     t = node[1][0]
 
-    #if t == token.LPAR:
-    #    return com_call_function(builder,nodelist,node[2])
-    if t == token.DOT:
+    if t == token.LPAR:
+        return com_call_function(builder,nodelist,node[2])
+    elif t == token.DOT:
         return builder.Getattr(nodelist, node[2][1])
-    '''elif t == token.LSQB:
+    elif t == token.LSQB:
         item = node[2]
 
         while len(item)==2:
             item = item[1]
 
         if item[0]==token.COLON:
+            lineno = item[2]
             return builder.Subscript(nodelist,
                 (symbol.subscript,
-                    (token.STRING,'None'),item,(token.STRING,'None')
+                    (token.STRING,'None',lineno),item,(token.STRING,'None',lineno)
                 )
             )
 
-        return builder.Subscript(nodelist, item)'''
+        return builder.Subscript(nodelist, item)
 
     raise AssertionError("Unknown power", nodelist)
-
-
 
 
 
@@ -203,6 +203,67 @@ def atom(builder, nodelist):
 
 
 
+# arglist: (argument ',')* (argument [',']| '*' test [',' '**' test] | '**' test)
+
+def com_call_function(builder, primaryNode, nodelist):
+    if nodelist[0] == token.RPAR:
+        return builder.CallFunc(primaryNode,(),(),None,None)
+
+    args = []; kw = []
+    len_nodelist = len(nodelist)
+    for i in range(1, len_nodelist, 2):
+        node = nodelist[i]
+        if node[0] == token.STAR or node[0] == token.DOUBLESTAR:
+            break
+        iskw, result = com_argument(node, kw)
+        if iskw:
+            kw.append(result)
+        else:
+            args.append(result)
+    else:
+        # No broken by star arg, so skip the last one we processed.
+        i = i + 1
+
+    if i < len_nodelist and nodelist[i][0] == token.COMMA:
+        # need to accept an application that looks like "f(a, b,)"
+        i = i + 1
+
+    star_node = dstar_node = None
+    while i < len_nodelist:
+        tok = nodelist[i]
+        ch = nodelist[i+1]
+        i = i + 3
+        if tok[0]==token.STAR:
+            star_node = ch
+        elif tok[0]==token.DOUBLESTAR:
+            dstar_node = ch
+        else:
+            raise AssertionError, 'unknown node type: %s' % (tok,)
+
+    return builder.CallFunc(primaryNode, args, kw, star_node, dstar_node)
+
+
+
+# argument: [test '='] test [gen_for]  (Really [keyword '='] test)
+
+def com_argument(nodelist, kw):
+
+    # XXX Python 2.4 needs genexp handling here
+
+    if len(nodelist) == 2:
+        if kw:
+            raise SyntaxError, "non-keyword arg after keyword arg"
+        return 0, nodelist[1]
+
+    n = nodelist[1]
+    while len(n) == 2 and n[0] != token.NAME:
+        n = n[1]
+    if n[0] != token.NAME:
+        raise SyntaxError, "keyword can't be an expression (%r)" % (n,)
+
+    return 1, ((token.STRING,`n[1]`,n[2]), nodelist[3])
+
+
 # listmaker: test ( list_for | (',' test)* [','] )
 
 def listmaker(builder, nodelist):
@@ -224,23 +285,44 @@ def listmaker(builder, nodelist):
 
 
 
+# subscript: '.' '.' '.' | test | [test] ':' [test] [sliceop]
+# sliceop: ':' [test]
 
+def subscript(builder, nodelist):
+    if nodelist[1][0]==token.DOT:
+        return builder.Const(Ellipsis)
 
+    have_stride = nodelist[-1][0]==symbol.sliceop
+    item = nodelist
+    while type(item[1]) is tuple: item=item[1]                  # find a token
+    start = stop = stride = (token.STRING, 'None', item[-1])    # use its line#
+    nl = len(nodelist)
 
+    if nl==5:
+        start,stop = nodelist[1],nodelist[3]        # test : test sliceop
+    elif nl==4:
+        if nodelist[1][0]==token.COLON:             #   : test sliceop
+            stop = nodelist[2]
+        elif have_stride:                           # test :   sliceop
+            start = nodelist[1]
+        else:
+            start, stop = nodelist[1], nodelist[3]  # test : test
+    elif nl==3:
+        if nodelist[1][0]==token.COLON:
+            if not have_stride:
+                stop = nodelist[2]      # : test
+        else:
+            start = nodelist[1]         # test :
 
+    else:
+        raise AssertionError("Unrecognized subscript", nodelist)
 
+    if have_stride:
+        if len(nodelist[-1])==3:
+            stride = nodelist[-1][2]
+        return builder.Sliceobj(start,stop,stride)
 
-
-
-
-
-
-
-
-
-
-
-
+    return builder.Slice(start,stop)
 
 
 
