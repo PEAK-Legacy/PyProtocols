@@ -136,7 +136,7 @@ class FrameInfoTest(TestCase):
     def checkClassInfo(self):
         kind,module,f_locals,f_globals = self.classLevelFrameInfo
         assert kind=="class"
-        assert f_locals is self.__class__.__dict__  # ???
+        assert f_locals['classLevelFrameInfo'] is self.classLevelFrameInfo
         for d in module.__dict__, f_globals:
             assert d is globals()
 
