@@ -6,8 +6,8 @@ from setuptools import setup, Feature, Extension, find_packages
 
 # Metadata
 PACKAGE_NAME = "PyProtocols"
-PACKAGE_VERSION = "0.9.3"
-HAPPYDOC_IGNORE = ['-i', 'tests', '-i', 'setup']
+PACKAGE_VERSION = "0.9.3rc1"
+HAPPYDOC_IGNORE = ['-i', 'tests', '-i', 'setup', '-i', 'setuptools']
 
 execfile('src/setup/common.py')
 

@@ -293,7 +293,11 @@ class InterfaceClass(AbstractBaseMeta):
     subclass from 'AbstractBase' or 'Interface' instead.)
     """
 
-    __call__ = Protocol.__call__
+    def __call__(self, *__args, **__kw):
+        if self.__init__ is Interface.__init__:
+            return Protocol.__call__(self,*__args, **__kw)
+        else:
+            return type.__call__(self,*__args, **__kw)
 
     def getBases(self):
         return [
@@ -304,10 +308,6 @@ class InterfaceClass(AbstractBaseMeta):
 
 class Interface(object):
     __metaclass__ = InterfaceClass
-
-
-
-
 
 
 

@@ -33,7 +33,8 @@ Fixes and changes since PyProtocols 0.9.2
    interface may contain implementation code, and can be subclassed to create
    concrete implementations.  In previous versions, you could use 'Interface'
    as such a base class, but now calling an 'Interface' object performs
-   adaptation, rather than instantiation.
+   adaptation rather than instantiation, unless the subclass redefines
+   '__init__'.
 
  - 'Protocol' instances (except for 'AbstractBase' subclasses) are now callable
    with a signature similar to 'adapt()'.  E.g. 'ISomething(foo,*args)' is

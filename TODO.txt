@@ -1,8 +1,5 @@
 Items needing investigation or implementation for PyProtocols 1.0
 
- * Release 0.9.3, after testing against the latest Zope X3 and updating docs
-   to reflect what version of Zope X3 is supported/tested.
-
  * Fully drop the 'factory' argument to 'adapt', and upgrade the two-argument
    adapter warning to a DeprecationWarning (for complete removal in 1.1).
 

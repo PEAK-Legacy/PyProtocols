@@ -1,4 +1,4 @@
-PyProtocols Release 0.9.3
+PyProtocols Release 0.9.3 (release candidate 1)
 
  Copyright (C) 2003 by Phillip J. Eby.  All rights reserved.  This software may
  be used under the same terms as Zope or Python.  THERE ARE ABSOLUTELY NO
@@ -52,14 +52,18 @@ PyProtocols Release 0.9.3
 
  Version 0.9.3 Release Notes
 
-    This version is a complete, working release, so you can download it and
-    try it out.  But, the exact spellings of the API and other interfaces
-    may be subject to change.  We would like feedback from the community on
-    the current API, as some API names may not be clear or obvious yet.
-    Please contact the author with your input.
+    For **important** notes on upgrading from previous releases, and
+    information about changes coming in 1.0, please see the UPGRADING.txt file.
+    For the complete list of changes from 0.9.2, please see the CHANGES.txt
+    file.
+
+    Note that the 0.9.x release series is now in "maintenance mode", and no
+    new features will be added in future 0.9.x releases.  From now on, new
+    features will only be added to the 1.x releases, beginning with 1.0a1
+    later this year.
 
     If you'd like to use Zope interfaces with PyProtocols, you must
-    use Zope X3 Milestone 4 or later, as PyProtocols' Zope support uses
+    use Zope X3 beta 1 or later, as PyProtocols' Zope support uses
     the latest Zope interface declaration API.
 
     If you'd like to use Twisted interfaces with PyProtocols, you must use
