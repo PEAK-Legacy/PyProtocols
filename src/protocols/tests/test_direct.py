@@ -124,13 +124,20 @@ class AdviseMixinMultiMeta2(ClassChecks):
 class InstanceTestsBase(BasicChecks, InstanceConformChecks): pass
 class ClassTestsBase(ClassChecks, ClassConformChecks): pass
 
+class Picklable:
+    # Pickling needs classes in top-level namespace
+    pass
+
+class NewStyle(object):
+    pass
+
 TestClasses = (
     AdviseMixinInstance, AdviseMixinClass, AdviseMixinMultiMeta1,
     AdviseMixinMultiMeta2
 )
 
 TestClasses += makeClassProvidesTests(ClassTestsBase)
-TestClasses += makeInstanceTests(InstanceTestsBase)
+TestClasses += makeInstanceTests(InstanceTestsBase,Picklable,NewStyle)
 
 def test_suite():
     return TestSuite([makeSuite(t,'check') for t in TestClasses])

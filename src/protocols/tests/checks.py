@@ -30,12 +30,12 @@ class IPure(Interface):
     # registered with them won't be picklable
     pass
 
-class Picklable:
-    # Pickling needs classes in top-level namespace
-    pass
 
-class NewStyle(object):
-    pass
+
+
+
+
+
 
 
 
@@ -49,8 +49,6 @@ class TestBase(TestCase):
     a1 = staticmethod(a1)
     a2 = staticmethod(a2)
     IPure = IPure
-    Picklable = Picklable
-    NewStyle = NewStyle
 
     def assertObProvidesOnlyA(self):
         assert adapt(self.ob, self.IA, None) is self.ob
@@ -75,6 +73,8 @@ class TestBase(TestCase):
     def make(self,klass):
         # This is overridden by tests where 'klass' is a metaclass
         return klass()
+
+
 
 
 
@@ -173,13 +173,13 @@ class ProviderChecks(TestBase):
         declareAdapter(factory,provides=ifaces,forObjects=[self.ob])
 
     def checkSimpleRegister(self):
+        #print self.ob.__implements__
         self.declareObImplements([self.IA])
         self.assertObProvidesOnlyA()
 
     def checkImpliedRegister(self):
         self.declareObImplements([self.IB])
         self.assertObProvidesAandB()
-
 
 
 
@@ -408,7 +408,7 @@ class ClassProvidesChecks:
         self.assertChangingBasesChangesInterface(M1,M2,M1,M2)
 
 
-def makeInstanceTests(base):
+def makeInstanceTests(base,Picklable,NewStyle):
 
     """Generate a set of instance-oriented test classes using 'base'"""
 
@@ -425,17 +425,17 @@ def makeInstanceTests(base):
 
     class AdviseInstance(base):
         def setUp(self):
-            self.ob = self.Picklable()
+            self.ob = Picklable()
 
         def checkPickling(self):
             from cPickle import loads,dumps     # pickle has a bug!
             adviseObject(self.ob, provides=[self.IPure])
             newOb = loads(dumps(self.ob))
-            assert adapt(newOb,self.IPure,None) is newOb, newOb.__conform__.subject()
+            assert adapt(newOb,self.IPure,None) is newOb
 
     class AdviseNewInstance(AdviseInstance):
         def setUp(self):
-            self.ob = self.NewStyle()
+            self.ob = NewStyle()
 
     return AdviseFunction, AdviseModule, AdviseInstance, AdviseNewInstance
 

@@ -15,6 +15,13 @@ class IA(Interface):
 class IB(IA):
     pass
 
+class Picklable:
+    # Pickling needs classes in top-level namespace
+    pass
+
+class NewStyle(object):
+    pass
+
 from checks import ImplementationChecks, makeClassTests, makeInstanceTests
 from checks import ProviderChecks, ClassProvidesChecks
 
@@ -26,7 +33,8 @@ class InstanceChecks(ProviderChecks):
     IA = IA
     IB = IB
 
-TestClasses = makeClassTests(BasicChecks)+makeInstanceTests(InstanceChecks)
+TestClasses = makeClassTests(BasicChecks)
+TestClasses += makeInstanceTests(InstanceChecks,Picklable,NewStyle)
 
 def test_suite():
     return TestSuite([makeSuite(t,'check') for t in TestClasses])
