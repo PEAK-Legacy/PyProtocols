@@ -1,0 +1,305 @@
+\section{\module{protocols} ---
+         Protocol Definition, Declaration, and Adaptation}
+\declaremodule{}{protocols}
+\moduleauthor{Phillip J. Eby}{pje@telecommunity.com}
+\sectionauthor{Phillip J. Eby}{pje@telecommunity.com}
+\modulesynopsis{Protocol declaration and adaptation functions as described in
+    PEP XXX.}
+
+\begin{quotation}
+The typical Python programmer is an integrator, someone who is
+connecting components from various vendors.  Often times the
+interfaces between these components require an intermediate
+adapter.  Usually the burden falls upon the programmer to
+study the interface exposed by one component and required by
+another, determine if they are directly compatible, or develop
+an adapter.  Sometimes a vendor may even include the
+appropriate adapter, but then searching for the adapter and
+figuring out how to deploy the adapter takes time.
+
+\hfill --- Martelli \& Evans, PEP 246
+\end{quotation}
+
+This package builds on the object adaptation protocol presented in \pep{246}
+to make it easier for component authors, framework suppliers, and other
+developers to:
+
+\begin{itemize}
+
+\item Specify what behavior a component requires or provides
+
+\item Specify how to adapt the interface provided by one component to that
+required by another
+
+\item Specify how to adapt objects of a particular type or class (even
+built-in types) to a particular required interface
+
+\item Automatically adapt a supplied object to a required interface, and
+
+\item Do all of the above, even when the components or frameworks involved
+were not written to take advantage of this package, and even if the frameworks
+have different mechanisms for defining interfaces.
+
+\end{itemize}
+
+To make use of this package, the framework developer will typically revise
+existing type-checking code (such as \function{isinstance()},
+\function{type()}, \function{hasattr()}, or interface checks) to use the
+\function{adapt()} function instead.  In addition, if the framework has objects
+that represent interfaces or protocols, the framework developer can make
+them usable with this package's declaration APIs by adding
+adapters for (or direct implementations of) the \class{IOpenProtocol}
+interface provided by this package.
+
+If the developer of a framework does not do these things, it may still be
+possible for a framework user or third-party developer to do them.  The user
+of a framework can often call \function{adapt()} on a component before passing
+it to a non-adapting framework.  And, it's possible to externally adapt a
+framework's interface objects as well.  For example, the
+\module{protocols.classic} module includes an adapter that implements
+\class{IOpenProtocol} on behalf of Zope \class{Interface} objects.  This
+allows them to be used as arguments to this package's protocol declaration
+APIs.  This works even though Zope is completely unaware of the protocols
+package.  (Of course, this does not give Zope \class{Interface} objects all
+of the capabilities that \class{Protocol} objects have, but it does make their
+existing functionality accessible through the same API.)
+
+Assuming, however, that a framework either already supports this package, or
+has been externally adapted to do so, then the typical use of this package for
+a non-framework developer is to declare what interfaces their classes or
+objects provide, and/or declare adaptations between interfaces or components.
+
+Finally, framework and non-framework developers may also wish to use the
+\class{Protocol} and \class{Interface} base classes from this package to
+define protocols or interfaces of their own, or perhaps use some of the
+adaptation mechanisms supplied by this package to implement ``double
+dispatching'' or ``visitor'' patterns.
+
+
+\begin{seealso}
+
+\seepep{246}{Object Adaptation}{PEP 246 describes an early version of the 
+adaptation protocol used by this package.}
+
+\end{seealso}
+
+XXX Subsections not necessarily in correct order yet
+
+\subsection{Protocols and Interfaces}
+
+Many languages and systems provide ways of defining \strong{interfaces} that
+components provide or require.  Some mechanisms are purely for documentation,
+others are used at runtime to obtain or verify an implementation.  Typically,
+interfaces are formal, intended for compiler-verified static type checking.
+
+As a dynamic language, Python more often uses a looser notion of interface,
+known as a \strong{protocol}.  While protocols are often very precisely
+specified, their intended audience is a human reader or developer, not a
+compiler or automated verification tool.
+
+Automated verification tools, however, tend to demand a high overhead from
+programmers.  The Java language, for example, requires that all methods of an
+interface be defined by a class that claims to implement the interface...
+even if those methods are never used in the program being compiled.  And yet,
+the more important \emph{dynamic} behavior of the interface at runtime is not
+captured or verifiable by the compiler, so written documentation for human
+readers is still required!
+
+In the Python language, the primary uses for objects representing protocols
+or interfaces are at runtime, rather than compile time.  Typically, such
+objects are used to ask for an implementation of the interface, or supplied
+by an object to claim that it supports the interface.
+
+In principle, any Python object may be used as a \strong{protocol object}.
+However, for a variety of practical purposes, it is best that protocol objects
+be hashable and comparable.  That is, protocol objects should be usable as
+dictionary keys.
+
+This still allows for a wide variety of protocol objects, though.  One might
+assign meaning to the number 42, for example, as referring to some
+hypothetical ``hitchhiker'' protocol.  More realistically, the Microsoft COM
+framework uses UUIDs (Universally Unique Identifiers) to identify interfaces.
+UUIDs can be represented as Python strings, and thus are usable as protocol
+objects.
+
+But a simple string or number is not very useful as a protocol object.  Aside
+from the issue of how to assign strings or numbers to protocols, these
+protocol objects cannot \emph{do} anything, and they document nothing.
+
+There are thus two more common approaches to creating protocol objects in
+Python: classes (such as abstract base classes or ``ABCs''), and \strong{
+interface objects}.  Interface objects are typically also defined using Python
+\code{class} statements, but use a custom metaclass to create an object
+that may not be usable in the same ways as a ``real'' Python class.  Many
+Python frameworks (such as Twisted and Zope) provide their own
+framework-specific implementations of the ``interface object'' concept.
+
+Since classes and most interface object implementations can be used as
+dictionary keys, and because their Python source code can serve as (or
+be converted to) useful documentation, both of these approaches are viable
+ways to create usable protocol objects for use with the \module{protocols}
+package.
+
+In addition, using inheritance between classes or interface objects permits
+the definition of simple implication relationships between protocol objects.
+Inheriting from a protocol to create a new protocol means that the new
+protocol \strong{implies} the old protocol.  That is, any implementation
+or adaptation to the new protocol, is implied to be usable in a place
+where the old protocol was required.  (We will have more to say about direct
+and adapted implication relationships later on, in section
+\ref{proto-implication}.)
+
+At this point, we still haven't described any mechanisms for making adapters
+available, or declaring what protocols are supported by a class or object
+To do that, we need to define two additional kinds of protocol objects, that
+have more specialized abilities.
+
+An \strong{adapting protocol} is a protocol object that is potentially able to
+adapt components to support the protocol it represents, or at least to
+recognize that a component supports (or claims to support) the protocol.  To
+do this, an adapting protocol must have an \function{__adapt__} method, as
+will be described in section \ref{adapt-protocol}.  (Often, this method
+can be added to an existing class, or patched into an interface object
+implementation.)
+
+An \strong{open protocol} is an adapting protocol that is also capable of
+accepting adapter declarations, and managing its implication relationships
+with other protocols.  Open protocols can be used with this package's
+protocol declaration APIs, as long as they implement (or can be adapted to)
+the \class{IOpenProtocol} interface, as will be described in section
+\ref{open-protocols}.
+
+Whether a protocol object is as simple as a string, or as complex as a
+fully open protocol, it can be used to request that a component support
+(or adapt to) that protocol.  In the next section, we'll look at how to make
+such a request, and how the different kinds of protocol objects participate
+(or not) in fulfilling such requests.
+
+
+\subsection{\function{adapt()} and the Adaptation Protocol
+\label{adapt-protocol}}
+
+Component adaptation is the central focus of the \module{protocols} package.
+All of the package's protocol declaration APIs depend on component adaptation
+to work, and all of the package's protocol implementation classes exist
+simply to make it easier for developers to use component adaptation in their
+frameworks and programs.
+
+Component adaptation is performed by calling the \function{adapt()} function,
+whose design is based largely on the specification presented in \pep{246}:
+
+\begin{funcdesc}{adapt}{component, protocol,
+\optional{, default \optional{, factory}}}
+
+Return an implementation of \var{protocol} (a protocol object) for
+\var{component} (any object).  The implementation returned may be
+\var{component}, or an adapter that implements the protocol on its
+behalf.  If no implementation is available, return \var{default}.  If no
+\var{default} is provided, call \code{\var{factory}(\var{component},
+\var{protocol})} and return the result.  If no \var{factory} is supplied,
+raise \exception{NotImplementedError}.
+
+\var{default} may be supplied as a positional or keyword argument.
+\var{factory}, however, must be supplied as a keyword argument if it is
+to be used.
+
+\end{funcdesc}
+
+The component adaptation process performed by \function{adapt()} proceeds
+in four steps:
+
+\begin{enumerate}
+
+\item If the protocol is a class or type, and the component is an instance
+of that class or type, the component is returned unchanged.  (This quickly
+disposes of the most trivial cases).
+
+\item If the component has a \function{__conform__} method, it is called,
+passing in the protocol.  If the method returns a value other than
+\constant{None}, it is returned as the result of \function{adapt()}.
+
+\item If the protocol has an \function{__adapt__} method, it is called,
+passing in the component.  If the method returns a value other than
+\constant{None}, it is returned as the result of \function{adapt()}.
+
+\item Perform default processing as described above, returning \var{default},
+invoking \var{factory}, or raising \exception{NotImplementedError} as
+appropriate.
+
+\end{enumerate}
+
+This four-step process is called the \strong{adaptation protocol}.  Note
+that it can be useful even in the case where neither the component nor the
+protocol object are aware that the adaptation protocol exists, and it
+gracefully degrades to a kind of \function{isinstance()} check in that
+case.  However, if either the component or the protocol object has been
+constructed (or altered) so that it has the appropriate \function{__conform__}
+or \function{__adapt__} method, then much more meaningful results can be
+achieved.
+
+
+\begin{note}
+
+There are a few differences between the \module{protocols}
+implementation of \function{adapt()} and the \pep{246} specification.
+
+First, \exception{TypeError} is not treated in the same way.  \pep{246}
+says that if a \function{__conform__} or \function{__adapt__} method raises
+a \exception{TypeError}, it should be treated in the same way as if the
+method returned \constant{None}.  This was a workaround for the issue of
+accidentally calling an unbound class method, in the case where a component
+or protocol supplied to \function{adapt()} was a class.  The
+\module{protocols} implementation of \function{adapt()} attempts to catch
+such errors also, but will reraise any exception that appears to come from
+\emph{within} the execution of the \function{__conform__} or
+\function{__adapt__} method.  So if these methods raise a
+\exception{TypeError}, it will be passed through to the caller of
+\function{adapt}, and thus raising \exception{TypeError} should not be used
+in place of returning \constant{None}.
+
+Second, \exception{NotImplementedError} is raised when no adaptation is
+found, and no default is supplied, rather than \exception{TypeError}.
+And third, \function{protocols.adapt()} has an optional \var{factory}
+argument that the \pep{246} \function{adapt()} does not.
+
+These differences are the result of experience using the \module{protocols}
+package with PEAK, and advances in the Python state-of-the-art since
+\pep{246} was written (over two years ago).  We believe that they make the
+adaptation protocol more robust, more predictable, and more usable for
+its most common applications.
+\end{note}
+
+
+XXX junk from here on...  to be continued...
+
+An object that provides a \function{__conform__} method is said to be a
+\strong{conforming object}....
+
+
+An protocol object that supplies an \function{__adapt__} method is said to be
+an \strong{adapting protocol}, and ....
+
+
+For non-adapting protocols, it is up to the
+component to recognize the protocol, and signify its conformance or provide
+an adapter.
+
+
+\subsection{Defining Interfaces and Protocols}
+subsetting, extending...
+
+\subsection{Protocol Implication \label{proto-implication}}
+
+\subsection{Declaring Protocols for Classes}
+
+\subsection{Module Contents}
+
+\subsection{The \class{IOpenProtocol} Interface \label{open-protocols}}
+\subsection{Examples}
+Replacing introspection with Adaptation, simple adaptation...?
+
+\subsection{Advanced Techniques}
+\subsubsection{Instance-specific Declarations}
+\subsubsection{Custom Declaration Mechanisms}
+\subsubsection{Adapting ``Foreign'' Interfaces}
+
