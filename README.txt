@@ -1,4 +1,4 @@
-PyProtocols Release 0.9
+PyProtocols Release 0.9.1
 
  Copyright (C) 2003 by Phillip J. Eby.  All rights reserved.  This software may
  be used under the same terms as Zope or Python.  THERE ARE ABSOLUTELY NO
@@ -10,47 +10,47 @@ PyProtocols Release 0.9
     something is?  Wouldn't it be nice if you could just declare "I want this
     object to have this behavior" and magically convert whatever value you
     have, to the type you need?  PyProtocols lets you do just that, cleanly,
-    quickly, and robustly -- even with built-in types or other people's 
-    classes. 
+    quickly, and robustly -- even with built-in types or other people's
+    classes.
 
     PyProtocols extends the PEP 246 adapt() function with a new "declaration
     API" that lets you easily define your own interfaces and adapters, and
     declare what adapters should be used to adapt what types, objects, or
     interfaces.  In addition to its own Interface type, PyProtocols can also
-    use Twisted and Zope's Interface types.  (Of course, since Twisted and 
+    use Twisted and Zope's Interface types.  (Of course, since Twisted and
     Zope interfaces aren't as flexible, only a subset of the PyProtocols API
-    works with them.  Specific limitations are listed in the documentation.) 
+    works with them.  Specific limitations are listed in the documentation.)
 
     If you're familiar with Interface objects in Zope, Twisted, or PEAK, the
-    Interface objects in PyProtocols are very similar.  But, they can also do 
-    many things that no other Python interface types can do.  For example, 
+    Interface objects in PyProtocols are very similar.  But, they can also do
+    many things that no other Python interface types can do.  For example,
     PyProtocols supports "subsetting" of interfaces, where you can declare that
     one interface is a subset of another existing interface.  This is like
     declaring that somebody else's existing interface is actually a subclass
     of the new interface.  Twisted and Zope don't allow this, which
     makes them very hard to use if you're trying to define interfaces like
-    "Read-only Mapping" as a subset of "Mapping Object". 
+    "Read-only Mapping" as a subset of "Mapping Object".
 
-    Unlike Zope and Twisted, PyProtocols also doesn't force you to use a 
+    Unlike Zope and Twisted, PyProtocols also doesn't force you to use a
     particular interface coding style or even a specific interface type.  You
-    can use its built-in interface types, or define your own.  If there's 
+    can use its built-in interface types, or define your own.  If there's
     another Python package out there with interface types that you'd like to
-    use (CORBA? COM?), you can even create your own adapters to make them 
-    work with the PyProtocols API. 
+    use (CORBA? COM?), you can even create your own adapters to make them
+    work with the PyProtocols API.
 
 
     PyProtocols is also the only interface package that supports automatic
     "transitive adaptation".  That is, if you define an adapter from interface
-    A to interface B, and another from B to C, PyProtocols automatically 
+    A to interface B, and another from B to C, PyProtocols automatically
     creates and registers a new adapter from A to C for you.  If you later
-    declare an explicit adapter from A to C, it silently replaces the 
+    declare an explicit adapter from A to C, it silently replaces the
     automatically created one.
 
     PyProtocols may be used, modified, and distributed under the same terms
-    and conditions as Python or Zope. 
+    and conditions as Python or Zope.
 
 
- Version 0.9 Release Notes
+ Version 0.9.1 Release Notes
 
     This version is a complete, working release, so you can download it and
     try it out.  But, the exact spellings of the API and other interfaces
@@ -59,7 +59,7 @@ PyProtocols Release 0.9
     Please contact the author with your input.
 
     If you'd like to use Zope interfaces with PyProtocols, you must
-    use the current CVS version of Zope X3, as PyProtocols' Zope support uses
+    use Zope X3 Milestone 4 release, as PyProtocols' Zope support uses
     the latest Zope interface declaration API.
 
     If you'd like to use Twisted interfaces with PyProtocols, you must use
@@ -117,17 +117,6 @@ PyProtocols Release 0.9
   version 0.7.2.  You do *not* have to have Pyrex installed, even to build the
   C extension, but if you do have it installed, make sure it's up to date before
   building the C extension.
-
-
-
-
-
-
-
-
-
-
-
 
 
 
