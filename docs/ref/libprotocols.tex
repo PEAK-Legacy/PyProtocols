@@ -829,14 +829,14 @@ or adapt to,
 \item A relationship from an instance, to a protocol it provides or adapts to,
 and
 
-\item A relationship from a protocol, to a protocol that implies or is adaptable
-to it.
+\item A relationship from a protocol, to a protocol that it implies or is
+adaptable to.
 \end{itemize}
 
 All of these relationships may be declared by reference to the source type,
-instance or protocol, the desired destination protocol, and the adapter to be
-used. (In the event that no adapter is needed, the special adapter
-\function{NO_ADAPTER_NEEDED} is specified.)
+instance or protocol, the desired destination protocol, and an adapter factory
+to be used. (In the event that no adapter is needed, the special adapter
+factory \function{NO_ADAPTER_NEEDED} is specified.)
 
 To declare relationships like these, the \module{protocols} declaration API
 provides three ``primitive'' declaration functions.  Each takes a \var{protocol}
@@ -1105,27 +1105,150 @@ A sequence of protocols that the enclosing module provides.  Equivalent to
 
 
 
-\subsection{Creating and Using Adapters}
+\subsection{Creating and Using Adapters, Components, and Protocols}
 
 IAdapterFactory
 
 Defining __conform__ - interactions?
 
+Rejecting inherited contracts
+
+object identity; adaptation reflexivity or lack thereof
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 \subsection{Protocol Declarations for Individual Objects \label{protocols-instances}}
 
-...
+Because objects' behavior usually comes from a class definition, it's not too
+often that you will declare that an individual object provides or supports an
+interface, as opposed to making a blanket declaration about an entire class or
+type of object.  But objects like functions and modules do not \emph{have} a
+class definition that encompasses their behavior, and classes themselves
+sometimes provide an interface (e.g. via \function{classmethod} objects).
+
+So, the declaration API needs to also be able to declare what protocols an
+individual object (such as a function, module, or class) supports or provides.
+This is what \function{adviseObject()} and the
+\code{classProvides}/\code{classDoesNotProvide} keywords of
+\function{advise()} do.
+
+In most cases, for an object to be usable with \function{adviseObject()}, it
+must support the \class{IOpenProvider} interface.  Since many of the objects
+one might wish to use with \function{adviseObject()} (such as modules,
+functions, and classes) do not directly provide this interface, the
+\module{protocols.classic} module supplies and declares an adapter factory tha
+can adapt most Python objects to support this interface, assuming that they
+have a \code{__dict__} attribute.
+
+This default adapter works well for many situations, but it has some
+limitations you may need to be aware of.  First, it works by ``poking'' a new
+\method{__conform__} method into the adapted object.  If the object already
+has a \method{__conform__} method, a \exception{TypeError} will be raised.  So,
+if you need an object to be an \class{IOpenProvider}, but it has a
+\method{__conform__} method, you may want to have its class include
+\class{ProviderMixin} among its base classes, so that your objects won't rely
+on the default adapter for \class{IOpenProvider}.  (See \class{ProviderMixin}
+in section \ref{protocols-contents} for more on this.)
+
+Both the default adapter and \class{ProviderMixin} support inheritance of
+protocol declarations, when the object being adapted is a class or type.  In
+this way, \code{advise(classProvides=\var{protocols})} declarations (or
+\code{adviseObject(someClass,\var{protocols})} calls) are inherited by
+subclasses.  Of course, you can always reject inherited protocol information
+using \code{advise(classDoesNotProvide=\var{protocols})} or
+\function{adviseObject(newClass,doesNotProvide=\var{protocols})}.
+
+Both the default adapter and \class{ProviderMixin} work by keeping a mapping of
+protocols to adapter factories.  Keep in mind that this means the protocols and
+adapter factories will continue to live until your object is garbage collected.
+Also, that means for your object to be pickleable, all of the protocols and
+adapter factories used must be pickleable.  (This latter requirement can be
+quite difficult to meet, since adapter factories are often functions.)
+
+XXX should we add __reduce__ to NO_ADAPTER_NEEDED/DOES_NOT_SUPPORT?  NB
+composed adapters aren't currently pickleable either.
+
+Note that none of these restrictions apply if you are only using declarations
+about types and protocols, as opposed to individual objects.  (Or if you only
+make individual-object declarations for functions, modules, and classes.)
+Also note that if you have some objects that need to dynamically support or
+not support a protocol on a per-instance basis, then \function{adviseObject()}
+is probably not what you want anyway!  Instead, give your objects' class a
+\method{__conform__()} method that does the right thing when the object is
+asked to conform to a protocol.  \function{adviseObject()} is really intended
+for adding metadata to objects that ``don't know any better''.
+
+In general, protocol declarations are a \emph{static} mechanism: they cannot be
+changed or removed at will, only successively refined.  All protocol
+declarations made must be consistent with the declarations that have already
+been made.  This makes them unsuitable as a mechanism for dynamic behavior such
+as supporting a protocol based on an object's current state.
+
+In the next section, we'll look more at the static nature of declarations,
+and explore what it means to make conflicting (or refining) protocol
+declarations.
+
+XXX This section seems awfully short; wasn't there more to say about this?
+Maybe it should be a subsubsection.
+
+
+
+
+
+
+
+
 
 \subsection{Protocol Implication and Adapter Precedence \label{proto-implication}}
 
-subsetting, extending...
+transitivity
 
+adapters can be composed
 
+``adapter path''
 
+``shortest path''
 
+overriding existing declarations
 
+ambiguous override
 
+how circularity is avoided
 
+Use of subsetting to create ``context'' of sorts
+
+GC consequences of implication: protocols must hold references to implied
+protocols, so subsetting means subset protocol will exist as long as the
+superset protocol does.
 
 
 
@@ -1680,6 +1803,7 @@ support the requirements defined by \class{IProtocol} as well.
 
 
 \subsubsection{\module{protocols.adapters} --- ``Adapter arithmetic'' support \label{protocol-adapters-module}}
+\declaremodule{protocols-adapters}{protocols.adapters}
 
 The \module{protocols.adapters} module provides support for doing ``adapter
 arithmetic'' such as determining which of two adapter paths is shorter,
@@ -1719,7 +1843,6 @@ details.)
 \end{funcdesc}
 
 
-
 \begin{funcdesc}{composeAdapters}{baseAdapter, baseProtocol, extendingAdapter}
 Return a new \class{IAdapterFactory} composed of the input adapter factories
 \var{baseAdapter} and \var{extendingAdapter}.  If either input adapter is
@@ -1745,8 +1868,9 @@ Treat \var{mapping} as an adapter registry, replacing the entry designated by
 \var{key} with an \code{(\var{adapter},\var{depth})} tuple, if and only if
 the new entry would be a ``shorter path'' than the existing entry, if any.
 (I.e., if \code{minimumAdapter(old, \var{adapter}, oldDepth, \var{depth})}
-returns \var{adapter} and \var{adapter} is not the existing registered adapter.
-The function returns a true value if it updates the contents of \var{mapping}.
+returns \var{adapter}, and \var{adapter} is not the existing registered
+adapter.  The function returns a true value if it updates the contents of
+\var{mapping}.
 
 This function is used to manage type-to-protocol, protocol-to-protocol, and
 object-to-protocol adapter registries, keyed by type or protocol.  The
@@ -1760,9 +1884,8 @@ and \method{get()} methods.  Values stored in the mapping will be
 
 
 
-
 \subsubsection{\module{protocols.advice} --- Metaclasses and other ``Magic''}
-
+\declaremodule{protocols-advice}{protocols.advice}
 addClassAdvisor
 
 isClassAdvisor
@@ -1780,7 +1903,7 @@ minimalBases
 
 \subsubsection{\module{protocols.classic} --- Adapters to support built-in types
 and Zope Interfaces}
-
+\declaremodule{protocols-classic}{protocols.classic}
 
 
 
