@@ -1,6 +1,6 @@
 from unittest import TestSuite, TestCase, makeSuite
 from protocols import adapt, advise, Interface, Attribute, declareAdapter
-from protocols import AbstractBase
+from protocols import AbstractBase, AdaptationFailure
 
 class APITests(TestCase):
 
@@ -100,6 +100,7 @@ class APITests(TestCase):
         self.assertTypeErrorPassed(None, Unadaptive(), None)
         self.assertTypeErrorPassed(Nonconformist(), None, None)
 
+        self.assertRaises(AdaptationFailure, adapt, None, None)
 
     def assertTypeErrorPassed(self, *args):
         try:
@@ -114,7 +115,6 @@ class APITests(TestCase):
         class I1(Interface): pass
         class I2(I1): pass
         declareAdapter(lambda o: o, provides=[I1],forProtocols=[I2])
-
 
 
 

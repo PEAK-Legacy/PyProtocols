@@ -12,7 +12,7 @@ from sys import _getframe, exc_info, modules
 from types import ClassType
 ClassTypes = ClassType, type
 
-from adapters import NO_ADAPTER_NEEDED, DOES_NOT_SUPPORT
+from adapters import NO_ADAPTER_NEEDED, DOES_NOT_SUPPORT, AdaptationFailure
 from adapters import bindAdapter
 from advice import addClassAdvisor, getFrameInfo
 from interfaces import IOpenProtocol, IOpenProvider, IOpenImplementor

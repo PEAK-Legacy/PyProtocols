@@ -1,7 +1,7 @@
 """C Speedups for commonly-used operations"""
 
 __all__ = [
-    'IMPLEMENTATION_ERROR', 'NO_ADAPTER_NEEDED', 'DOES_NOT_SUPPORT',
+    'NO_ADAPTER_NEEDED', 'DOES_NOT_SUPPORT',
     'adapt', 'Protocol__adapt__', 'metamethod', 'classicMRO', 'getMRO',
     'Protocol__call__',
 ]
