@@ -765,9 +765,22 @@ class PredicateTests(TestCase):
             Signature(x=NotTest(types.NoneType)))
 
 
+
+
+
+
+
+
+
+
+
+
+
+
     def testParseExpressionMatching(self):
         parse = GenericFunction(lambda x,y,z:None).parse
         pe = lambda e: parse(e,locals(),globals())
+
         self.assertEqual(pe('isinstance(x,int)'), Signature(x=int))
         self.assertEqual(pe('isinstance(x,(str,unicode))'),
             Signature(x=OrTest(str,unicode)))
@@ -775,6 +788,34 @@ class PredicateTests(TestCase):
             Signature(x=OrTest(int,str,unicode)))
         self.assertEqual(pe('not isinstance(x,(int,(str,unicode)))'),
             Signature(x=~OrTest(int,str,unicode)))
+
+        self.assertEqual(
+            pe('issubclass(x,int)'), Signature(x=SubclassTest(int)))
+        self.assertEqual(pe('issubclass(x,(str,unicode))'),
+            Signature(x=OrTest(SubclassTest(str),SubclassTest(unicode))))
+        self.assertEqual(pe('issubclass(x,(int,(str,unicode)))'),
+            Signature(x=OrTest(*map(SubclassTest,(int,str,unicode)))))
+        self.assertEqual(pe('not issubclass(x,(int,(str,unicode)))'),
+            Signature(x=~OrTest(*map(SubclassTest,(int,str,unicode)))))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     def testParseDNF(self):

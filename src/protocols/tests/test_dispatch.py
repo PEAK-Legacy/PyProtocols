@@ -244,6 +244,47 @@ class TestTests(TestCase):
 
 
 
+    def testSubclassTest(self):
+        s = SubclassTest(Vehicle)
+        self.failUnless(
+            ITest(s).dispatch_function is strategy.dispatch_by_subclass )
+
+        # seeds()
+        self.assertEqual( s.seeds({}), [Vehicle,None])
+
+        # __contains__
+        for klass in Vehicle,LandVehicle,WaterVehicle:
+            self.failUnless(klass in s)
+        for klass in None,GasPowered,object,Wheeled:
+            self.failUnless(klass not in s)
+
+        # implies()
+        self.failUnless( s.implies(SubclassTest(object)) )
+        self.failUnless( SubclassTest(LandVehicle).implies(s) )
+        self.failUnless( s.implies(NullTest) )
+        self.failIf( s.implies(SubclassTest(LandVehicle)) )
+        self.failIf( SubclassTest(object).implies(s) )
+
+        # eq/ne/invert
+        self.assertEqual( s, SubclassTest(Vehicle))
+        self.assertNotEqual( s, SubclassTest(LandVehicle))
+        self.assertNotEqual( s, NullTest)
+        self.assertEqual( ~s, NotTest(s) )
+
+        # matches()
+        table = {LandVehicle:1,object:2,None:3}
+        items = list(s.matches(table))
+        self.assertEqual(items,[LandVehicle])
+
+        # dispatch
+        table = {Vehicle:1,object:2,None:3}
+        self.assertEqual(strategy.dispatch_by_subclass(Vehicle,table), 1)
+        self.assertEqual(strategy.dispatch_by_subclass(LandVehicle,table), 1)
+        self.assertEqual(strategy.dispatch_by_subclass(object,table), 2)
+        self.assertEqual(strategy.dispatch_by_subclass(None,table), 3)
+        self.assertRaises(AttributeError,
+            strategy.dispatch_by_subclass, Bicycle,table)
+
     def testInequalities(self):
         self.assertRaises(ValueError, Inequality, '', 1)
         self.assertRaises(ValueError, Inequality, 'xyz', 2)
@@ -538,11 +579,11 @@ class TestTests(TestCase):
 
         # Ensure ordering preserved among conditions within a signature
         self.assertNotEqual(
-            (x_gt_10 & y_in_LandVehicle).items(), 
+            (x_gt_10 & y_in_LandVehicle).items(),
             (y_in_LandVehicle & x_gt_10).items())
 
         self.assertNotEqual(
-            (x_gt_10 & y_in_LandVehicle & x_lt_20).items(), 
+            (x_gt_10 & y_in_LandVehicle & x_lt_20).items(),
             (y_in_LandVehicle & x_gt_10 & x_lt_20).items())
 
 
@@ -1017,7 +1058,7 @@ class SimpleGenerics(TestCase):
             [s.when(WaterVehicle)]
             def s(x,v):
                 return "splash!"
-            
+
         self.assertEqual(X().s(v=LandVehicle()),"land")
         self.assertEqual(X().s(WaterVehicle()),"water")
         self.assertEqual(Y().s(WaterVehicle()),"splash!")
@@ -1278,7 +1319,7 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
 
         [f.when("'y' in fiz")]
         def f(**fiz): return "y"
-        
+
         self.assertEqual(f(x=1),"x")
         self.assertEqual(f(y=1),"y")
         self.assertRaises(AmbiguousMethod, f, x=1, y=1)
@@ -1292,7 +1333,7 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
 
         [f.when("'y' in fiz")]
         def f(*fiz): return "y"
-        
+
         self.assertEqual(f("foo","x"),"x")
         self.assertEqual(f("bar","q","y"),"y")
         self.assertEqual(f("bar","q","y"),"y")
@@ -1319,7 +1360,7 @@ def test_combiners():
     return doctest.DocFileSuite(
         'combiners.txt', optionflags=doctest.ELLIPSIS, package='dispatch',
     )
-    
+
 def test_suite():
     return TestSuite(
         [test_combiners(), ] +

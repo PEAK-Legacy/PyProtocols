@@ -1,7 +1,7 @@
 from __future__ import generators
 from dispatch import *
 from dispatch.strategy import Inequality, Signature, ExprBase, default
-from dispatch.functions import NullTest
+from dispatch.strategy import SubclassTest, NullTest
 from dispatch.ast_builder import build
 
 import protocols, operator, dispatch
@@ -837,23 +837,23 @@ def convertIsInstanceToClassTest(expr,test):
     return Signature([(expr.argexprs[0],typecheck)])
 
 
+def _tupleToSubclassTest(ob):
+    if isinstance(ob,tuple):
+        return OrTest(*map(_tupleToSubclassTest,ob))
+    return SubclassTest(ob)
 
+[expressionSignature.when(
+    # matches 'issubclass(expr,Const)'
+    "expr in Call and expr.function==issubclass"
+    " and len(expr.argexprs)==2 and expr.argexprs[1] in Const"
+)]
+def convertIsSubclassToSubClassTest(expr,test):
+    typecheck = _tupleToSubclassTest(expr.argexprs[1].value)
 
+    if not test.truth:
+        typecheck = ~typecheck
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    return Signature([(expr.argexprs[0],typecheck)])
 
 
 

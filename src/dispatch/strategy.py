@@ -6,6 +6,9 @@
     ClassTest -- Index handler for testing that an expression is of a type
         or class
 
+    SubclassTest -- Index handler for testing that an expression is a subclass
+        of a given class
+
     Inequality -- Index handler for testing that an expression has a range
         relation (i.e. <,>,<=,>=,==,!=) to a constant value
 
@@ -17,10 +20,7 @@
     most_specific_signatures, ordered_signatures, method_chain, method_list,
         all_methods, safe_methods, separate_qualifiers -- utility functions for
         creating method combinations
-
 """
-
-
 
 
 
@@ -52,7 +52,7 @@ from dispatch.functions import NullTest
 from new import instancemethod
 
 __all__ = [
-    'ProtocolTest', 'ClassTest', 'Inequality', 'Min', 'Max',
+    'ProtocolTest', 'ClassTest', 'SubclassTest', 'Inequality', 'Min', 'Max',
     'Predicate', 'Signature', 'PositionalSignature', 'Argument',
     'most_specific_signatures', 'ordered_signatures', 'separate_qualifiers',
     'method_chain', 'method_list', 'all_methods', 'safe_methods',
@@ -122,7 +122,6 @@ class TGraph:
 
 
 def dispatch_by_mro(ob,table):
-
     """Lookup '__class__' of 'ob' in 'table' using its MRO order"""
 
     try:
@@ -149,17 +148,19 @@ def dispatch_by_mro(ob,table):
         return table[object]
 
 
-
-
-
-
-
-
-
-
-
-
-
+def dispatch_by_subclass(ob,table):
+    if isinstance(ob,ClassTypes):
+        while 1:
+            if ob in table:
+                return table[ob]
+            try:
+                ob, = ob.__bases__
+                return table[ob]
+            except ValueError:
+                if ob.__bases__:
+                    return table.reseed(ob)
+                break
+    return table[None]
 
 
 class ClassTest(Adapter):
@@ -201,6 +202,47 @@ class ClassTest(Adapter):
                 yield key
 
     def __invert__(self): from predicates import NotTest; return NotTest(self)
+
+
+class SubclassTest(object):
+    """Test that indicates expr is a subclass of a particular class"""
+
+    protocols.advise(instancesProvide=[ITest])
+    dispatch_function = staticmethod(dispatch_by_subclass)
+
+    def __init__(self,klass):
+        self.klass = klass
+
+    def seeds(self,table):
+        return [self.klass,None]
+
+    def __contains__(self,ob):
+        if isinstance(ob,ClassTypes) and issubclass(ob,self.klass):
+            return True
+
+    def implies(self,otherTest):
+        return self.klass in ITest(otherTest)
+
+    def __repr__(self):
+        return "SubclassTest(%s)" % (self.klass.__name__,)
+
+    def subscribe(self,listener): pass
+    def unsubscribe(self,listener): pass
+
+    def __eq__(self,other):
+        return type(self) is type(other) and self.klass is other.klass
+
+    def __ne__(self,other):
+        return not self.__eq__(other)
+
+    def __invert__(self): from predicates import NotTest; return NotTest(self)
+
+    def matches(self,table):
+        for key in table:
+            if key in self:
+                yield key
+
+
 
 
 class _ExtremeType(object):     # Courtesy of PEP 326
