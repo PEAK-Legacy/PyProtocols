@@ -620,10 +620,12 @@ class GenericFunction(AbstractGeneric):
     def combine(self,cases):
         import strategy
 
-        cases = strategy.separate_qualifiers(cases,
-            primary=[strategy.ordered_signatures,strategy.safe_methods],
-            before =[strategy.ordered_signatures,strategy.all_methods],
-            after  =[strategy.ordered_signatures,strategy.all_methods],
+        strict = [strategy.ordered_signatures,strategy.safe_methods]
+        loose  = [strategy.ordered_signatures,strategy.all_methods]
+
+        cases = strategy.separate_qualifiers(
+            cases,
+            around = strict, before = loose, primary = strict, after =loose,
         )
 
         primary = strategy.method_chain(cases.get('primary',[]))
@@ -633,25 +635,32 @@ class GenericFunction(AbstractGeneric):
             befores = strategy.method_list(cases.get('before',[]))
             afters = strategy.method_list(list(cases.get('after',[]))[::-1])
 
-            def wrapper(*args,**kw):
+            def chain(*args,**kw):
                 for tmp in befores(*args,**kw): pass  # toss return values
                 result = primary(*args,**kw)
                 for tmp in afters(*args,**kw): pass  # toss return values
                 return result
 
-            return wrapper
+        else:
+            chain = primary
 
-        return primary
+        if cases.get('around'):
+            chain = strategy.method_chain(list(cases['around'])+[chain])
 
-
-
-
-
-
+        return chain
 
 
 
 
+
+
+    def around(self,cond):
+        """Add function as an "around" method w/'cond' as a guard
+
+        If 'cond' is parseable, it will be parsed using the caller's frame
+        locals and globals.
+        """
+        return self._decorate(cond,"around")
 
 
     def before(self,cond):
@@ -679,15 +688,6 @@ class GenericFunction(AbstractGeneric):
         locals and globals.
         """
         return self._decorate(cond)
-
-
-
-
-
-
-
-
-
 
 
 

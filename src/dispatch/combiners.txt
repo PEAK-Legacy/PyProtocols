@@ -17,14 +17,25 @@ techniques, ranging from using a provided subclass of ``GenericFunction`` or
 
 
 --------------------------
-The "Default" Combinations
+The "Standard" Combination
 --------------------------
+
+The default ``GenericFunction`` class implements a result combination strategy
+similar to the "standard method combination" for generic functions in the
+Common Lisp Object System (CLOS).  Specifically, it supports methods calling
+the "next method", and it supports "before", "after", and "around" methods, in
+an ordering similar to that of CLOS.
+
+Let's go over each of these concepts in turn.  But as we do, please keep in
+mind that before/after/around methods in PyProtocols should be needed less
+often than their CLOS equivalents, so make sure you *really* need a particular
+feature before making your code more complicated than it needs to be.
 
 
 Using ``next_method``
 =====================
 
-By default, ``GenericFunction`` will only invoke the most-specific applicable
+By default, a ``GenericFunction`` will only invoke the most-specific applicable
 method.  However, if you add a ``next_method`` argument to the beginning of
 an individual method's signature, you can use it to call the "next method"
 that applies.  That is, the second-most-specific method.  If that method also
@@ -76,7 +87,6 @@ if ``next_method`` is ambiguous or missing *without* calling it first.)
 The ``next_method`` technique is implemented by ``GenericFunction`` using the
 ``strategy.method_chain()`` function, which we will cover later in the section
 on `Method Combination Utilities`_.
-
 
 
 Before/After Methods
@@ -164,11 +174,37 @@ execution terminates at that point, and methods later in the order are not
 run.
 
 
-
 "Around" Methods
 ================
 
-TODO: write text and implement.
+Sometimes you need to recognize certain special cases, and perhaps not run
+the entire generic function, or need to alter its return value in some way,
+etc.  You can do this with "around" methods, which run "around" the entire
+"before/primary/after" sequence described in the previous section.
+
+A good way to think of this is that it's as if the "around" methods form a
+separate generic function, whose default (least-specific) method is the
+original, "inner" generic function.
+
+When "around" methods are applicable on a given invocation of the generic
+function, the most-specific "around" method is invoked.  It may then choose
+to call its ``next_method`` to invoke the next-most-specific "around" method,
+and so on.  When there are no more "around" methods, calling ``next_method``
+instead invokes the "before", "primary", and "after" methods, according to
+the sequence described in the previous section.  For example::
+
+    >>> if BankAccount.withdraw.around("amount > self.balance"): # Python 2.3
+    ...     def overdraft_fee(next_method,self,amount):
+    ...         print "Adding overdraft fee of $25"
+    ...         return next_method(self,amount+25)
+    >>> acct.withdraw(20)
+    Adding overdraft fee of $25
+    Transferring 45 from overdraft protection
+
+(Note: the ``if`` block should be replaced by a decorator in normal code; it
+needs to be as shown for ``doctest`` to properly parse the above test in
+Python versions < 2.4.)
+
 
 
 Default Result Combination
