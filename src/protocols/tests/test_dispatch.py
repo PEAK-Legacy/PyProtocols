@@ -9,7 +9,7 @@ import dispatch,protocols
 from dispatch import *
 from dispatch.predicates import *; from dispatch.functions import *
 from protocols import Interface,advise,declareImplementation
-from dispatch import strategy
+from dispatch import strategy, functions
 from dispatch.strategy import *
 
 class Vehicle(object):  pass
@@ -271,12 +271,12 @@ class CriteriaTests(TestCase):
         i = Pointer(ob)
         validateCriterion(i,strategy.dispatch_by_identity)
         i = ICriterion(i)
-
         self.assertEqual(list(i.seeds({})),[None,id(ob)])
 
-
-
-
+    def testCriterionIndex(self):
+        i = functions.CriterionIndex()
+        i[SubclassCriterion(int)] = 42
+        self.assertEqual(i.casemap_for([42]), {int:[42],None:[]})
 
 
 

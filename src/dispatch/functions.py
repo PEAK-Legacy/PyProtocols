@@ -82,14 +82,13 @@ class CriterionIndex:
 
     def casemap_for(self,cases):
         """Return a mapping from seeds->caselists for the given cases"""
-        casemap = {}
         get = self.matchingSeeds.get
-        set = casemap.setdefault
         dflt = self.allSeeds
+        casemap = dict([(key,[]) for key in dflt])
 
         for case in cases:
             for key in get(case,dflt):
-                set(key,[]).append(case)
+                casemap[key].append(case)
 
         return casemap
 
@@ -103,6 +102,7 @@ class CriterionIndex:
                 itsSeeds.append(seed)
 
         self.allSeeds[seed] = None
+
 
 
 
