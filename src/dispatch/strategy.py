@@ -1,7 +1,5 @@
 """Indexing and Method Combination Strategies
 
-    NullTest -- A "don't care" index handler
-
     ProtocolTest -- Index handler for testing that an expression adapts to
         a protocol
 
@@ -13,21 +11,23 @@
 
     Min, Max -- Extreme values for use with 'Inequality'
 
+    Predicate, Signature, PositionalSignature, Argument -- primitives to
+        implement indexable multiple dispatch predicates
+
+
     single_best_method -- Method combiner that returns a single "best"
         (i.e. most specific) method, or raises AmbiguousMethod.
-        
+
     chained_methods -- Method combiner that allows calling the "next method"
         with 'next_method()'.
 
     next_method -- invoke the next most-applicable method, or raise
         AmbiguousMethod if appropriate.
 
+    most_specific_signatures, ordered_signatures -- utility functions for
+        creating method combiners
+
 """
-
-
-
-
-
 
 
 
@@ -48,14 +48,14 @@ ClassTypes = (ClassType, type)
 from sys import _getframe
 from weakref import WeakKeyDictionary
 from dispatch.interfaces import *
+from dispatch.functions import NullTest
 
 __all__ = [
-    'NullTest', 'ProtocolTest', 'ClassTest', 'Inequality', 'Min', 'Max', 
+    'ProtocolTest', 'ClassTest', 'Inequality', 'Min', 'Max',
     'single_best_method', 'chained_methods', 'next_method',
+    'Predicate', 'Signature', 'PositionalSignature', 'Argument',
+    'most_specific_signatures', 'ordered_signatures',
 ]
-
-
-
 
 
 
@@ -408,47 +408,6 @@ class ProtocolTest(StickyAdapter):
 
 
 
-class NullTest:
-
-    """Test that is always true"""
-
-    protocols.advise(instancesProvide=[ITest])
-
-    dispatch_function = staticmethod(lambda ob,table: None)
-
-    def seeds(self,table):
-        return ()
-
-    def __contains__(self,ob):   return True
-    def implies(self,otherTest): return False
-
-    def __repr__(self): return "NullTest"
-
-    def subscribe(self,listener): pass
-    def unsubscribe(self,listener): pass
-
-NullTest = NullTest()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def most_specific_signatures(cases):
     """List the most specific '(signature,method)' pairs from 'cases'
 
@@ -572,24 +531,18 @@ def chained_methods(cases):
             raise NoApplicableMethods
     return method
 
-class DispatchNode(dict):
+class ExprBase(object):
 
-    """A mapping w/lazily population and supporting 'reseed()' operations"""
+    protocols.advise(instancesProvide=[IDispatchableExpression])
 
-    protocols.advise(instancesProvide=[IDispatchTable])
+    def __ne__(self,other):
+        return not self.__eq__(other)
 
-    __slots__ = 'expr_id','contents','reseed'
+    def __hash__(self):
+        return self.hash
 
-    def __init__(self, best_id, contents, reseed):
-        self.reseed = reseed
-        self.expr_id = best_id
-        self.contents = contents
-        dict.__init__(self)
-
-    def build(self):
-        if self.contents:
-            self.update(dict(self.contents()))
-            self.contents = None
+    def asFuncAndIds(self,generic):
+        raise NotImplementedError
 
 
 
@@ -608,6 +561,217 @@ class DispatchNode(dict):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+class Argument(ExprBase):
+
+    """The most basic kind of dispatch expression: an argument specifier"""
+
+    def __init__(self,pos=None,name=None):
+        if pos is None and name is None:
+            raise ValueError("Argument name or position must be specified")
+
+        self.pos = pos
+        self.name = name
+        self.hash = hash((type(self),self.pos,self.name))
+
+
+    def __eq__(self,other):
+        return isinstance(other,Argument) and \
+            (other.pos==self.pos) and \
+            (other.name==self.name)
+
+
+    def asFuncAndIds(self,generic):
+        byName = byPos = None
+        if self.name:
+            byName = generic.argByName(self.name)
+            if self.pos:
+                byPos = generic.argByPos(self.pos)
+                # check name/pos equal
+            else:
+                return byName
+        else:
+            return generic.argByPos(self.pos)
+
+
+    def __repr__(self):
+        if self.name:
+            return self.name
+        return 'Argument(%r)' % self.pos
+
+
+
+
+
+class Predicate(object):
+    """A set of alternative signatures in disjunctive normal form"""
+
+    protocols.advise(
+        instancesProvide=[IDispatchPredicate],
+        asAdapterForProtocols = [protocols.sequenceOf(ISignature)],
+    )
+
+    def __init__(self,items):
+        self.items = all = []
+        for item in map(ISignature,items):
+            if item not in all:
+                all.append(item)
+
+    def __iter__(self):
+        return iter(self.items)
+
+    def __and__(self,other):
+        return Predicate([ (a & b) for a in self for b in other ])
+
+    def __or__(self,other):
+
+        sig = ISignature(other,None)
+
+        if sig is not None:
+            if len(self.items)==1:
+                return self.items[0] | sig
+            return Predicate(self.items+[sig])
+
+        return Predicate(list(self)+list(other))
+
+    def __eq__(self,other):
+        return self is other or self.items==list(other)
+
+    def __ne__(self,other):
+        return not self.__eq__(other)
+
+    def __repr__(self):
+        return `self.items`
+
+
+protocols.declareAdapter(
+    lambda ob: Predicate([ob]), [IDispatchPredicate], forProtocols=[ISignature]
+)
+
+class Signature(object):
+    """A set of tests (in conjunctive normal form) applied to expressions"""
+
+    protocols.advise(instancesProvide=[ISignature])
+
+    __slots__ = 'data'
+
+    def __init__(self, __id_to_test=(), **kw):
+        items = list(__id_to_test)+[(Argument(name=k),v) for k,v in kw.items()]
+        self.data = data = {}
+        for k,v in items:
+            v = ITest(v)
+            k = k,v.dispatch_function
+            if k in data:
+                from predicates import AndTest
+                data[k] = AndTest(data[k],v)
+            else:
+                data[k] = v
+
+    def implies(self,otherSig):
+        otherSig = ISignature(otherSig)
+        for expr_id,otherTest in otherSig.items():
+            if not self.get(expr_id).implies(otherTest):
+                return False
+        return True
+
+    def items(self):
+        return self.data.items()
+
+    def get(self,expr_id):
+        return self.data.get(expr_id,NullTest)
+
+    def __repr__(self):
+        return 'Signature(%s)' % (','.join(
+            [('%r=%r' % (k,v)) for k,v in self.data.items()]
+        ),)
+
+    def __and__(self,other):
+        me = self.data.items()
+        if not me:
+            return other
+
+        if IDispatchPredicate(other) is other:
+            return Predicate([self]) & other
+
+        they = ISignature(other).items()
+        if not they:
+            return self
+
+        return Signature(
+            [(k,v) for (k,d),v in me] +[(k,v) for (k,d),v in they]
+        )
+
+
+    def __or__(self,other):
+
+        me = self.data.items()
+        if not me:
+            return self  # Always true
+
+        if IDispatchPredicate(other) is other:
+            return Predicate([self]) | other
+
+        they = ISignature(other).items()
+        if not they:
+            return other  # Always true
+
+        if len(me)==1 and len(they)==1 and me[0][0]==they[0][0]:
+            from predicates import OrTest
+            return Signature([
+                (me[0][0][0],
+                    OrTest(me[0][1],they[0][1])
+                )
+            ])
+        return Predicate([self,other])
+
+
+
+    def __eq__(self,other):
+
+        if other is self:
+            return True
+
+        other = ISignature(other,None)
+
+        if other is None or other is NullTest:
+            return False
+
+        for k,v in self.items():
+            if v!=other.get(k):
+                return False
+
+        for k,v in other.items():
+            if v!=self.get(k):
+                return False
+
+        return True
+
+
+    def __ne__(self,other):
+        return not self.__eq__(other)
+
+
+class PositionalSignature(Signature):
+
+    protocols.advise(
+        instancesProvide=[ISignature],
+        asAdapterForProtocols=[protocols.sequenceOf(ITest)]
+    )
+
+    __slots__ = ()
+
+    def __init__(self,tests,proto=None):
+        Signature.__init__(self, zip(map(Argument,range(len(tests))), tests))
 
 
 

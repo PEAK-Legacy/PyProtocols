@@ -1,39 +1,80 @@
+"""Generic function implementations"""
+
 from __future__ import generators
+from dispatch.interfaces import *
+
 import protocols, inspect
-from interfaces import *
-from strategy import single_best_method, NullTest, DispatchNode, ClassTypes
-from protocols.advice import as,add_assignment_advisor
+from protocols.advice import add_assignment_advisor
 from protocols.interfaces import allocate_lock
-from types import FunctionType
+
+from types import FunctionType, ClassType, InstanceType
+ClassTypes = (ClassType, type)
 
 __all__ = [
-    'SimpleGeneric', 'GenericFunction', 'defmethod', 'when',
+    'SimpleGeneric', 'GenericFunction', 'defmethod', 'when', 'NullTest', 'as',
 ]
 
 
+class DispatchNode(dict):
+
+    """A mapping w/lazily population and supporting 'reseed()' operations"""
+
+    protocols.advise(instancesProvide=[IDispatchTable])
+
+    __slots__ = 'expr_id','contents','reseed'
+
+    def __init__(self, best_id, contents, reseed):
+        self.reseed = reseed
+        self.expr_id = best_id
+        self.contents = contents
+        dict.__init__(self)
+
+    def build(self):
+        if self.contents:
+            self.update(dict(self.contents()))
+            self.contents = None
 
 
 
 
 
 
+class NullTest:
+
+    """Test that is always true"""
+
+    protocols.advise(instancesProvide=[ITest])
+
+    dispatch_function = staticmethod(lambda ob,table: None)
+
+    def seeds(self,table):
+        return ()
+
+    def __contains__(self,ob):   return True
+    def implies(self,otherTest): return False
+
+    def __repr__(self): return "NullTest"
+
+    def subscribe(self,listener): pass
+    def unsubscribe(self,listener): pass
+
+NullTest = NullTest()
 
 
 
+def as(*decorators):
+    """Use Python 2.4 decorators w/Python 2.2+"""
 
+    if len(decorators)>1:
+        decorators = list(decorators)
+        decorators.reverse()
 
+    def callback(frame,k,v,old_locals):
+        for d in decorators:
+            v = d(v)
+        return v
 
-
-
-
-
-
-
-
-
-
-
-
+    return add_assignment_advisor(callback)
 
 
 
@@ -163,14 +204,15 @@ class ProtocolAsSimplePredicate(protocols.Adapter):
 
 
 class GenericFunction:
-
     """Extensible multi-dispatch generic function
 
     Note: this class is *not* threadsafe!  It probably needs to be, though.  :(
     """
     protocols.advise(instancesProvide=[IGenericFunction])
 
-    def __init__(self, args=(), method_combiner=single_best_method):
+    def __init__(self, args=(), method_combiner=None):
+        if method_combiner is None:
+            from strategy import single_best_method as method_combiner
         self.method_combiner = method_combiner
         self.args_by_name = abn = {}; self.args = args
         for n,p in zip(args,range(len(args))):
@@ -201,7 +243,6 @@ class GenericFunction:
     def testChanged(self):
         self.dirty = True
         self._dispatcher = None
-
 
     def _build_dispatcher(self, state=None):
         if state is None:
@@ -328,7 +369,7 @@ class GenericFunction:
 
     def __setitem__(self,signature,method):
         """Update indexes to include 'signature'->'method'"""
-        from predicates import Signature
+        from dispatch.strategy import Signature
 
         self.__lock.acquire()
         try:
@@ -441,8 +482,8 @@ class GenericFunction:
     def parse(self,expr_string,local_dict,global_dict):
         self.__lock.acquire()
         try:
-            from predicates import TestBuilder
-            from ast_builder import parse_expr
+            from dispatch.predicates import TestBuilder
+            from dispatch.ast_builder import parse_expr
             builder=TestBuilder(self.args,local_dict,global_dict,__builtins__)
             return parse_expr(expr_string,builder)
         finally:

@@ -10,7 +10,7 @@ from dispatch import *
 from dispatch.predicates import *
 from protocols import Interface,advise,declareImplementation
 from dispatch import strategy
-from dispatch.strategy import most_specific_signatures, ordered_signatures
+from dispatch.strategy import *
 
 class Vehicle(object):  pass
 class LandVehicle(Vehicle): pass

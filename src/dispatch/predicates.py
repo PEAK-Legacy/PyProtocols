@@ -1,15 +1,16 @@
-from interfaces import *
-from strategy import NullTest, Inequality
+from dispatch.interfaces import *
+from dispatch.strategy import Inequality, Signature, ExprBase, Argument
+from dispatch.functions import NullTest, as
+from dispatch.ast_builder import build
+
 import protocols, operator
-from ast_builder import build
 from types import NoneType
-from protocols.advice import as
 
 __all__ = [
-    'Call', 'Argument', 'Signature', 'PositionalSignature',
+    'Call',
     'AndTest', 'OrTest', 'NotTest', 'TruthTest', 'ExprBuilder',
     'Const', 'Getattr', 'Tuple', 'Var', 'dispatch_by_truth',
-    'OrExpr', 'AndExpr', 'Predicate', 'TestBuilder',
+    'OrExpr', 'AndExpr', 'TestBuilder',
 ]
 
 
@@ -28,7 +29,6 @@ def add_dict(d1,d2):
     d1 = d1.copy()
     d1.update(d2)
     return d1
-
 
 
 
@@ -203,20 +203,6 @@ class ExprBuilder:
 
 
 
-class ExprBase(object):
-
-    protocols.advise(instancesProvide=[IDispatchableExpression])
-
-    def __ne__(self,other):
-        return not self.__eq__(other)
-
-    def __hash__(self):
-        return self.hash
-
-    def asFuncAndIds(self,generic):
-        raise NotImplementedError
-
-
 class LogicalExpr(ExprBase):
 
     def __new__(klass,*argexprs):
@@ -231,17 +217,6 @@ class LogicalExpr(ExprBase):
 
     def __eq__(self,other):
         return type(self) is type(other) and other.argexprs == self.argexprs
-
-
-
-
-
-
-
-
-
-
-
 
 
 class OrExpr(LogicalExpr):
@@ -267,22 +242,6 @@ class OrExpr(LogicalExpr):
             if item:
                 break
         return item
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 class AndExpr(LogicalExpr):
@@ -485,47 +444,6 @@ class Call(ExprBase):
 
 
 
-
-
-
-
-
-class Argument(ExprBase):
-
-    """The most basic kind of dispatch expression: an argument specifier"""
-
-    def __init__(self,pos=None,name=None):
-        if pos is None and name is None:
-            raise ValueError("Argument name or position must be specified")
-
-        self.pos = pos
-        self.name = name
-        self.hash = hash((type(self),self.pos,self.name))
-
-
-    def __eq__(self,other):
-        return isinstance(other,Argument) and \
-            (other.pos==self.pos) and \
-            (other.name==self.name)
-
-
-    def asFuncAndIds(self,generic):
-        byName = byPos = None
-        if self.name:
-            byName = generic.argByName(self.name)
-            if self.pos:
-                byPos = generic.argByPos(self.pos)
-                # check name/pos equal
-            else:
-                return byName
-        else:
-            return generic.argByPos(self.pos)
-
-
-    def __repr__(self):
-        if self.name:
-            return self.name
-        return 'Argument(%r)' % self.pos
 
 
 
@@ -854,170 +772,6 @@ class NotBuilder(TestBuilder):
 
 
 
-
-
-
-
-
-class Predicate(object):
-    """A set of alternative signatures in disjunctive normal form"""
-
-    protocols.advise(
-        instancesProvide=[IDispatchPredicate],
-        asAdapterForProtocols = [protocols.sequenceOf(ISignature)],
-    )
-
-    def __init__(self,items):
-        self.items = all = []
-        for item in map(ISignature,items):
-            if item not in all:
-                all.append(item)
-
-    def __iter__(self):
-        return iter(self.items)
-
-    def __and__(self,other):
-        return Predicate([ (a & b) for a in self for b in other ])
-
-    def __or__(self,other):
-
-        sig = ISignature(other,None)
-
-        if sig is not None:
-            if len(self.items)==1:
-                return self.items[0] | sig
-            return Predicate(self.items+[sig])
-
-        return Predicate(list(self)+list(other))
-
-    def __eq__(self,other):
-        return self is other or self.items==list(other)
-
-    def __ne__(self,other):
-        return not self.__eq__(other)
-
-    def __repr__(self):
-        return `self.items`
-
-
-protocols.declareAdapter(
-    lambda ob: Predicate([ob]), [IDispatchPredicate], forProtocols=[ISignature]
-)
-
-class Signature(object):
-
-    """A set of tests (in conjunctive normal form) applied to expressions"""
-
-    protocols.advise(instancesProvide=[ISignature])
-
-    __slots__ = 'data'
-
-    def __init__(self, __id_to_test=(), **kw):
-        items = list(__id_to_test)+[(Argument(name=k),v) for k,v in kw.items()]
-        self.data = data = {}
-        for k,v in items:
-            v = ITest(v)
-            k = k,v.dispatch_function
-            if k in data:
-                data[k] = AndTest(data[k],v)
-            else:
-                data[k] = v
-
-    def implies(self,otherSig):
-        otherSig = ISignature(otherSig)
-        for expr_id,otherTest in otherSig.items():
-            if not self.get(expr_id).implies(otherTest):
-                return False
-        return True
-
-    def items(self):
-        return self.data.items()
-
-    def get(self,expr_id):
-        return self.data.get(expr_id,NullTest)
-
-    def __repr__(self):
-        return 'Signature(%s)' % (','.join(
-            [('%r=%r' % (k,v)) for k,v in self.data.items()]
-        ),)
-
-    def __and__(self,other):
-        me = self.data.items()
-        if not me:
-            return other
-
-        if IDispatchPredicate(other) is other:
-            return Predicate([self]) & other
-
-        they = ISignature(other).items()
-        if not they:
-            return self
-
-        return Signature(
-            [(k,v) for (k,d),v in me] +[(k,v) for (k,d),v in they]
-        )
-
-
-    def __or__(self,other):
-
-        me = self.data.items()
-        if not me:
-            return self  # Always true
-
-        if IDispatchPredicate(other) is other:
-            return Predicate([self]) | other
-
-        they = ISignature(other).items()
-        if not they:
-            return other  # Always true
-
-        if len(me)==1 and len(they)==1 and me[0][0]==they[0][0]:
-            return Signature([
-                (me[0][0][0],
-                    OrTest(me[0][1],they[0][1])
-                )
-            ])
-        return Predicate([self,other])
-
-
-
-
-    def __eq__(self,other):
-
-        if other is self:
-            return True
-
-        other = ISignature(other,None)
-
-        if other is None or other is NullTest:
-            return False
-
-        for k,v in self.items():
-            if v!=other.get(k):
-                return False
-
-        for k,v in other.items():
-            if v!=self.get(k):
-                return False
-
-        return True
-
-
-    def __ne__(self,other):
-        return not self.__eq__(other)
-
-
-class PositionalSignature(Signature):
-
-    protocols.advise(
-        instancesProvide=[ISignature],
-        asAdapterForProtocols=[protocols.sequenceOf(ITest)]
-    )
-
-    __slots__ = ()
-
-    def __init__(self,tests,proto=None):
-        Signature.__init__(self, zip(map(Argument,range(len(tests))), tests))
 
 
 

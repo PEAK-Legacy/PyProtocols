@@ -2,6 +2,7 @@
 
 from unittest import TestCase, makeSuite, TestSuite
 from protocols.advice import *
+import dispatch
 import sys
 from types import InstanceType
 
@@ -152,12 +153,12 @@ class DecoratorTests(TestCase):
 
         def f(): pass
 
-        [as(lambda x: [x])]
+        [dispatch.as(lambda x: [x])]
         f1 = f
 
         self.assertEqual(f1, [f])
 
-        [as(list, lambda x: (x,))]
+        [dispatch.as(list, lambda x: (x,))]
         f1 = f
         self.assertEqual(f1, [f])
 

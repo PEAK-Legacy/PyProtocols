@@ -2,7 +2,7 @@
 
 from unittest import TestCase, makeSuite, TestSuite
 from dispatch import *
-from dispatch.predicates import *
+from dispatch.predicates import *; from dispatch.strategy import *
 from dispatch.ast_builder import *
 from dispatch import predicates
 import operator,sys,types
