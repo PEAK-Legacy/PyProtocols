@@ -1346,7 +1346,7 @@ an object that provides \class{IAdapterFactory}; i.e., its constructor should
 accept being called with two arguments: the object to be adapted, and the
 target protocol.)
 
-\item[factoryMethod = \var{methodName}] \hfill \\
+\item[factoryMethod = \var{methodName}] \hfill \\ \versionadded{1.0}
 When using \code{asAdapterForTypes} or \code{asAdapterForProtocols}, you can
 also supply a factory method name, using this keyword.  The method named must be
 a \emph{class} method, and it will be used in place the class' normal constructor.
@@ -1404,6 +1404,7 @@ Using this keyword argument is equivalent to calling
 forProtocols=\var{protocols})}.
 
 \item[equivalentProtocols = \var{protocols}] \hfill \\
+\versionadded{1.0}
 Declare that the containing class is a protocol that is equivalent to the
 listed protocols.  That is, the containing protocol both implies, and is implied
 by, the listed protocols.  This is a convenience feature intended mainly to
@@ -1430,7 +1431,6 @@ protocols.  This is for classes that need to reject inherited class-level
 calling \code{adviseObject(\var{containing class},
 doesNotProvide=\var{protocols})}, and the \class{IOpenProvider} requirements
 mentioned above for \code{classProvides} apply here as well.
-
 
 
 \item[moduleProvides = \var{protocols}] (module context only) \hfill \\
@@ -1720,11 +1720,175 @@ for more details on these and other functions that relate to adapter paths.
 
 
 \newpage
+\subsection{Dynamic Protocols (NEW in 1.0)\label{protocols-generated}}
+
+For many common uses of protocols, it may be inconvenient to subclass
+\class{protocols.Interface} or to manually create a \class{Protocol} instance.
+So, the \module{protocols} package includes a number of utility methods to make
+these uses more convenient.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\subsubsection{Defining a protocol based on a URI or UUID}
+\begin{funcdesc}{protocolForURI}{uri}
+Return a protocol object that represents the supplied URI or UUID string.  It
+is guaranteed that you will receive the same protocol object if you call this
+routine more than once with equal strings.  This behavior is preserved even
+across pickling and unpickling of the returned protocol object.
+
+The purpose of this function is to permit modules to refer to protocols defined
+in another module, that may or may not be present at runtime.  To do this, a
+protocol author can declare that their protocol is equivalent to a URI string:
+
+\begin{verbatim%
+}from protocols import advise, Interface, protocolForURI
+
+class ISomething(Interface):
+    advise(
+        equivalentProtocols = [protocolForURI("some URI string")]
+    )
+    # etc...
+\end{verbatim}
+
+Then, if someone wishes to use this protocol without importing
+\code{ISomething} (and thereby becoming dependent on the module that provides
+it), they can do something like:
+
+\begin{verbatim%
+}from protocols import advise, protocolForURI
+
+class MyClass:
+    advise(
+        provides = [protocolForURI("some URI string")]
+    )
+    # etc...
+\end{verbatim}
+
+Thus, instances of \code{MyClass} will be considered to support
+\code{ISomething}, if needed.  But, if \code{ISomething} doesn't exist, no
+error occurs.
+\end{funcdesc}
+
+
+\subsubsection{Defining a protocol as a subset of an existing type}
+\begin{funcdesc}{protocolForType}{baseType,
+\optional{methods=(), implicit=False}}
+Return a protocol object that represents the subset of \var{baseType} denoted
+by \var{methods}.  It is guaranteed that you will receive the same protocol
+object if you call this routine more than once with eqivalent paremeters.  This
+behavior is preserved even across pickling and unpickling of the returned
+protocol object.
+
+\var{baseType} should be a type object, and \var{methods} should be a sequence
+of attribute or method names.  (The order of the names is not important.)  The
+\var{implicit} flag allows adapting objects that don't explicitly declare
+support for the protocol.  (More on this later.)
+
+Typical usage of this function is to quickly define a simple protocol based on
+a Python built-in type such as \class{list}, \class{dict}, or \class{file}:
+
+\begin{verbatim%
+}IReadFile = protocols.protocolForType(file, ['read','close'])
+IReadMapping = protocols.protocolForType(dict, ['__getitem__'])
+\end{verbatim}
+
+The advantage of using this function instead of creating an \class{Interface}
+subclass is that users do not need to import your specific \class{Interface}
+definition.  As long as they declare support for a protocol based on the
+same type, and with at least the required methods, then their object will
+be considered to support the protocol.  For example, declaring that you support
+\code{protocolForType(file, ['read','write','close'])} automatically implies
+that you support \code{protocolForType(file, ['read','close'])} and
+\code{protocolForType(file, ['write','close'])} as well.  (Note: instances of
+the \var{baseType} and its subclasses will also be considered to provide the
+returned protocol, whether or not they explicitly declare support.)
+
+If you supply a true value for the \var{implicit} flag, the returned protocol
+will also adapt objects that have the specified methods or attributes.  In
+other words, \code{protocolForType(file, ['read','close'], True)} returns a
+protocol that will consider any object with \method{read} and \method{close}
+methods to provide that protocol, as well as objects that explicitly support
+\code{protocolForType(file, ['read','close'])}.
+
+
+In order to automatically declare the relationships between the protocols for
+different subsets, this function internally generates all possible subsets of
+a requested \var{methods} list.  So, for example, requesting a protocol with
+8 method names may cause as many as 127 protocol objects to be created.  Of
+course, these are generated only once in the lifetime of the program, but you
+should be aware of this if you are using large method subsets.  Using as few as
+32 method names would create 2 billion protocols!
+
+Note also that the supplied \var{baseType} is used only as a basis for
+semantic distinctions between sets of similar method names, and to declare that
+the \var{baseType} and its subclasses support the returned protocol.  No
+protocol-to-protocol relationships are automatically defined between protocols
+requested for different base types, regardless of any subclass/superclass
+relationship between the base types.
+\end{funcdesc}
+
+
+\subsubsection{Defining a protocol for a sequence}
+
+XXX sequenceOf()
+
+\subsubsection{Defining a protocol as a local variation of another protocol}
+
+XXX Variation
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\newpage
 \subsection{Package Contents and Contained Modules\label{protocols-contents}}
 
 The following functions, classes, and interfaces are available from the
-top-level \module{protocols} package.  They are arranged in order of
-their expected frequency of use, with most frequently used items listed first.
+top-level \module{protocols} package.  They are arranged roughly in order of
+their expected frequency of use, with more frequently-used items listed first.
 
 \begin{funcdesc}{adapt}{component, protocol,
 \optional{, default \optional{, factory}}}
@@ -1780,6 +1944,27 @@ the \code{__metaclass__} of the class.  If your class sets an explicit
 called, or the protocol declarations will not occur!}
 \end{funcdesc}
 
+\begin{classdesc}{Adapter}{ob, proto}
+\versionadded{1.0}
+This base class provides a convenient \method{__init__} method for adapter
+classes.  To use it, just subclass \class{protocols.Adapter} and add methods
+to implement the desired interface(s).  (And of course, declare what interfaces
+the adapter provides, for what types, and so on.)  Your subclass' methods can
+use the following attributes, which will have been set by the \method{__init__}
+method:
+
+\begin{memberdesc}{subject}
+The \member{subject} attribute of an \class{Adapter} instance is
+the \var{ob} supplied to its constructor.  That is, it is the object being
+adapted.
+\end{memberdesc}
+
+\begin{memberdesc}{protocol}
+The \member{subject} attribute of an \class{Adapter} instance is
+the \var{proto} supplied to its constructor.  That is, it is the protocol to
+which the \member{subject} is being adapted.
+\end{memberdesc}
+\end{classdesc}
 
 \begin{funcdesc}{NO_ADAPTER_NEEDED}{component, protocol}
 This function simply returns \var{component}.  It is a placeholder used whenever
@@ -1819,6 +2004,9 @@ listed protocols must be adaptable to \class{IOpenProtocol}.
 \end{funcdesc}
 
 
+
+
+
 \begin{funcdesc}{adviseObject}{ob
 \optional{, provides=[ ]} \optional{, doesNotProvide=[ ]}}
 Declare that \var{ob} provides (or does not provide) the specified protocols.
@@ -1830,17 +2018,6 @@ must be adaptable to \class{IOpenProtocol}.  See section
 \ref{protocols-instances}, ``Protocol Declarations for Individual Objects'',
 for more information on using \function{adviseObject}.
 \end{funcdesc}
-
-
-
-
-
-
-
-
-
-
-
 
 
 \begin{funcdesc}{declareAdapter}{factory, provides
@@ -1861,6 +2038,57 @@ items listed in the respective keyword arguments.
 \end{funcdesc}
 
 
+
+
+
+
+
+
+
+
+
+
+\begin{classdesc}{StickyAdapter}{ob, proto}
+\versionadded{1.0}
+This base class is the same as the \class{Adapter} class, but with an extra
+feature.  When a \class{StickyAdapter} instance is created, it declares itself
+as an adapter for its \member{subject}, so that subsequent \function{adapt()}
+calls will return the same adapter instance.  (Technically, it declares an
+adapter function that returns itself.)
+
+This approach is useful when an adapter wants to hold information on behalf of
+its subject, that must not be lost when the subject is adapted in
+more than one place.
+
+Note that for a \class{StickyAdapter} subclass to be useful, the types it
+adapts \emph{must} support \class{IOpenProvider}.  See section
+\ref{protocols-instances}, ``Protocol Declarations for Individual Objects'' for
+more information on this.  Also, you should never declare that a
+\class{StickyAdapter} subclass adapts an individual object (as opposed to a
+type or protocol), since such a declaration would create a conflict when the
+adapter instance tries to register itself as an adapter for that same object
+and protocol.
+
+\class{StickyAdapter} adds one attribute to those defined by \class{Adapter}:
+
+\begin{memberdesc}{attachForProtocols}
+A tuple of additional protocols to be declared by the constructor, in
+addition to the protocol the adapter class was invoked by.  Define this in
+your subclass' body if it is providing multiple protocols, and wants to
+use the same instance to supply them.
+\end{memberdesc}
+
+\end{classdesc}
+
+
+
+
+
+
+
+
+
+
 \begin{classdesc}{Attribute}{doc\optional{,name=\constant{None}, value=\constant{None}}}
 This class is used to document attributes required by an interface.  An example
 usage:
@@ -1877,12 +2105,71 @@ If you are using the ``Abstract Base Class'' or ABC style of interface
 documentation, you may wish to also use the \var{name} and \var{value}
 attributes.  If supplied, the \class{Attribute} object will act as a data
 descriptor, supplying \var{value} as a default value, and storing any newly set
-value in the objects' instance dictionary.  This is useful if you will be
+value in the object's instance dictionary.  This is useful if you will be
 subclassing the abstract base and creating instances of it, but still want to
 have documentation appear in the interface.  When the interface is displayed
 with tools like \program{pydoc} or \function{help()}, the attribute
 documentation will be shown.
 \end{classdesc}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\begin{funcdesc}{protocolForURI}{uri} \versionadded{1.0}
+Return a protocol object that represents the supplied URI or UUID string.  It
+is guaranteed that you will receive the same protocol object if you call this
+routine more than once with equal strings.  This behavior is preserved even
+across pickling and unpickling of the returned protocol object.
+
+The purpose of this function is to permit modules to refer to protocols defined
+in another module, that may or may not be present at runtime.  A more detailed
+description of this function's operations and purpose may be found in
+section \ref{protocols-generated}.
+\end{funcdesc}
+
+\begin{funcdesc}{protocolForType}{baseType,
+\optional{methods=(), implicit=False}} \versionadded{1.0}
+Return a protocol object that represents the subset of \var{baseType} denoted
+by \var{methods}.  It is guaranteed that you will receive the same protocol
+object if you call this routine more than once with eqivalent paremeters.  This
+behavior is preserved even across pickling and unpickling of the returned
+protocol object.
+
+\var{baseType} should be a type object, and \var{methods} should be a sequence
+of attribute or method names.  (The order of the names is not important.)  The
+\var{implicit} flag allows adapting objects that don't explicitly declare
+support for the protocol.
+
+If you supply a true value for the \var{implicit} flag, the returned protocol
+will also adapt objects that have the specified methods or attributes.  In
+other words, \code{protocolForType(file, ['read','close'], True)} returns a
+protocol that will consider any object with \method{read} and \method{close}
+methods to provide that protocol, as well as objects that explicitly support
+\code{protocolForType(file, ['read','close'])}.
+
+A more detailed description of this function's operations and purpose may be
+found in section \ref{protocols-generated}.
+
+(Note: this function may generate up to \code{2**len(\var{methods})} protocol
+objects, so beware of using large method lists.)
+\end{funcdesc}
+
+
 \newpage
 \subsubsection{Classes and Functions typically used for Customization/Extension}
 
