@@ -39,6 +39,8 @@ execfile('src/setup/common.py')
 
 
 
+from setuptools import setup
+
 setup(
     name=PACKAGE_NAME,
     version=PACKAGE_VERSION,
@@ -50,6 +52,7 @@ setup(
 
     url="http://peak.telecommunity.com/PyProtocols.html",
 
+    test_module = TEST_MODULE,
     package_dir = {'':'src'},
     packages    = packages,
     cmdclass = SETUP_COMMANDS,
@@ -57,9 +60,6 @@ setup(
     ext_modules = extensions,
     scripts = scripts,
 )
-
-
-
 
 
 
