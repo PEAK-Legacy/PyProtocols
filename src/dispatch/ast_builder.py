@@ -50,11 +50,12 @@ def com_binary(opname, builder,nodelist):
     items = [nodelist[i] for i in range(1,len(nodelist),2)]
     return getattr(builder,opname)(items)
 
-
 # testlist: test (',' test)* [',']
 # subscriptlist: subscript (',' subscript)* [',']
 testlist = subscriptlist = curry(com_binary, 'Tuple')
 
+# testlist_gexp test (gen_for | (',' test)* [','])
+testlist_gexp = testlist    # XXX
 
 # test: and_test ('or' and_test)* | lambdef
 test = curry(com_binary, 'Or')
@@ -67,7 +68,6 @@ and_test = curry(com_binary, 'And')
 # not_test: 'not' not_test | comparison
 def not_test(builder, nodelist):
     return builder.Not(nodelist[2])
-
 
 
 
