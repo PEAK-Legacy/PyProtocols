@@ -739,13 +739,13 @@ class PredicateTests(TestCase):
     def testParseMembership(self):
         parse = GenericFunction(lambda x,y,z:None).parse
         pe = lambda e: parse(e,locals(),globals())
-        in_test = lambda seq: OrCriterion(*[Inequality('==',v) for v in seq])
 
         self.assertEqual(pe('x in int'), Signature(x=int))
         self.assertEqual(pe('x not in int'), Signature(x=NotCriterion(int)))
-        self.assertEqual(pe('x in (1,2,3)'), Signature(x=in_test([1,2,3])))
+        self.assertEqual(pe('x in (1,2,3)'),
+            predicates.compileIn(Argument(name='x'),[1,2,3],True))
         self.assertEqual(pe('x not in (1,2,3)'),
-            Signature(x=~in_test([1,2,3])))
+            predicates.compileIn(Argument(name='x'),[1,2,3],False))
 
         self.assertEqual(pe('x is y'),
             Signature([(Call(predicates.is_,Argument(name='x'),
@@ -782,40 +782,54 @@ class PredicateTests(TestCase):
         pe = lambda e: parse(e,locals(),globals())
 
         self.assertEqual(pe('isinstance(x,int)'), Signature(x=int))
+
         self.assertEqual(pe('isinstance(x,(str,unicode))'),
-            Signature(x=OrCriterion(str,unicode)))
+            Signature(x=str)|Signature(x=unicode))
+
         self.assertEqual(pe('isinstance(x,(int,(str,unicode)))'),
-            Signature(x=OrCriterion(int,str,unicode)))
+            Signature(x=int)|Signature(x=str)|Signature(x=unicode))
+
         self.assertEqual(pe('not isinstance(x,(int,(str,unicode)))'),
-            Signature(x=~OrCriterion(int,str,unicode)))
+            Signature(x=AndCriterion(
+                ~ICriterion(int), ~ICriterion(str), ~ICriterion(unicode))
+            )
+        )
 
         self.assertEqual(
             pe('issubclass(x,int)'), Signature(x=SubclassCriterion(int)))
+
         self.assertEqual(pe('issubclass(x,(str,unicode))'),
-            Signature(x=OrCriterion(
-                SubclassCriterion(str),SubclassCriterion(unicode))))
+            Signature(x=SubclassCriterion(str)) |
+            Signature(x=SubclassCriterion(unicode))
+        )
+
         self.assertEqual(pe('issubclass(x,(int,(str,unicode)))'),
-            Signature(
-                x=OrCriterion(*map(SubclassCriterion,(int,str,unicode)))))
+            Signature(x=SubclassCriterion(int)) |
+            Signature(x=SubclassCriterion(str)) |
+            Signature(x=SubclassCriterion(unicode))
+        )
+
         self.assertEqual(pe('not issubclass(x,(int,(str,unicode)))'),
             Signature(
-                x=~OrCriterion(*map(SubclassCriterion,(int,str,unicode)))))
+                x=AndCriterion(
+                    *[~SubclassCriterion(x) for x in (int,str,unicode)])
+                )
+        )
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+    def testCompileIn(self):
+        x = Argument(name='x')
+        in_expr = predicates.compileIn(x,[1,2,3],True)
+        not_in = predicates.compileIn(x,[1,2,3],False)           
+        self.failUnless(isinstance(not_in,Signature))
+        self.failUnless(isinstance(in_expr,Predicate))
+        self.assertEqual(in_expr,
+            Predicate([Signature(x=Inequality('==',v)) for v in 1,2,3])
+        )
+        self.assertEqual(not_in,
+            Signature([(x,AndCriterion(*[Inequality('<>',v) for v in 1,2,3]))])
+        )
 
 
     def testParseDNF(self):

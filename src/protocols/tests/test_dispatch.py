@@ -450,45 +450,45 @@ class CriteriaTests(TestCase):
 
 
     def testAndOr(self):
-        def is_in(items):
-            return OrCriterion(*[Inequality('==',x) for x in items])
         equals_two = Inequality('==',2)
-        odd_primes = is_in([3,5,7,11,13,19])
-        lo_primes = OrCriterion(equals_two, odd_primes)
-        self.assertEqual(lo_primes.criteria[1:], odd_primes.criteria) # flatten
-        self.failIf((4,4) in lo_primes)
-        self.failUnless((11,11) in lo_primes)
-
-        # Rephrase as And(Not(), Or(...)), so we can confirm other implications
-        lo_primes = is_in([2,3,5,7,11,13,19])
+        less_than_four = Inequality('<',4)
+        lo_primes = AndCriterion(Inequality('>',1),less_than_four)  #2, 3
         odd_primes = AndCriterion(NotCriterion(equals_two), lo_primes)
         self.failIf((4,4) in lo_primes)
-        self.failUnless((11,11) in lo_primes)
+        self.failUnless((3,3) in lo_primes)
 
-        odd_nums  = is_in([1,3,5,7,9,11,13,15,19])
-        even_nums = is_in([2,4,6,8,10,12,14])
-        even_primes = AndCriterion(lo_primes,even_nums)
+        even_primes = AndCriterion(equals_two,less_than_four)
 
-        self.failIf((3,3) in even_nums)
-        self.failUnless((4,4) in even_nums)
+        self.failUnless((3,3) in less_than_four)
+        self.failIf((4,4) in less_than_four)
 
         self.failIf((3,3) in even_primes)
         self.failUnless((2,2) in even_primes)
 
-        self.failUnless(odd_primes.implies(odd_nums))
-        self.failUnless(odd_primes.implies(lo_primes))
-        self.failUnless(even_primes.implies(even_nums))
+        self.failUnless(even_primes.implies(equals_two))
+        self.failUnless(even_primes.implies(less_than_four))
 
-        self.failIf(lo_primes.implies(even_nums))
-        self.failIf(odd_primes.implies(even_nums))
-
-        self.failUnless(odd_primes.implies(NullCriterion))
         self.failUnless(even_primes.implies(NullCriterion))
-        self.failUnless(lo_primes.implies(NullCriterion))
+
         self.assertRaises(ValueError, AndCriterion,
             Inequality('==',1), TruthCriterion(1))
-        self.assertRaises(ValueError, OrCriterion,
-            Inequality('==',1), HumanPowered)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def testRangeIntersection(self):
         ten_to_twenty = AndCriterion(Inequality('>=',10), Inequality('<=',20))
@@ -514,50 +514,32 @@ class CriteriaTests(TestCase):
                 NotCriterion(ten_to_twenty))
         )
 
-        either = OrCriterion(fifteen_to_nineteen,ten_to_twenty)
         for item in fifteen_to_nineteen, ten_to_twenty:
-            self.failUnless( item.implies(either) )
             self.failUnless( item.implies(NullCriterion) )
             self.failUnless( NotCriterion(item).implies(NullCriterion) )
+
 
     def testClassIntersections(self):
         self.failUnless( Hummer in AndCriterion(LandVehicle,GasPowered) )
         self.failUnless( Speedboat in NotCriterion(LandVehicle) )
-        self.failUnless( Bicycle in
-            OrCriterion(NotCriterion(HumanPowered),LandVehicle) )
         self.failUnless( AndCriterion(LandVehicle,GasPowered).implies(
             GasPowered) )
         # This implication doesn't hold true because RiverBoat is a Wheeled
         # non-LandVehicle; if Riverboat didn't exist the implication would hold
         self.failIf( NotCriterion(LandVehicle).implies(NotCriterion(Wheeled)) )
 
+
+
+
     def testSimplifications(self):
         self.assertEqual((~TruthCriterion(1)), TruthCriterion(0))
         self.assertEqual((~(~TruthCriterion(1))), TruthCriterion(27))
-
-        self.assertEqual(
-            (~AndCriterion(Inequality('>=',10),Inequality('<=',20))),
-            OrCriterion((~Inequality('>=',10)),(~Inequality('<=',20)))
-        )
-
-        self.assertEqual(
-            (~OrCriterion(Inequality('>=',10),Inequality('<=',20))),
-            AndCriterion((~Inequality('>=',10)),(~Inequality('<=',20)))
-        )
 
         self.assertEqual(
             AndCriterion(AndCriterion(Inequality('>=',10),Inequality('<=',20)),
                 Inequality('==',15)
             ),
             AndCriterion(
-                Inequality('>=',10),Inequality('<=',20),Inequality('==',15))
-        )
-
-        self.assertEqual(
-            OrCriterion(OrCriterion(Inequality('>=',10),Inequality('<=',20)),
-                Inequality('==',15)
-            ),
-            OrCriterion(
                 Inequality('>=',10),Inequality('<=',20),Inequality('==',15))
         )
 
@@ -571,6 +553,24 @@ class CriteriaTests(TestCase):
         self.failIf(greater(1,10))
         self.failIf(greater(1,1))
         self.failUnless(greater(2,1))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def testSignatureArithmetic(self):
         x_gt_10 = Signature(x=Inequality('>',10))
@@ -592,9 +592,8 @@ class CriteriaTests(TestCase):
 
         self.assertEqual((x_gt_10 | empty), empty)
         self.assertEqual((empty | x_gt_10), empty)
-        self.assertEqual((x_gt_10 | x_lt_20),
-            Signature(x=OrCriterion(Inequality('>',10),Inequality('<',20)))
-        )
+        self.assertEqual((x_gt_10 | x_lt_20), Predicate([x_gt_10, x_lt_20]))
+
         self.assertEqual((x_gt_10 | y_in_LandVehicle),
             Predicate([x_gt_10,y_in_LandVehicle])
         )
@@ -612,6 +611,7 @@ class CriteriaTests(TestCase):
         self.assertEqual((Predicate([x_gt_10]) | Predicate([y_in_LandVehicle])),
             Predicate([x_gt_10, y_in_LandVehicle])
         )
+
 
         # pred & pred
         self.assertEqual((Predicate([x_gt_10]) & Predicate([y_in_LandVehicle])),

@@ -1259,14 +1259,14 @@ class Signature(object):
         if not they:
             return other  # Always true
 
-        if len(me)==1 and len(they)==1 and me[0][0]==they[0][0]:
-            from predicates import OrCriterion
-            return Signature([
-                (me[0][0][0],
-                    OrCriterion(me[0][1],they[0][1])
-                )
-            ])
         return Predicate([self,other])
+
+
+
+
+
+
+
 
 
     def __eq__(self,other):

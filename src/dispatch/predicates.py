@@ -2,7 +2,7 @@ from __future__ import generators
 from dispatch import *
 from dispatch.strategy import Inequality, Signature, ExprBase, default
 from dispatch.strategy import SubclassCriterion, NullCriterion
-from dispatch.strategy import AbstractCriterion, Pointer
+from dispatch.strategy import AbstractCriterion, Pointer, Predicate
 from dispatch.ast_builder import build
 
 import protocols, operator, dispatch
@@ -10,7 +10,7 @@ from types import NoneType
 
 __all__ = [
     'Call',
-    'AndCriterion', 'OrCriterion', 'NotCriterion', 'TruthCriterion',
+    'AndCriterion', 'NotCriterion', 'TruthCriterion',
     'ExprBuilder', 'Const', 'Getattr', 'Tuple', 'dispatch_by_truth',
     'OrExpr', 'AndExpr', 'CriteriaBuilder', 'expressionSignature',
 ]
@@ -452,42 +452,20 @@ class MultiCriterion(AbstractCriterion):
     def __repr__(self):
         return '%s%r' % (self.__class__.__name__,tuple(self.criteria))
 
+    def __invert__(self):
+        raise NotImplementedError
+
 
 class AndCriterion(MultiCriterion):
     """All criteria must return true for expression"""
 
     __slots__ = ()
 
-    def __invert__(self):
-        return OrCriterion(*[~cri for cri in self.criteria])
-
     def __contains__(self,key):
         for criterion in self.criteria:
             if key not in criterion:
                 return False
         return True
-
-
-class OrCriterion(MultiCriterion):
-    """At least one criterion must return true for expression"""
-
-    __slots__ = ()
-
-    def __invert__(self):
-        return AndCriterion(*[~cri for cri in self.criteria])
-
-    def __contains__(self,key):
-        for criterion in self.criteria:
-            if key in criterion:
-                return True
-        return False
-
-
-
-
-
-
-
 
 
 class NotCriterion(MultiCriterion):
@@ -508,27 +486,8 @@ class NotCriterion(MultiCriterion):
         return key not in self.criteria[0]
 
 
-
 def dispatch_by_truth(ob,table):
     return table.get(bool(ob))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 class TruthCriterion(AbstractCriterion):
@@ -662,12 +621,9 @@ def compileIn(expr,criterion,truth):
         return applyCriterion(expr,criterion,truth)
 
     if truth:
-        criterion = OrCriterion(*[Inequality('==',v) for v in criterion])
+        return or_criteria(expr,[Inequality('==',v) for v in criterion])
     else:
-        criterion = AndCriterion(*[Inequality('<>',v) for v in criterion])
-
-    return Signature([(expr,criterion)])
-
+        return and_criteria(expr,[Inequality('<>',v) for v in criterion])
 
 [dispatch.on('criterion')]
 def applyCriterion(expr,criterion,truth):
@@ -685,11 +641,14 @@ def applyICriterion(expr,criterion,truth):
 def applyDefault(expr,criterion,truth):
     return None     # no special application possible
 
+def or_criteria(expr,seq):
+    seq = [Signature([(expr,v)]) for v in seq]
+    if len(seq)==1:
+        return seq[0]
+    return Predicate(seq)
 
-
-
-
-
+def and_criteria(expr,seq):
+    return Signature([(expr,AndCriterion(*seq))])
 
 
 
@@ -736,10 +695,13 @@ class NotBuilder(CriteriaBuilder):
 
 
 
-def _tupleToOrCriterion(ob):
+def _yield_tuples(ob):
     if isinstance(ob,tuple):
-        return OrCriterion(*map(_tupleToOrCriterion,ob))
-    return ob
+        for i1 in ob:
+            for i2 in _yield_tuples(i1):
+                yield i2
+    else:
+        yield ob
 
 [expressionSignature.when(
     # matches 'isinstance(expr,Const)'
@@ -747,18 +709,15 @@ def _tupleToOrCriterion(ob):
     " and len(expr.argexprs)==2 and expr.argexprs[1] in Const"
 )]
 def convertIsInstanceToClassCriterion(expr,criterion):
-    typecheck = _tupleToOrCriterion(expr.argexprs[1].value)
+
+    seq = _yield_tuples(expr.argexprs[1].value)
+    expr = expr.argexprs[0]
 
     if not criterion.truth:
-        typecheck = ~typecheck
+        return and_criteria(expr,[~ICriterion(cls) for cls in seq])
 
-    return Signature([(expr.argexprs[0],typecheck)])
+    return or_criteria(expr,map(ICriterion,seq))
 
-
-def _tupleToSubclassCriterion(ob):
-    if isinstance(ob,tuple):
-        return OrCriterion(*map(_tupleToSubclassCriterion,ob))
-    return SubclassCriterion(ob)
 
 [expressionSignature.when(
     # matches 'issubclass(expr,Const)'
@@ -766,14 +725,14 @@ def _tupleToSubclassCriterion(ob):
     " and len(expr.argexprs)==2 and expr.argexprs[1] in Const"
 )]
 def convertIsSubclassToSubClassCriterion(expr,criterion):
-    typecheck = _tupleToSubclassCriterion(expr.argexprs[1].value)
+
+    seq = _yield_tuples(expr.argexprs[1].value)
+    expr = expr.argexprs[0]
 
     if not criterion.truth:
-        typecheck = ~typecheck
+        return and_criteria(expr,[~SubclassCriterion(cls) for cls in seq])
 
-    return Signature([(expr.argexprs[0],typecheck)])
-
-
+    return or_criteria(expr,map(SubclassCriterion,seq))
 
 
 
