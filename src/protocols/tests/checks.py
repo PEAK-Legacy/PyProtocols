@@ -3,6 +3,7 @@
 __all__ = [
     'TestBase', 'ImplementationChecks', 'ProviderChecks',
     'InstanceImplementationChecks', 'makeClassTests', 'ClassProvidesChecks',
+    'AdaptiveChecks', 'SimpleAdaptiveChecks',
 ]
 
 from unittest import TestCase, makeSuite, TestSuite
@@ -10,12 +11,6 @@ from protocols import *
 
 
 # Dummy interfaces and adapters used in tests
-
-class IA(Interface):
-    pass
-
-class IB(IA):
-    pass
 
 def a1(ob,p):
     return 'a1',ob
@@ -39,16 +34,17 @@ class IPure(Interface):
 
 
 
+
+
+
+
+
 class TestBase(TestCase):
 
     """Non-adapter instance tests"""
 
-    IA = IA
-    IB = IB
-    Interface = Interface
     a1 = staticmethod(a1)
     a2 = staticmethod(a2)
-    IPure = IPure
 
     def assertObProvidesOnlyA(self):
         assert adapt(self.ob, self.IA, None) is self.ob
@@ -74,12 +70,6 @@ class TestBase(TestCase):
         # This is overridden by tests where 'klass' is a metaclass
         return klass()
 
-
-
-
-
-
-
     def assertObProvidesSubsetOfA(self):
         # Assert that self.ob provides a new subset of self.IA
         # (Caller must ensure that self.ob provides self.IA)
@@ -87,6 +77,7 @@ class TestBase(TestCase):
             advise(protocolIsSubsetOf=[self.IA])
 
         assert adapt(self.ob, IC, None) is self.ob
+
 
 
     def setupBases(self,base):
@@ -110,17 +101,6 @@ class TestBase(TestCase):
             assert adapt(m1,self.IA,None) is m1
             assert adapt(m1,self.IB,None) is m1
 
-
-
-
-
-
-
-
-
-
-
-
     def assertObProvidesABCD(self,IC,ID):
         assert adapt(self.ob, self.IA, None) is self.ob
         assert adapt(self.ob, self.IB, None) is self.ob
@@ -132,27 +112,6 @@ class TestBase(TestCase):
         assert adapt(self.ob, self.IB, None) is None
         assert adapt(self.ob, IC, None) is self.ob
         assert adapt(self.ob, ID, None) is self.ob
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -203,45 +162,13 @@ class ProviderChecks(TestBase):
 
 
 
-class AdaptiveChecks:
+class SimpleAdaptiveChecks:
 
-    """General adapter/protocol implication checks
-
-    These are probably only usable with PyProtocols interfaces"""
+    """Simple adapter-oriented checks that Twisted can handle"""
 
     def checkDelayedImplication(self):
         self.declareObImplements([self.IA])
         self.assertObProvidesSubsetOfA()
-
-    def checkAmbiguity(self):
-        self.declareObAdapts(self.a1,[self.IA])
-        self.assertAmbiguous(self.a1,self.a2,1,1,[self.IA])
-
-    def checkOverrideDepth(self):
-        self.declareObAdapts(self.a1,[self.IB])
-        assert adapt(self.ob,self.IA,None) == ('a1',self.ob)
-
-        self.declareObAdapts(self.a2,[self.IA])
-        assert adapt(self.ob,self.IA,None) == ('a2',self.ob)
-
-
-    def checkComposed(self):
-        class IC(self.Interface): pass
-        declareAdapter(self.a2,provides=[IC],forProtocols=[self.IA])
-        self.declareObAdapts(self.a1,[self.IA])
-        assert adapt(self.ob,IC,None) == ('a2',('a1',self.ob))
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     def checkIndirectImplication(self):
@@ -264,6 +191,43 @@ class AdaptiveChecks:
         self.assertObProvidesABCD(IC,ID)
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+class AdaptiveChecks(SimpleAdaptiveChecks):
+
+    """General adapter/protocol implication checks
+
+    Twisted and Zope can't handle these."""
+
+    def checkAmbiguity(self):
+        self.declareObAdapts(self.a1,[self.IA])
+        self.assertAmbiguous(self.a1,self.a2,1,1,[self.IA])
+
+    def checkOverrideDepth(self):
+        self.declareObAdapts(self.a1,[self.IB])
+        assert adapt(self.ob,self.IA,None) == ('a1',self.ob)
+
+        self.declareObAdapts(self.a2,[self.IA])
+        assert adapt(self.ob,self.IA,None) == ('a2',self.ob)
+
+
+    def checkComposed(self):
+        class IC(self.Interface): pass
+        declareAdapter(self.a2,provides=[IC],forProtocols=[self.IA])
+        self.declareObAdapts(self.a1,[self.IA])
+        assert adapt(self.ob,IC,None) == ('a2',('a1',self.ob))
+
+
     def checkLateDefinition(self):
         # Zope fails this because it has different override semantics
 
@@ -276,11 +240,6 @@ class AdaptiveChecks:
         # NO_ADAPTER_NEEDED at same depth should override DOES_NOT_SUPPORT
         self.declareObAdapts(DOES_NOT_SUPPORT, [self.IA])
         assert adapt(self.ob,self.IA,None) is self.ob
-
-
-
-
-
 
 
 

@@ -11,28 +11,28 @@ from protocols import *
 from checks import ProviderChecks, AdaptiveChecks, ClassProvidesChecks
 from checks import makeClassProvidesTests, makeInstanceTests
 
+class IA(Interface):  pass
+class IB(IA): pass
+class IPure(Interface):
+    # We use this for pickle/copy tests because the other protocols
+    # imply various dynamically created interfaces, and so any object
+    # registered with them won't be picklable
+    pass
+
 
 class BasicChecks(AdaptiveChecks, ProviderChecks):
 
     """Checks to be done on every object"""
 
+    IA = IA
+    IB = IB
+    Interface = Interface
+    IPure = IPure
+
 
 class ClassChecks(ClassProvidesChecks, BasicChecks):
 
     """Checks to be done on classes and types"""
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
