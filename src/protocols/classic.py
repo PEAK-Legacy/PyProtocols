@@ -99,7 +99,7 @@ except ImportError:
         # Older Zopes
         from Interface import Interface as ZopeInterface
         from Interface.Implements import implements as ZopeImplements
-        from Interface.implements import flattenInterfaces as ZopeFlatten
+        from Interface.Implements import flattenInterfaces as ZopeFlatten
 
     except ImportError:
         ZopeInterface = None

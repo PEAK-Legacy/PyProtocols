@@ -1,7 +1,7 @@
 """Zope 3-like API spellings; these will be removed from the main API"""
 
 from api import declareAdapterForType, declareAdapterForObject
-from adapters import NO_ADAPAPTER_NEEDED, DOES_NOT_SUPPORT
+from adapters import NO_ADAPTER_NEEDED, DOES_NOT_SUPPORT
 from advice import addClassAdvisor
 from sys import modules, _getframe
 
