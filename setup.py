@@ -2,7 +2,7 @@
 
 """Distutils setup file"""
 
-from setuptools import setup, Feature, Extension, findPackages
+from setuptools import setup, Feature, Extension, find_packages
 
 # Metadata
 PACKAGE_NAME = "PyProtocols"
@@ -32,7 +32,7 @@ setup(
 
     test_suite  = 'protocols.tests.test_suite',
     package_dir = {'':'src'},
-    packages    = findPackages('src'),
+    packages    = find_packages('src'),
     cmdclass    = SETUP_COMMANDS,
     features    = {'speedups': speedups}
 )
