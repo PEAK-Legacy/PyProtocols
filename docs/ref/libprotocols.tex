@@ -707,8 +707,8 @@ Component adaptation is intended to completely replace all non-cooperative
 introspection techniques, such as \function{type()}, \function{isinstance()},
 \function{hasattr()}, and even interface checks.  Such introspection
 tends to limit framework flexibility by unnecessarily closing policies to
-extension by end users.  It often makes code maintenance more difficult as
-well, since such checks are often performed in more than one place, and
+extension by framework users.  It often makes code maintenance more difficult
+as well, since such checks are often performed in more than one place, and
 must be kept in sync whenever a new interface or type must be checked.
 
 Some common use cases for such introspection are:
