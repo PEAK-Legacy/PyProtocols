@@ -18,7 +18,7 @@ HAPPYDOC_IGNORE = [
 scripts = []
 
 packages = [
-    'protocols',
+    'protocols', 'protocols.tests',
 ]
 
 extensions = []
