@@ -52,7 +52,7 @@ class APITests(TestCase):
 
     def checkAdviseModuleKeywordsValidated(self):
         try:
-            exec "advise(instancesProvide=[list])" in globals(),globals()
+            exec "advise(instancesProvide=[IProtocol1])" in globals(),globals()
         except TypeError,v:
             assert v.args==(
              "Invalid keyword argument for advising modules: instancesProvide",
@@ -60,18 +60,18 @@ class APITests(TestCase):
         else:
             raise AssertionError("Should've caught invalid keyword")
 
+    def checkAdviseInClassExec(self):
+        d = {'advise':advise,'IProtocol1':IProtocol1}
+        exec "class Foo: advise(instancesProvide=[IProtocol1])" in d
 
     def checkSimpleAdaptation(self):
-
         class Conformer:
             def __conform__(self,protocol):
                 if protocol==42:
                     return "hitchhiker",self
-
         class AdaptingProtocol:
             def __adapt__(klass,ob):
                 return "adapted", ob
-
             __adapt__ = classmethod(__adapt__)
 
         c = Conformer()

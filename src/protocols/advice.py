@@ -190,7 +190,7 @@ def addClassAdvisor(callback, depth=2,frame=None):
     frame = frame or sys._getframe(depth)
     kind, module, caller_locals, caller_globals = getFrameInfo(frame)
 
-    if kind != "class":
+    if kind not in ("class","class-exec"):
         raise SyntaxError(
             "Advice must be in the body of a class statement"
         )
