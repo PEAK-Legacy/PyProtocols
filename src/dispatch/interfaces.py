@@ -84,12 +84,6 @@ class ITest(Interface):
         """Return iterable of keys from 'table' that this test is true for"""
 
 
-    def appliedTo(expr):
-        """Return an 'ISignature' or 'IDispatchPredicate' for 'expr in test'
-
-        'expr' must be an 'IDispatchableExpression'
-        """
-
     def subscribe(listener):
         """Call 'listener.testChanged()' if test's applicability changes
 
@@ -99,6 +93,7 @@ class ITest(Interface):
         """Stop calling 'listener.testChanged()'
 
         Unsubscribing a listener that was not subscribed should be a no-op."""
+
 
 
 class IDispatchFunction(Interface):
@@ -119,6 +114,11 @@ class IDispatchFunction(Interface):
 
     def __hash__():
         """Return hashcode"""
+
+
+
+
+
 
 
 class IDispatchTable(Interface):

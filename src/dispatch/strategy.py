@@ -58,11 +58,11 @@ __all__ = [
     'default',
 ]
 
-
-
-
-
-
+rev_ops = {
+    '>': '<=', '>=': '<', '=>': '<',
+    '<': '>=', '<=': '>', '=<': '>',
+    '<>': '==', '!=': '==', '==':'!='
+}
 
 
 
@@ -201,7 +201,7 @@ class ClassTest(Adapter):
                 yield key
 
     def __invert__(self): from predicates import NotTest; return NotTest(self)
-    def appliedTo(self,expr): return Signature([(expr, self)])
+
 
 class _ExtremeType(object):     # Courtesy of PEP 326
 
@@ -282,8 +282,8 @@ class Inequality(object):
                 return True
         return False
 
-    def __invert__(self): from predicates import NotTest; return NotTest(self)
-    def appliedTo(self,expr): return Signature([(expr, self)])
+    def __invert__(self):
+        return Inequality(rev_ops[self.op], self.val)
 
     def implies(self,otherTest):
         for r in self.ranges:
@@ -406,7 +406,7 @@ class ProtocolTest(StickyAdapter):
                 yield key
 
     def __invert__(self): from predicates import NotTest; return NotTest(self)
-    def appliedTo(self,expr): return Signature([(expr, self)])
+
 
     def implies(self,otherTest):
 

@@ -517,7 +517,7 @@ class MultiTest(object):
             if key in self:
                 yield key
 
-    def appliedTo(self,expr): return Signature([(expr, self)])
+
 
 
 
@@ -576,18 +576,6 @@ class NotTest(MultiTest):
 
     elim_single = False
 
-    def xxx__new__(klass, test):
-        test = ITest(test)
-        if isinstance(test,NotTest):
-            return test.test
-        elif isinstance(test,OrTest):
-            return AndTest(*map(NotTest, test.tests))
-        elif isinstance(test,AndTest):
-            return OrTest(*map(NotTest, test.tests))
-        elif isinstance(test,TruthTest):
-            return TruthTest(not test.truth)
-        return super(NotTest,klass).__new__(klass,test)
-
     def __init__(self, test):
         test = self.test = ITest(test)
         self.tests = test,
@@ -606,6 +594,18 @@ def dispatch_by_truth(ob,table):
         return table.get(True)
     else:
         return table.get(False)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -648,7 +648,7 @@ class TruthTest(object):
     def matches(self,table):
         return self.truth,
 
-    def appliedTo(self,expr): return Signature([(expr, self)])
+
 
 
 
@@ -661,6 +661,38 @@ def expressionSignature(expr,test):
 [expressionSignature.when(default)]
 def expressionSignature(expr,test):
     return Signature([(expr,test)])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class TestBuilder:
@@ -690,11 +722,6 @@ class TestBuilder:
             self.__class__ = TestBuilder
 
 
-
-
-
-
-
     _mirror_ops = {
         '>': '<', '>=': '<=', '=>':'<=',
         '<': '>', '<=': '>=', '=<':'>=',
@@ -702,8 +729,14 @@ class TestBuilder:
         'is': 'is', 'is not': 'is not'
     }
 
-    def Compare(self,initExpr,((op,other),)):
 
+
+
+
+
+
+
+    def Compare(self,initExpr,((op,other),)):
         left = build(self.expr_builder,initExpr)
         right = build(self.expr_builder,other)
 
@@ -712,60 +745,68 @@ class TestBuilder:
 
         if isinstance(right,Const):
             if op=='in' or op=='not in':
-                right = sequence_test(right.value) or ITest(right.value)
-                if op=='not in':
-                    right = ~right
-            elif op=='is' or op=='is not':
-                if right.value is None:
-                    right = ITest(NoneType)
-                    if op=='is not':
-                        right = ~right
-                else:
-                    left, right = Call(is_,left,right), TruthTest(op=='is')
+                cond = compileIn(left,right.value,op=='in')
+                if cond is not None:
+                    return cond
             else:
-                right = Inequality(op,right.value)
+                if op=='is' or op=='is not':
+                    if right.value is None:
+                        right = ITest(NoneType)
+                        if op=='is not':
+                            right = ~right
+                    else:
+                        left, right = Call(is_,left,right), TruthTest(op=='is')
+                else:
+                    right = Inequality(op,right.value)
+                return Signature([(left, right)])
 
-            return right.appliedTo(left)  #Signature([(left, right)])
-
-        else:
-            # Both sides involve variables, so it's a boolean test  :(
-            return expressionSignature(
-                self.expr_builder.Compare(initExpr,((op,other),)),
-                self.mode
-            )
-
-
+        # Both sides involve variables or an un-optimizable constant,
+        #  so it's a generic boolean test  :(
+        return expressionSignature(
+            self.expr_builder.Compare(initExpr,((op,other),)), self.mode
+        )
 
     def And(self,items):
         sig = build(self,items[0])
-        for expr in items[1:]:
-            sig &= build(self,expr)
+        for expr in items[1:]: sig &= build(self,expr)
         return sig
 
     def Or(self,items):
         sig = build(self,items[0])
-        for expr in items[1:]:
-            sig |= build(self,expr)
+        for expr in items[1:]: sig |= build(self,expr)
         return sig
 
 
-
-def sequence_test(seq):
+def compileIn(expr,test,truth):
+    """Return a signature or predicate (or None) for 'expr in test'"""
     try:
-        iter(seq)
+        iter(test)
     except TypeError:
-        return None
+        return applyTest(expr,test,truth)
+
+    if truth:
+        test = OrTest(*[Inequality('==',v) for v in test])
     else:
-        return OrTest(*[Inequality('==',v) for v in seq])
+        test = AndTest(*[Inequality('<>',v) for v in test])
+
+    return Signature([(expr,test)])
+        
+
+[dispatch.on('test')]
+def applyTest(expr,test,truth):
+    """Apply 'test' to 'expr' (ala 'expr in test') -> signature or predicate"""
 
 
+[applyTest.when(ITest)]
+def applyITest(expr,test,truth):
+    if not truth:
+        test = ~test
+    return Signature([(expr,test)])
 
 
-
-
-
-
-
+[applyTest.when(object)]
+def applyDefault(expr,test,truth):
+    return None     # no special application possible
 
 
 
