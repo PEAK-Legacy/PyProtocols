@@ -4,7 +4,7 @@ import protocols
 __all__ = [
     'Call', 'Argument', 'Signature', 'PositionalSignature',
     'AndTest', 'OrTest', 'NotTest', 'TruthTest',
-    #'Const','Getattr','Tuple','Var','dispatch_by_truth',
+    'Const', 'Getattr', 'Tuple', 'Var', 'dispatch_by_truth',
 ]
 
 
@@ -39,11 +39,11 @@ class ExprBase(object):
 
 
 
-'''class Var(ExprBase):
+class Var(ExprBase):
 
     """Look up a variable in a sequence of namespaces"""
 
-    def __init__(self,var_name,namespaces):
+    def __init__(self,var_name,*namespaces):
         self.namespaces = namespaces
         self.var_name = var_name
         self.hash = hash((type(self),tuple(map(id,namespaces)),var_name))
@@ -51,9 +51,9 @@ class ExprBase(object):
 
     def __eq__(self,other):
 
-        if not isinstance(other,Var) or self.namespaces!=other.namespaces \
-            or other.var_name!=self.var_name \
-        :
+        if (not isinstance(other,Var) or self.namespaces!=other.namespaces
+            or other.var_name!=self.var_name
+        ):
             return False
 
         for myns,otherns in zip(self.namespaces,other.namespaces):
@@ -137,7 +137,7 @@ class Const(ExprBase):
 
     def asFuncAndIds(self,generic):
         return lambda:self.value,()
-'''
+
 
 
 class Call(ExprBase):
@@ -338,9 +338,9 @@ class TruthTest(object):
 
     protocols.advise(instancesProvide=[ITest])
 
-    dispatch_function = dispatch_by_truth
+    dispatch_function = staticmethod(dispatch_by_truth)
 
-    def __init__(self,truth):
+    def __init__(self,truth=True):
         self.truth = not not truth  # force boolean
 
     def seeds(self,table):

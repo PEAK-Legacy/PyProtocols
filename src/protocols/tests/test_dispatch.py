@@ -368,9 +368,7 @@ class TestTests(TestCase):
 
 
     def testSimplifications(self):
-
         self.assertEqual(NotTest(TruthTest(1)), TruthTest(0))
-
         self.assertEqual(NotTest(NotTest(TruthTest(1))), TruthTest(27))
 
         self.assertEqual(
@@ -398,13 +396,15 @@ class TestTests(TestCase):
         )
 
 
+    def testTruthDispatch(self):
+        x_gt_y = Call(operator.gt, Argument(name='x'), Argument(name='y'))
+        greater = GenericFunction(args=['x','y'])
+        greater[Signature([(x_gt_y, TruthTest(False))])] = lambda x,y: False
+        greater[Signature([(x_gt_y, TruthTest(True))])]  = lambda x,y: True
 
-
-
-
-
-
-
+        self.failIf(greater(1,10))
+        self.failIf(greater(1,1))
+        self.failUnless(greater(2,1))
 
 
 
@@ -460,7 +460,7 @@ class ExpressionTests(TestCase):
         self.assertEqual(f.argByName('a'), f.argByName('a'))
 
         for arg in arga,argb,argc:
-            self.assertEqual(arg, (0,1))
+            self.assertEqual(arg, (RAW_VARARGS_ID,RAW_KWDARGS_ID))
 
         args = (1,2,3); kw={'a':1, 'b':2, 'c':3}
 
@@ -529,6 +529,88 @@ class ExpressionTests(TestCase):
 
 
 
+
+
+    def testConsts(self):
+        f = GenericFunction(args=['x'])
+        x_plus_two = Call(operator.add,Argument(name='x'),Const(2))
+
+        f[Signature([(x_plus_two,Inequality('>',10))])] = lambda x: True
+        f[Signature([])] = lambda x: False
+
+        self.failUnless(f(9))
+        self.failIf(f(8))
+
+        foo, bar, fourA, fourB = Const("foo"),Const("bar"),Const(4),Const(4)
+        self.assertEqual(fourA,fourB)
+        self.assertEqual(hash(fourA),hash(fourB))
+        self.assertNotEqual(bar,foo)
+        self.assertNotEqual(hash(bar),hash(foo))
+
+
+    def testGetattr(self):
+        vehicle_mpg = Getattr(Argument(name='v'),'mpg')
+        test_mpg = lambda test,val: (vehicle_mpg,Inequality(test,val))
+        fuel_efficient = GenericFunction(args=['v'])
+        fuel_efficient[Signature([test_mpg('==','N/A')])] = lambda v: True
+        fuel_efficient[Signature([test_mpg('>',35)])]     = lambda v: True
+        fuel_efficient[Signature([])] = lambda v: False
+
+        b=Bicycle(); b.mpg = 'N/A'; h=Hummer();  h.mpg = 10
+        self.failUnless(fuel_efficient(b))
+        self.failIf(fuel_efficient(h))
+
+        vm2 = Getattr(Argument(name='v'),'mpg')
+        xm = Getattr(Argument(name='x'),'mpg')
+        vg = Getattr(Argument(name='v'),'gpm')
+
+        self.assertEqual(vehicle_mpg, vm2)
+        self.assertEqual(hash(vehicle_mpg), hash(vm2))
+        for item in xm,vg:
+            self.assertNotEqual(vehicle_mpg, item)
+            self.assertNotEqual(hash(vehicle_mpg), hash(item))
+
+
+
+    def testTuple(self):
+        xy = Tuple(tuple,Argument(name='x'),Argument(name='y'))
+        xy_is_one_two = GenericFunction(args=['x','y'])
+        xy_is_one_two[Signature([(xy,Inequality('==',(1,2)))])] = lambda x,y:True
+        xy_is_one_two[Signature([])] = lambda x,y: False
+
+        self.failUnless(xy_is_one_two(1,2))
+        self.failIf(xy_is_one_two(1,3))
+        self.failIf(xy_is_one_two(2,1))
+
+        xy2 = Tuple(tuple,Argument(name='x'),Argument(name='y'))
+        yx = Tuple(tuple,Argument(name='y'),Argument(name='x'))
+        lx = Tuple(list,Argument(name='x'),Argument(name='y'))
+        zz = Tuple(tuple,Argument(name='z'),Argument(name='z'))
+
+        self.assertEqual(xy, xy2)
+        self.assertEqual(hash(xy), hash(xy2))
+        for item in yx,lx,zz:
+            self.assertNotEqual(xy, item)
+            self.assertNotEqual(hash(xy), hash(item))
+
+    def testVar(self):
+        d1={}; d2={}
+        x = Var('x',d1,d2)
+        foo = GenericFunction(args=[])
+        foo[Signature([(x,Inequality('==',"foo"))])] = lambda: True
+        foo[Signature([])] = lambda: False
+
+        d2['x']="foo"; self.failUnless(foo())
+        d1['x']="bar"; self.failIf(foo())
+        del d2['x'];   self.failIf(foo())
+        del d1['x'];   self.assertRaises(NameError, foo)
+
+        x2 = Var('x',d1,d2)
+        self.assertEqual(x, x2)
+        self.assertEqual(hash(x), hash(x2))
+        for item in Var('y',d1,d2),Var('x',d1),Var('x',d1,{}),Var('x',d2,d1):
+            self.assertNotEqual(x, item)
+            self.assertNotEqual(hash(x), hash(item))
 
 
 class GenericTests(TestCase):

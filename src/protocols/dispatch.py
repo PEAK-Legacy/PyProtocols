@@ -5,24 +5,23 @@
  for Python, while adding a few other enhancements like incremental index
  building and lazy expansion of the dispatch DAG.   Also, their algorithm
  was designed only for class selection and true/false tests, while this
- framework can be used with any kind of test, such as numeric
- ranges, or custom tests such as categorization/hierarchy membership.  (So far,
- only class and protocol membership are implemented.)
+ framework can be used with any kind of test, such as numeric ranges, or custom
+ tests such as categorization/hierarchy membership.
 
  NOTE: this module is not yet ready for prime-time.  APIs are subject to change
  randomly without notice.  You have been warned!
 
  TODO
 
-    * Argument enhancements: Lazy-get for and/or, variadic args, kw args, etc.
-
     * Express arbitrary predicates as Python expressions (in string form)
+
+    * Expression/test ordering constraints
 
     * Convenience API using function decorators
 
     * Support before/after/around methods, and result combination ala CLOS
 
-    * Expression/test ordering constraints
+    * Argument enhancements: variadic args, kw args, etc.
 
     * Support costs on expressions
 
@@ -31,9 +30,10 @@
 
     * Add C speedups
 
+    * Thread-safety
+
     * Support DAG-walking for visualization, debugging, and ambiguity detection
 """
-
 
 
 
@@ -56,6 +56,7 @@ __all__ = [
     'most_specific_signatures', 'ordered_signatures',
     'dispatch_by_mro', 'next_method', 'IDispatchableExpression',
     'IGenericFunction', 'Min', 'Max', 'Inequality', 'IDispatchTable',
+    'EXPR_GETTER_ID','RAW_VARARGS_ID','RAW_KWDARGS_ID',
 ]
 
 
@@ -67,10 +68,9 @@ class NoApplicableMethods(Exception):
     """No applicable method has been defined for the given arguments"""
 
 
-
-
-
-
+EXPR_GETTER_ID = 0
+RAW_VARARGS_ID = 1
+RAW_KWDARGS_ID = 2
 
 
 
@@ -221,7 +221,18 @@ class IGenericFunction(Interface):
         """Return 'asFuncAndIds()' for argument number 'pos'"""
 
     def getExpressionId(expr):
-        """Return an expression ID for use in 'asFuncAndIds()' 'idtuple'"""
+        """Return an expression ID for use in 'asFuncAndIds()' 'idtuple'
+
+        Note that the constants 'EXPR_GETTER_ID', 'RAW_VARARGS_ID', and
+        'RAW_KWDARGS_ID' may be used in place of calling this method, if
+        one of the specified expressions is desired.
+
+        'EXPR_GETTER_ID' corresponds to a function that will return the value
+        of any other expression whose ID is passed to it.  'RAW_VARARGS_ID'
+        and 'RAW_KWDARGS_ID' correspond to the raw varargs tuple and raw
+        keyword args dictionary supplied to the generic function on a given
+        invocation.
+        """
 
     def testChanged():
         """Notify that a test has changed meaning, invalidating any indexes"""
@@ -230,17 +241,6 @@ class IGenericFunction(Interface):
         """Empty all signatures, methods, tests, expressions, etc."""
 
     # copy() ?
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -455,6 +455,7 @@ class _Notifier(Protocol):
 
     def __init__(self,baseProto):
         Protocol.__init__(self)
+        from weakref import WeakKeyDictionary
         self.__subscribers = WeakKeyDictionary()
         baseProto.addImpliedProtocol(self, protocols.NO_ADAPTER_NEEDED, 1)
 
@@ -474,7 +475,6 @@ class _Notifier(Protocol):
             self._Protocol__lock.release()
 
     def registerImplementation(self,klass,adapter=protocols.NO_ADAPTER_NEEDED,depth=1):
-
         old_reg = Protocol.registerImplementation.__get__(self,self.__class__)
         result = old_reg(klass,adapter,depth)
 
@@ -796,7 +796,7 @@ class GenericFunction:
         self.cases = []
         self.disp_indexes = {}
         self.expr_map = {}
-        self.expr_defs = [None,None]    # args+kw
+        self.expr_defs = [None,None,None]    # get,args,kw
         self._dispatcher = None
 
 
@@ -862,7 +862,11 @@ class GenericFunction:
     def __call__(self,*__args,**__kw):
 
         node = self._dispatcher
-        cache = {0:__args, 1:__kw}
+
+        if node is None:
+            node = self._dispatcher = self._build_dispatcher()
+            if node is None:
+                raise NoApplicableMethods
 
         def get(expr_id):
             if expr_id in cache:
@@ -870,23 +874,30 @@ class GenericFunction:
             f,args = self.expr_defs[expr_id]
             return f(*map(get,args))
 
-        if node is None:
-            node = self._dispatcher = self._build_dispatcher()
+        cache = {
+            EXPR_GETTER_ID: get, RAW_VARARGS_ID:__args, RAW_KWDARGS_ID:__kw
+        }
 
-        while node is not None:
+        try:
+            while node is not None and type(node) is DispatchNode:
 
-            if type(node) is DispatchNode:
                 (expr, dispatch_function) = node.expr_id
 
                 if node.contents:
                     node.build()
 
                 node = dispatch_function(get(expr), node)         # XXX
+        finally:
+            cache = None    # allow GC of values computed during dispatch
 
-            else:
-                return node(*__args,**__kw)
+        if node is not None:
+            return node(*__args,**__kw)
+        else:
+            raise NoApplicableMethods
 
-        raise NoApplicableMethods
+
+
+
 
 
     def __argByNameAndPos(self,name,pos):
@@ -897,7 +908,7 @@ class GenericFunction:
             else:
                 return args[pos]
 
-        return getArg, (0,1)
+        return getArg, (RAW_VARARGS_ID,RAW_KWDARGS_ID)
 
 
     def argByName(self,name):
@@ -905,6 +916,29 @@ class GenericFunction:
 
     def argByPos(self,pos):
         return self.args_by_name[self.args[pos]]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     def __setitem__(self,signature,method):
@@ -917,6 +951,7 @@ class GenericFunction:
             ]
         )
         self._addCase((signature, method))
+
 
     def _addCase(self,case):
         (signature,method) = case
@@ -939,6 +974,12 @@ class GenericFunction:
 
         self.cases.append(case)
         self._dispatcher = None
+
+
+
+
+
+
 
 
     def _best_split(self, cases, disp_ids):
