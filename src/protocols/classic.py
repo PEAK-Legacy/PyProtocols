@@ -5,7 +5,7 @@ __all__ = ['ProviderMixin']
 from types import FunctionType, ModuleType, InstanceType, ClassType
 
 from adapters import *
-from api import declareImplementation, advise, declareAdapterForObject
+from api import declareImplementation, advise, declareAdapterForObject, adapt
 from interfaces import *
 from new import instancemethod
 from advice import getMRO, metamethod
@@ -52,7 +52,7 @@ class ProviderMixin:
         if registry is None:
             self.__protocols_provided__ = registry = {}
         if updateWithSimplestAdapter(registry,protocol,adapter,depth):
-            protocol.addImplicationListener(self)
+            adapt(protocol,IOpenProtocol).addImplicationListener(self)
 
     declareProvides = metamethod(declareProvides)
 
@@ -205,7 +205,7 @@ class MiscObjectsAsOpenProvider(object):
 
     def declareProvides(self, protocol, adapter=NO_ADAPTER_NEEDED, depth=1):
         if updateWithSimplestAdapter(self.reg, protocol, adapter, depth):
-            protocol.addImplicationListener(self.reg)
+            adapt(protocol,IOpenProtocol).addImplicationListener(self.reg)
 
 
     def newRegistry(self,subject):
