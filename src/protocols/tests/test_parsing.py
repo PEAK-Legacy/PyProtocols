@@ -331,7 +331,9 @@ class ExprBuilderTests(TestCase):
     """Test that expression builder builds correct IDispatchableExpressions"""
 
     def setUp(self):
-        self.arguments  = arguments = ['a','b','c','d','e','f','g']
+        self.arguments  = arguments = dict(
+            [(n,Argument(name=n)) for n in 'abcdefg']
+        )
         self.namespaces = namespaces = locals(),globals(),__builtins__
         self.builder    = builder    = ExprBuilder(arguments,*namespaces)
 
@@ -361,8 +363,6 @@ class ExprBuilderTests(TestCase):
         self.assertEqual(self.parse("123"), Const(123))
         self.assertEqual(self.parse("'xyz'"), Const('xyz'))
         self.assertEqual(self.parse("'abc' 'xyz'"), Const('abcxyz'))
-
-
 
 
 
@@ -639,12 +639,12 @@ class ExprBuilderTests(TestCase):
             )
         )
 
-
-
-
-
-
-
+    def testTrivialMacros(self):
+        a,b,c = Argument(name='a'), Argument(name='b'), Argument(name='c')
+        self.arguments['q'] = Call(operator.gt,a,b)
+        self.assertEqual(self.parse("q"), Call(operator.gt,a,b))
+        self.assertEqual(self.parse("c and q"),
+            AndExpr(c,Call(operator.gt,a,b)))
 
 
 

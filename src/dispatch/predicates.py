@@ -1,6 +1,6 @@
 from __future__ import generators
 from dispatch import *
-from dispatch.strategy import Inequality, Signature, ExprBase, Argument,default
+from dispatch.strategy import Inequality, Signature, ExprBase, default
 from dispatch.functions import NullTest
 from dispatch.ast_builder import build
 
@@ -50,7 +50,7 @@ class ExprBuilder:
 
     def Name(self,name):
         if name in self.arguments:
-            return Argument(name=name)
+            return self.arguments[name]
 
         if self.bind_globals:
             for ns in self.namespaces[1:]:

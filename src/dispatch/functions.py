@@ -178,7 +178,7 @@ def declareForProto(pro,proto,factory):
     protocols.declareAdapter(factory,provides=[proto],forProtocols=[pro])
 
 def declareForSequence(seq,proto,factory):
-    for item in seq: declarePredicate(item,proto,factory)    
+    for item in seq: declarePredicate(item,proto,factory)
 
 declareForType(ClassType, proto, lambda ob:(ob,declareForType))
 declareForType(type,      proto, lambda ob:(ob,declareForType))
@@ -204,13 +204,14 @@ declareForProto(protocols.IBasicSequence,proto,
 
 
 class Dispatcher:
-
     """Extensible multi-dispatch mapping object"""
 
     protocols.advise(instancesProvide=[IDispatcher])
 
     def __init__(self,args,method_combiner=None):
         self.args = args
+        from dispatch.strategy import Argument
+        self.argMap = dict([(name,Argument(name=name)) for name in args])
         if method_combiner is None:
             from strategy import single_best_method as method_combiner
         self.method_combiner = method_combiner
@@ -239,9 +240,8 @@ class Dispatcher:
     def parse(self,expr_string,local_dict,global_dict):
         from dispatch.predicates import TestBuilder
         from dispatch.ast_builder import parse_expr
-        builder=TestBuilder(self.args,local_dict,global_dict,__builtins__)
+        builder=TestBuilder(self.argMap,local_dict,global_dict,__builtins__)
         return parse_expr(expr_string,builder)
-
 
 
     def _build_dispatcher(self, state=None):
@@ -534,7 +534,7 @@ class Dispatcher:
 class GenericFunction(Dispatcher):
 
     """Extensible multi-dispatch generic function"""
-    
+
     protocols.advise(instancesProvide=[IGenericFunction])
 
     delegate = None
@@ -551,7 +551,7 @@ class GenericFunction(Dispatcher):
         Dispatcher.__init__(self,args,method_combiner)
 
     # We can't be used as a method, but make pydoc think we're a callable
-    __get__ = None  
+    __get__ = None
 
 
     def addMethod(self,predicate,function):
