@@ -1,11 +1,206 @@
 from dispatch import *
-import protocols
+import protocols, operator
+from ast_builder import build
 
 __all__ = [
     'Call', 'Argument', 'Signature', 'PositionalSignature',
-    'AndTest', 'OrTest', 'NotTest', 'TruthTest',
+    'AndTest', 'OrTest', 'NotTest', 'TruthTest', 'ExprBuilder',
     'Const', 'Getattr', 'Tuple', 'Var', 'dispatch_by_truth',
 ]
+
+
+# Helper functions for operations not supplied by the 'operator' module
+
+def is_(o1,o2):
+    return o1 is o2
+
+def is_not(o1,o2):
+    return o1 is not o2
+
+def not_in(o1,o2):
+    return o1 not in o2
+
+def add_dict(d1,d2):
+    d1 = d1.copy()
+    d1.update(d2)
+    return d1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class ExprBuilder:
+
+    bind_globals = True
+    simplify_comparisons = True
+
+    def __init__(self,arguments,*namespaces):
+        self.arguments = arguments
+        self.namespaces = namespaces
+
+    def Name(self,name):
+        if name in self.arguments:
+            return Argument(name=name)
+        elif name in self.namespaces[0]:
+            return Var(name,self.namespaces[0])
+        if self.bind_globals:
+            for ns in self.namespaces[1:]:
+                if name in ns:
+                    return Const(ns[name])
+        return Var(name,*self.namespaces)
+
+    def Const(self,value):
+        return Const(value)
+
+    def Getattr(self,expr,attr):
+        return Getattr(build(self,expr),attr)
+
+    _cmp_ops = {
+        '>': operator.gt, '>=': operator.ge,
+        '<': operator.lt, '<=': operator.le,
+        '<>': operator.ne, '!=': operator.ne, '==':operator.eq,
+        'in': operator.contains, 'not in': not_in,
+        'is': is_, 'is not': is_not
+    }
+
+    def Compare(self,initExpr,((op,other),)):
+        return Call(
+            self._cmp_ops[op], build(self,initExpr), build(self,other)
+        )
+
+
+
+    def mkBinOp(op):
+        def method(self,left,right):
+            return Call(op, build(self,left), build(self,right))
+        return method
+
+    LeftShift  = mkBinOp(operator.lshift)
+    Power      = mkBinOp(pow)
+    RightShift = mkBinOp(operator.rshift)
+    Add        = mkBinOp(operator.add)
+    Sub        = mkBinOp(operator.sub)
+    Mul        = mkBinOp(operator.mul)
+    Div        = mkBinOp(operator.div)
+    Mod        = mkBinOp(operator.mod)
+    FloorDiv   = mkBinOp(operator.floordiv)
+
+    def multiOp(op):
+        def method(self,items):
+            result = build(self,items[0])
+            for item in items[1:]:
+                result = Call(op, result, build(self,item))
+            return result
+        return method
+
+    Bitor      = multiOp(operator.or_)
+    Bitxor     = multiOp(operator.xor)
+    Bitand     = multiOp(operator.and_)
+
+    def unaryOp(op):
+        def method(self,expr):
+            return Call(op, build(self,expr))
+        return method
+
+    UnaryPlus  = unaryOp(operator.pos)
+    UnaryMinus = unaryOp(operator.neg)
+    Invert     = unaryOp(operator.invert)
+    Backquote  = unaryOp(repr)
+    Not        = unaryOp(operator.not_)
+
+
+
+
+    def tupleOp(op):
+        def method(self,items):
+            return Tuple(op,*[build(self,item) for item in items])
+        return method
+
+    Tuple      = tupleOp(tuple)
+    List       = tupleOp(list)
+
+    def Dict(self, items):
+        keys = Tuple(tuple, *[build(self,k) for k,v in items])
+        vals = Tuple(tuple, *[build(self,v) for k,v in items])
+        return Call(dict, Call(zip, keys, vals))
+
+    def Subscript(self,left,right):
+        left, right = build(self,left), build(self,right)
+        if isinstance(right,tuple):
+            return Call(operator.getslice,left,*right)
+        else:
+            return Call(operator.getitem,left,right)
+
+    def Slice(self,start,stop):
+        return build(self,start), build(self,stop)
+
+    def Sliceobj(self,*args):
+        return Call(slice,*[build(self,arg) for arg in args])
+
+    #And        = multiOp('And(%s)')
+    #Or         = multiOp('Or(%s)')
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def CallFunc(self,funcExpr,args,kw,star,dstar):
+
+        func = build(self,funcExpr)
+
+        if isinstance(func,Const) and not kw and not star and not dstar:
+            return Call(func.value, *[build(self,arg) for arg in args])
+
+        elif kw or dstar or args or star:
+
+            if args:
+                args = Tuple(tuple,*[build(self,arg) for arg in args])
+                if star:
+                    args = Call(
+                        operator.add, args, Call(tuple,build(self,star))
+                    )
+
+            elif star:
+                args = build(self,star)
+
+            if kw or dstar:
+
+                args = args or Const(())
+
+                if kw:
+                    kw = self.Dict(kw)
+                    if dstar:
+                        kw = Call(add_dict, kw, build(self,dstar))
+                elif dstar:
+                    kw = build(self,dstar)
+
+                return Call(apply, func, args, kw)
+
+            else:
+                return Call(apply, func, args)
+
+        else:
+            return Call(apply,func)
+
+
 
 
 class ExprBase(object):
@@ -20,6 +215,16 @@ class ExprBase(object):
 
     def asFuncAndIds(self,generic):
         raise NotImplementedError
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -81,7 +286,6 @@ class Var(ExprBase):
 
 
 class Tuple(ExprBase):
-
     """Compute an expression by calling a function with an argument tuple"""
 
     def __init__(self,function=tuple,*argexprs):
@@ -99,9 +303,11 @@ class Tuple(ExprBase):
             map(generic.getExpressionId, self.argexprs)
         )
 
+    def __repr__(self):
+        return 'Tuple%r' % (((self.function,)+self.argexprs),)
+
 
 class Getattr(ExprBase):
-
     """Compute an expression by calling a function with 0 or more arguments"""
 
     def __init__(self,ob_expr,attr_name):
@@ -120,9 +326,7 @@ class Getattr(ExprBase):
         )
 
 
-
 class Const(ExprBase):
-
     """Compute a 'constant' value"""
 
     def __init__(self,value):
@@ -138,10 +342,11 @@ class Const(ExprBase):
     def asFuncAndIds(self,generic):
         return lambda:self.value,()
 
+    def __repr__(self):
+        return 'Const(%r)' % (self.value,)
 
 
 class Call(ExprBase):
-
     """Compute an expression by calling a function with 0 or more arguments"""
 
     def __init__(self,function,*argexprs):
@@ -157,8 +362,8 @@ class Call(ExprBase):
     def asFuncAndIds(self,generic):
         return self.function,tuple(map(generic.getExpressionId, self.argexprs))
 
-
-
+    def __repr__(self):
+        return 'Call%r' % (((self.function,)+self.argexprs),)
 
 
 

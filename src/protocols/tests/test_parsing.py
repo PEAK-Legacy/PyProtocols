@@ -1,7 +1,11 @@
 """Test generic functions expression parsing"""
 
 from unittest import TestCase, makeSuite, TestSuite
+from protocols.predicates import *
 from protocols.ast_builder import *
+from protocols import predicates
+import operator,sys
+MAXINT = `sys.maxint`
 
 class StringBuilder:
 
@@ -32,10 +36,6 @@ class StringBuilder:
         return 'Sliceobj(%s,%s,%s)' % (
             build(self,start),build(self,stop),build(self,stride)
         )
-
-
-
-
 
 
 
@@ -250,10 +250,10 @@ class EventTests(TestCase):
         self.assertEqual(pe("a[...]"), "Getitem(a,Ellipsis)")
 
         # 2-element slices (getslice)
-        self.assertEqual(pe("a[:]"),   "Getitem(a,Slice(None,None))")
+        self.assertEqual(pe("a[:]"),   "Getitem(a,Slice(0,%s))" % MAXINT)
         self.assertEqual(pe("a[1:2]"), "Getitem(a,Slice(1,2))")
-        self.assertEqual(pe("a[1:]"),  "Getitem(a,Slice(1,None))")
-        self.assertEqual(pe("a[:2]"),  "Getitem(a,Slice(None,2))")
+        self.assertEqual(pe("a[1:]"),  "Getitem(a,Slice(1,%s))" % MAXINT)
+        self.assertEqual(pe("a[:2]"),  "Getitem(a,Slice(0,2))")
 
         # 3-part slice objects (getitem(slice())
         self.assertEqual(pe("a[::]"),   "Getitem(a,Sliceobj(None,None,None))")
@@ -279,11 +279,11 @@ class EventTests(TestCase):
         self.assertEqual(pe("a is not b"), "Compare(a is not b)")
         sb.simplify_comparisons = True
         self.assertEqual(pe("1<2<3"), "And(Compare(1 < 2),Compare(2 < 3))")
-        self.assertEqual(pe("a>=b>c<d"), "And(Compare(a >= b),Compare(b > c),Compare(c < d))")
+        self.assertEqual(pe("a>=b>c<d"),
+            "And(Compare(a >= b),Compare(b > c),Compare(c < d))")
         sb.simplify_comparisons = False
         self.assertEqual(pe("1<2<3"), "Compare(1 < 2 < 3)")
         self.assertEqual(pe("a>=b>c<d"), "Compare(a >= b > c < d)")
-
 
     def testMultiOps(self):
         self.assertEqual(pe("a and b"), "And(a,b)")
@@ -326,8 +326,336 @@ class EventTests(TestCase):
         )
 
 
+class ExprBuilderTests(TestCase):
+
+    """Test that expression builder builds correct IDispatchableExpressions"""
+
+    def setUp(self):
+        self.arguments  = arguments = ['a','b','c','d','e','f','g']
+        self.namespaces = namespaces = locals(),globals(),__builtins__
+        self.builder    = builder    = ExprBuilder(arguments,*namespaces)
+
+    def parse(self,expr):
+        return parse_expr(expr, self.builder)
+
+    def checkConstOrVar(self,items):
+        # Verify builder's handling of global/builtin namespaces
+
+        self.builder.bind_globals = True
+        for name,val in items:
+            # If bind_globals is true, return a constant for the current value
+            self.assertEqual(self.builder.Name(name),Const(val),name)
+
+        self.builder.bind_globals = False
+        for name,val in items:
+            # If bind_globals is false, return a variable
+            self.assertEqual(
+                self.builder.Name(name),Var(name,*self.namespaces),name
+            )
+
+
+    def testTokens(self):
+        self.assertEqual(self.builder.Const(123), Const(123))
+        for arg in self.arguments:
+            self.assertEqual(self.parse(arg), Argument(name=arg))
+        self.assertEqual(self.parse("123"), Const(123))
+        self.assertEqual(self.parse("'xyz'"), Const('xyz'))
+        self.assertEqual(self.parse("'abc' 'xyz'"), Const('abcxyz'))
+
+
+
+
+
+
+    def testSimpleBinariesAndUnaries(self):
+
+        pe = self.parse
+        a,b,c = Argument(name='a'), Argument(name='b'), Argument(name='c')
+
+        self.assertEqual(pe("a+b"), Call(operator.add, a, b))
+        self.assertEqual(pe("a-b"), Call(operator.sub, a, b))
+        self.assertEqual(pe("b*c"), Call(operator.mul, b, c))
+        self.assertEqual(pe("b/c"), Call(operator.div, b, c))
+        self.assertEqual(pe("b%c"), Call(operator.mod, b, c))
+        self.assertEqual(pe("b//c"), Call(operator.floordiv, b, c))
+        self.assertEqual(pe("a<<b"), Call(operator.lshift, a, b))
+        self.assertEqual(pe("a>>b"), Call(operator.rshift, a, b))
+        self.assertEqual(pe("a**b"), Call(pow, a, b))
+        self.assertEqual(pe("a.b"),  Getattr(a,'b'))
+        self.assertEqual(pe("a|b"),  Call(operator.or_, a, b))
+        self.assertEqual(pe("a&b"),  Call(operator.and_, a, b))
+        self.assertEqual(pe("a^b"),  Call(operator.xor, a, b))
+
+        self.assertEqual(pe("~a"), Call(operator.invert, a))
+        self.assertEqual(pe("+a"), Call(operator.pos, a))
+        self.assertEqual(pe("-a"), Call(operator.neg, a))
+        self.assertEqual(pe("not a"), Call(operator.not_,a))
+        self.assertEqual(pe("`a`"), Call(repr,a))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def testSequences(self):
+        pe = self.parse
+        a,b,c = Argument(name='a'), Argument(name='b'), Argument(name='c')
+        d,e,f = Argument(name='d'), Argument(name='e'), Argument(name='f')
+        g = Argument(name='g')
+
+        self.assertEqual(pe("a,"), Tuple(tuple,a))
+        self.assertEqual(pe("a,b"), Tuple(tuple,a,b))
+        self.assertEqual(pe("a,b,c"), Tuple(tuple,a,b,c))
+        self.assertEqual(pe("a,b,c,"), Tuple(tuple,a,b,c))
+
+        self.assertEqual(pe("()"), Tuple(tuple))
+        self.assertEqual(pe("(a)"), a)
+        self.assertEqual(pe("(a,)"), Tuple(tuple,a))
+        self.assertEqual(pe("(a,b)"), Tuple(tuple,a,b))
+        self.assertEqual(pe("(a,b,)"), Tuple(tuple,a,b))
+        self.assertEqual(pe("(a,b,c)"), Tuple(tuple,a,b,c))
+        self.assertEqual(pe("(a,b,c,)"), Tuple(tuple,a,b,c))
+
+        self.assertEqual(pe("[]"), Tuple(list))
+        self.assertEqual(pe("[a]"), Tuple(list,a))
+        self.assertEqual(pe("[a,]"), Tuple(list,a))
+        self.assertEqual(pe("[a,b]"), Tuple(list,a,b))
+        self.assertEqual(pe("[a,b,]"), Tuple(list,a,b))
+        self.assertEqual(pe("[a,b,c]"), Tuple(list,a,b,c))
+        self.assertEqual(pe("[a,b,c,]"), Tuple(list,a,b,c))
+
+        md = lambda k,v: Call(dict,Call(zip,Tuple(tuple,*k),Tuple(tuple,*v)))
+
+        self.assertEqual(pe("{}"),md((),()))
+        self.assertEqual(pe("{a:b}"),md([a],[b]))
+        self.assertEqual(pe("{a:b,}"),md([a],[b]))
+        self.assertEqual(pe("{a:b,c:d}"),md([a,c],[b,d]))
+        self.assertEqual(pe("{a:b,c:d,1:2}"),md([a,c,Const(1)],[b,d,Const(2)]))
+        self.assertEqual(pe("{a:b,c:d,1:2,}"),md([a,c,Const(1)],[b,d,Const(2)]))
+
+        self.assertEqual(
+            pe("{(a,b):c+d,e:[f,g]}"),
+            md([Tuple(tuple,a,b),e], [Call(operator.add,c,d),Tuple(list,f,g)])
+        )
+
+    def testCalls(self):
+        pe = self.parse
+
+        a,b,c = Argument(name='a'), Argument(name='b'), Argument(name='c')
+        x,y = Var('x',*self.namespaces), Var('y',*self.namespaces)
+
+        md = lambda k,v: Call(dict,Call(zip,Tuple(tuple,*k),Tuple(tuple,*v)))
+
+        one_two = Tuple(tuple,Const(1),Const(2))    # const
+        b_three = md([Const('b')],[Const(3)])       # const
+        empty = Const(())
+
+        self.assertEqual(pe("a()"), Call(apply,a))
+        self.assertEqual(pe("dict()"), Call(dict))      # const
+        self.assertEqual(pe("int(a)"), Call(int,a))
+
+        self.assertEqual(pe("a(1,2)"), Call(apply,a,one_two))
+        self.assertEqual(pe("a(1,2,)"), Call(apply,a,one_two))
+        self.assertEqual(pe("a(b=3)"), Call(apply,a,empty,b_three))
+
+        self.assertEqual(pe("a(1,2,b=3)"), Call(apply,a,one_two,b_three))
+
+        self.assertEqual(pe("a(*x)"), Call(apply,a,x))
+        self.assertEqual(pe("a(1,2,*x)"),
+            Call(apply,a,Call(operator.add,one_two,Call(tuple,x))))
+        self.assertEqual(pe("a(b=3,*x)"), Call(apply,a,x,b_three))
+
+        self.assertEqual(pe("a(1,2,b=3,*x)"),
+            Call(apply,a,Call(operator.add,one_two,Call(tuple,x)),b_three))
+
+        self.assertEqual(pe("a(**y)"),  Call(apply,a,Const(()),y))
+        self.assertEqual(pe("a(1,2,**y)"), Call(apply,a,one_two,y))
+
+        self.assertEqual(pe("a(b=3,**y)"),
+            Call(apply,a,Const(()),Call(predicates.add_dict, b_three, y)))
+
+        self.assertEqual(pe("a(1,2,b=3,**y)"),
+            Call(apply,a,one_two,Call(predicates.add_dict, b_three, y)))
+
+
+
+        self.assertEqual(pe("a(b=3,*x,**y)"),
+            Call(apply,a,x,Call(predicates.add_dict,b_three,y)))
+
+        self.assertEqual(pe("a(1,2,b=3,*x,**y)"),
+            Call(apply,a,Call(operator.add,one_two,Call(tuple,x)),
+                Call(predicates.add_dict, b_three, y)))
+
+        self.assertEqual(pe("a(*x,**y)"), Call(apply,a,x,y))
+
+        self.assertEqual(pe("a(1,2,*x,**y)"),
+            Call(apply,a,Call(operator.add,one_two,Call(tuple,x)),y))
+
+        self.assertRaises(SyntaxError, pe, "a(1=2)")    # expr as kw
+        self.assertRaises(SyntaxError, pe, "a(b=2,c)")  # kw before positional
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def testSubscripts(self):
+        pe = self.parse
+        a,b,c = Argument(name='a'), Argument(name='b'), Argument(name='c')
+
+        gi = lambda ob,key: Call(operator.getitem,ob,key)
+        gs = lambda ob,start,stop: Call(operator.getslice,ob,start,stop)
+        gso = lambda ob,*x: gi(ob, Call(slice,*map(Const,x)))
+
+        self.assertEqual(pe("a[1]"),   gi(a,Const(1)))
+        self.assertEqual(pe("a[2,3]"), gi(a,Tuple(tuple,Const(2),Const(3))))
+        self.assertEqual(pe("a[...]"), gi(a,Const(Ellipsis)))
+
+        # 2-element slices (getslice)
+        self.assertEqual(pe("a[:]"),   gs(a,Const(0),Const(sys.maxint)))
+        self.assertEqual(pe("a[1:2]"), gs(a,Const(1),Const(2)))
+        self.assertEqual(pe("a[1:]"),  gs(a,Const(1),Const(sys.maxint)))
+        self.assertEqual(pe("a[:2]"),  gs(a,Const(0),Const(2)))
+
+        # 3-part slice objects (getitem(slice())
+        self.assertEqual(pe("a[::]"),   gso(a,None,None,None))
+        self.assertEqual(pe("a[1::]"),  gso(a,1,None,None))
+        self.assertEqual(pe("a[:2:]"),  gso(a,None,2,None))
+        self.assertEqual(pe("a[1:2:]"), gso(a,1,2,None))
+        self.assertEqual(pe("a[::3]"),  gso(a,None,None,3))
+        self.assertEqual(pe("a[1::3]"), gso(a,1,None,3))
+        self.assertEqual(pe("a[:2:3]"), gso(a,None,2,3))
+        self.assertEqual(pe("a[1:2:3]"),gso(a,1,2,3))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def testCompare(self):
+        pe = self.parse
+        a,b,c = Argument(name='a'), Argument(name='b'), Argument(name='c')
+
+        self.assertEqual(pe("a>b"), Call(operator.gt,a,b))
+        self.assertEqual(pe("a>=b"), Call(operator.ge,a,b))
+        self.assertEqual(pe("a<b"), Call(operator.lt,a,b))
+        self.assertEqual(pe("a<=b"), Call(operator.le,a,b))
+        self.assertEqual(pe("a<>b"), Call(operator.ne,a,b))
+        self.assertEqual(pe("a!=b"), Call(operator.ne,a,b))
+        self.assertEqual(pe("a==b"), Call(operator.eq,a,b))
+        self.assertEqual(pe("a in b"), Call(operator.contains,a,b))
+
+        self.assertEqual(pe("a is b"), Call(predicates.is_,a,b))
+        self.assertEqual(pe("a not in b"), Call(predicates.not_in,a,b))
+        self.assertEqual(pe("a is not b"), Call(predicates.is_not,a,b))
+
+        # These need 'And' to work
+        #self.assertEqual(pe("1<2<3"), "And(Compare(1 < 2),Compare(2 < 3))")
+        #self.assertEqual(pe("a>=b>c<d"), "And(Compare(a >= b),Compare(b > c),Compare(c < d))")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def testSymbols(self):
+
+        # check arguments
+        for arg in self.arguments:
+            self.assertEqual(self.builder.Name(arg), Argument(name=arg))
+
+        # check locals
+        for name in self.namespaces[0]:
+            if name not in self.arguments:
+                self.assertEqual(
+                    self.builder.Name(name), Var(name,self.namespaces[0]), name
+                )
+
+        # check globals
+        self.checkConstOrVar(
+            [(name,const) for name,const in self.namespaces[1].items()
+                if name not in self.arguments
+                    and name not in self.namespaces[0]
+            ]
+        )
+
+        # check builtins
+        self.checkConstOrVar(
+            [(name,const) for name,const in self.namespaces[2].items()
+                if name not in self.arguments
+                    and name not in self.namespaces[0]
+                    and name not in self.namespaces[1]
+            ]
+        )
+
+        # check non-existent
+        name = 'no$such$thing'
+        self.assertEqual(self.builder.Name(name),Var(name,*self.namespaces))
+
+
+
+
+
+
+
+
 TestClasses = (
-    EventTests,
+    EventTests, ExprBuilderTests,
 )
 
 def test_suite():

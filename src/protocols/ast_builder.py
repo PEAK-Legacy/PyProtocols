@@ -1,7 +1,7 @@
 from token import tok_name, NAME, NUMBER, STRING, ISNONTERMINAL
 from symbol import sym_name
 from new import instancemethod
-import token, symbol, parser
+import token, symbol, parser, sys
 
 __all__ = [
     'parse_expr', 'build'
@@ -18,7 +18,7 @@ production = {
 }
 
 for tok in tok_name:
-    production[tok] = _simple
+    production.setdefault(tok,_simple)
 
 
 ops = {
@@ -190,9 +190,9 @@ def power(builder, nodelist):
             lineno = item[2]
             return builder.Subscript(nodelist,
                 (symbol.subscript,
-                    (token.STRING,'None',lineno),
+                    (token.STRING,`0`,lineno),
                     item,
-                    (token.STRING,'None',lineno)
+                    (token.STRING,`sys.maxint`,lineno)
                 )
             )
 
@@ -333,11 +333,17 @@ def subscript(builder, nodelist):
     if nodelist[1][0]==token.DOT:
         return builder.Const(Ellipsis)
 
+    item = nodelist; nl = len(nodelist)
+    while type(item[1]) is tuple: item=item[1]   # find token, to get a line#
+    lineno = item[-1]
     have_stride = nodelist[-1][0]==symbol.sliceop
-    item = nodelist
-    while type(item[1]) is tuple: item=item[1]                  # find a token
-    start = stop = stride = (token.STRING, 'None', item[-1])    # use its line#
-    nl = len(nodelist)
+    if have_stride:
+        start = stop = stride = (token.STRING, 'None', lineno)
+        if len(nodelist[-1])==3:
+            stride = nodelist[-1][2]
+    else:
+        start = (token.NUMBER,`0`,lineno)
+        stop  = (token.NUMBER,`sys.maxint`,lineno)
 
     if nl==5:
         start,stop = nodelist[1],nodelist[3]        # test : test sliceop
@@ -354,18 +360,12 @@ def subscript(builder, nodelist):
                 stop = nodelist[2]      # : test
         else:
             start = nodelist[1]         # test :
-
     else:
         raise AssertionError("Unrecognized subscript", nodelist)
 
     if have_stride:
-        if len(nodelist[-1])==3:
-            stride = nodelist[-1][2]
         return builder.Sliceobj(start,stop,stride)
-
     return builder.Slice(start,stop)
-
-
 
 for sym,name in sym_name.items():
     if name in globals():
