@@ -39,88 +39,6 @@ except ImportError:
 
 
 
-class install_data(install_data):
-
-    """Variant of 'install_data' that installs data to module directories"""
-    
-    def finalize_options (self):
-        self.set_undefined_options('install',
-                                   ('install_lib', 'install_dir'),
-                                   ('root', 'root'),
-                                   ('force', 'force'),
-                                  )
-
-class sdist(old_sdist):
-
-    """Variant of 'sdist' that (re)builds the documentation first"""
-   
-    def run(self):
-        # Build docs before source distribution
-        try:
-            import happydoclib
-        except ImportError:
-            pass
-        else:
-            self.run_command('happy')
-
-        # Run the standard sdist command
-        old_sdist.run(self)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-class test(Command):
-
-    """Command to run unit tests after installation"""
-
-    description = "Run unit tests after installation"
-
-    user_options = [
-        ('test-module=','m','Test module (default='+TEST_MODULE+')'),
-    ]
-
-    def initialize_options(self):
-        self.test_module = None
-
-    def finalize_options(self):
-
-        if self.test_module is None:
-            self.test_module = TEST_MODULE
-
-        self.test_args = [self.test_module+'.test_suite']
-
-        if self.verbose:
-            self.test_args.insert(0,'--verbose')
-
-    def run(self):
-
-        # Install before testing
-        self.run_command('install')
-
-        if not self.dry_run:
-            from unittest import main
-            main(None, None, sys.argv[:1]+self.test_args)
-
-
-
-
-
-
-
-
-
-
 class happy(Command):
 
     """Command to generate documentation using HappyDoc
@@ -162,13 +80,44 @@ class happy(Command):
 
 
 
+class sdist(old_sdist):
+
+    """Variant of 'sdist' that (re)builds the documentation first"""
+   
+    def run(self):
+        # Build docs before source distribution
+        try:
+            import happydoclib
+        except ImportError:
+            pass
+        else:
+            self.run_command('happy')
+
+        # Run the standard sdist command
+        old_sdist.run(self)
+
+
 SETUP_COMMANDS = {
-    'install_data': install_data,
     'sdist': sdist,
     'happy': happy,
-    'test': test,
     'sdist_nodoc': old_sdist,
     'build_ext': build_ext,
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
