@@ -7,6 +7,7 @@ from types import ClassType, InstanceType
 
 from protocols.dispatch import *
 from protocols import Interface,advise,declareImplementation
+import protocols.dispatch
 
 class Vehicle(object):  pass
 class LandVehicle(Vehicle): pass
@@ -31,7 +32,6 @@ class Bicycle(HumanPowered,LandVehicle): advise(instancesProvide=[TwoWheeled])
 class Hummer(GasPowered,LandVehicle): advise(instancesProvide=[FourWheeled])
 class Speedboat(GasPowered,WaterVehicle): pass
 class PaddleBoat(HumanPowered,WaterVehicle): pass
-
 
 
 
@@ -82,7 +82,7 @@ class TermTests(TestCase):
 
     def testNullTerm(self):
         # Null term has no seeds
-        self.failIf(list(NullTerm.seeds()))
+        self.failIf(list(NullTerm.seeds({})))
 
         # and it matches anything
         self.failUnless(object in NullTerm)
@@ -97,7 +97,7 @@ class TermTests(TestCase):
 
     def testClassTermSeedsAndDispatchFunctions(self):
         for klass in (Vehicle,LandVehicle,WaterVehicle,HumanPowered,GasPowered):
-            seeds = list(ITerm(klass).seeds())
+            seeds = list(ITerm(klass).seeds({}))
             self.failUnless(klass in seeds)
             self.failUnless(object in seeds)
             self.failIf(len(seeds)<>2)
@@ -109,11 +109,11 @@ class TermTests(TestCase):
         self.failUnless(Hummer in ITerm(Wheeled))
         self.failIf(ITerm(Hummer).implies(Speedboat))
         self.failUnless(ITerm(Speedboat).implies(WaterVehicle))
-        self.failUnless(object in list(ITerm(InstanceType).seeds()))
+        self.failUnless(object in list(ITerm(InstanceType).seeds({})))
 
     def testProtocolTerm(self):
         self.failUnless(Bicycle in ITerm(Wheeled))
-        seeds = list(ITerm(Wheeled).seeds())
+        seeds = list(ITerm(Wheeled).seeds({}))
         self.failUnless(Hummer in seeds)
         self.failUnless(Bicycle in seeds)
         self.failUnless(object in seeds)
@@ -160,6 +160,129 @@ class TermTests(TestCase):
         self.assertEqual( ordered_signatures([(s1,0),(s2,0)]),
             [[(s2,0)],[(s1,0)]]
         )
+
+
+    def testMinMax(self):
+        self.failUnless(Min < Max)
+        self.failUnless(Max > Min)
+        self.failUnless(Max == Max)
+        self.failUnless(Min == Min)
+        self.failIf(Min==Max or Max==Min)
+        self.failUnless(Max > "xyz")
+        self.failUnless(Min < "xyz")
+        self.failUnless(Max > 999999)
+        self.failUnless(Min < -999999)
+        data = [(27,Max),(Min,99),(53,Max),(Min,27),(53,56)]
+        data.sort()
+        self.assertEqual(data,
+            [(Min,27),(Min,99),(27,Max),(53,56),(53,Max)]
+        )
+
+
+    def testInequalities(self):
+        self.assertRaises(ValueError, Inequality, '', 1)
+        self.assertRaises(ValueError, Inequality, '!=', 2)
+        t1 = Inequality('>',55); t2 = Inequality('>=',100)
+
+        self.failIf( (55,55) in t1 )
+        self.failIf( (55,55) in t2 )
+
+        self.failUnless( (100,100) in t2 )
+        self.failUnless( (100,100) in t1 )
+        self.failUnless( (101,101) in t2 )
+        self.failUnless( (110,Max) in t2 )
+
+        self.failUnless(t2.implies(t1))
+        self.failIf(t1.implies(t2))
+
+        t3 = Inequality('<',99)
+        self.failIf(t1.implies(t3) or t2.implies(t3))
+        self.failIf(t3.implies(t1) or t3.implies(t2))
+
+        t4 = Inequality('<',"abc")
+        self.failUnless(("a","a") in t4); self.failIf(("b","b") in t4)
+
+
+    def testInequalitySeeds(self):
+        t1 = Inequality('>',27); t2 = Inequality('<=',19)
+        self.assertEqual(t1.seeds({}), [(Min,27),(27,27),(27,Max)])
+        self.assertEqual(t2.seeds({}), [(Min,19),(19,19),(19,Max)])
+        self.assertEqual(
+            t1.seeds({(Min,19):[], (19,19):[], (19,Max):[]}),
+            [(19,27),(27,27),(27,Max)]
+        )
+        self.assertEqual(
+            t2.seeds({(Min,27):[], (27,27):[], (27,Max):[]}),
+            [(Min,19),(19,19),(19,27)]
+        )
+
+        self.assertEqual(
+            protocols.dispatch.concatenate_ranges(
+                {(Min,27):[], (27,27):[], (27,Max):[],
+                 (Min,19):[], (19,19):[], (19,27): [],
+                }
+            ),
+            [(Min,19),(19,27),(27,Max)],
+        )
+        self.assertEqual(
+            protocols.dispatch.concatenate_ranges(
+                {(Min,19):[], (27,27):[], (19,Max):[],
+                  (19,27):[], (19,19):[], (27,Max):[],
+                }
+            ),
+            [(Min,19),(19,27),(27,Max)],
+        )
+
+
+
+
+
+
+
+
+
+
+
+
+    def testInequalityDispatch(self):
+
+        classify = GenericFunction(args=['age'])
+
+        classify[(Inequality('<',2),)]   = lambda age:"infant"
+        classify[(Inequality('<',13),)]  = lambda age:"preteen"
+        classify[(Inequality('<',5),)]   = lambda age:"preschooler"
+        classify[(Inequality('<',20),)]  = lambda age:"teenager"
+        classify[(Inequality('>=',20),)] = lambda age:"adult"
+        classify[(Inequality('>=',55),)] = lambda age:"senior"
+        classify[(Inequality('=',16),)]  = lambda age:"sweet sixteen"
+
+        self.assertEqual(classify(25),"adult")
+        self.assertEqual(classify(17),"teenager")
+        self.assertEqual(classify(13),"teenager")
+        self.assertEqual(classify(12.99),"preteen")
+        self.assertEqual(classify(0),"infant")
+        self.assertEqual(classify(4),"preschooler")
+        self.assertEqual(classify(55),"senior")
+        self.assertEqual(classify(54.9),"adult")
+        self.assertEqual(classify(14.5),"teenager")
+        self.assertEqual(classify(16),"sweet sixteen")
+        self.assertEqual(classify(16.5),"teenager")
+        self.assertEqual(classify(99),"senior")
+        self.assertEqual(classify(Min),"infant")
+        self.assertEqual(classify(Max),"senior")
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class ExpressionTests(TestCase):

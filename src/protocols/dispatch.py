@@ -16,7 +16,7 @@
 
     * Functional expressions
 
-    * Boolean terms, value comparison terms
+    * Boolean terms
 
     * Expression/term ordering constraints
 
@@ -55,7 +55,7 @@ __all__ = [
     'GenericFunction', 'chained_methods', 'ClassTerm', 'Signature',
     'PositionalSignature', 'most_specific_signatures', 'ordered_signatures',
     'dispatch_by_mro', 'next_method', 'Argument', 'IDispatchableExpression',
-    'IGenericFunction',
+    'IGenericFunction', 'Min', 'Max', 'Inequality',
 ]
 
 
@@ -93,7 +93,7 @@ class ITerm(Interface):
         """'IDispatchFunction' that should be used for testing this term"""
     )
 
-    def seeds():
+    def seeds(table):
         """Return iterable of known-good keys
 
         The keys returned will be used to build outgoing edges in generic
@@ -219,7 +219,7 @@ class ClassTerm(Adapter):
 
     dispatch_function = staticmethod(dispatch_by_mro)
 
-    def seeds(self):
+    def seeds(self,table):
         return [self.subject,object]
 
     def __contains__(self,ob):
@@ -239,6 +239,129 @@ class ClassTerm(Adapter):
 
     def subscribe(self,listener): pass
     def unsubscribe(self,listener): pass
+
+
+
+
+
+class _ExtremeType(object):     # Courtesy of PEP 326
+
+    def __init__(self, cmpr, rep):
+        object.__init__(self)
+        self._cmpr = cmpr
+        self._rep = rep
+
+    def __cmp__(self, other):
+        if isinstance(other, self.__class__) and\
+           other._cmpr == self._cmpr:
+            return 0
+        return self._cmpr
+
+    def __repr__(self):
+        return self._rep
+
+Max = _ExtremeType(1, "Max")
+Min = _ExtremeType(-1, "Min")
+
+
+def dispatch_by_inequalities(ob,table):
+    key = ob,ob
+    try:
+        return table[key]
+    except KeyError:
+        if None not in table:
+            table[None] = ranges = concatenate_ranges(table)
+        else:
+            ranges = table[None]
+        lo = 0; hi = len(ranges)
+        while lo<hi:
+            mid = (lo+hi)//2;  tl,th = ranges[mid]
+            if ob<tl:
+                hi = mid
+            elif ob>th:
+                lo = mid+1
+            else:
+                return table[ranges[mid]]
+
+
+
+class Inequality(object):
+
+    """Term that indicates target matches specified constant inequalities"""
+
+    protocols.advise(instancesProvide=[ITerm])
+
+    dispatch_function = staticmethod(dispatch_by_inequalities)
+
+    def __init__(self,op,val):
+        self.val = val
+        self.ranges = ranges = []
+        if '<' in op:  ranges.append((Min,val))
+        if '=' in op:  ranges.append((val,val))
+        if '>' in op:  ranges.append((val,Max))
+        if not ranges or [c for c in op if c not in '<=>']:
+            raise ValueError("Invalid inequality operator", op)
+
+    def seeds(self,table):
+        lo = Min; hi = Max; val = self.val
+        for l,h in table.keys():
+            if l>lo and l<=val:
+                lo = l
+            if h<hi and h>=val:
+                hi = h
+        return [(lo,val),(val,val),(val,hi)]
+
+    def __contains__(self,ob):
+        for r in self.ranges:
+            if ob==r:
+                return True
+            elif ob[0]==ob[1]:  # single point must be *inside* the range
+                if ob[0]>r[0] and ob[1]<r[1]:
+                    return True
+            elif ob[0]>=r[0] and ob[1]<=r[1]:   # for range, overlap allowed
+                return True
+        return False
+
+
+
+
+
+    def implies(self,otherTerm):
+        for r in self.ranges:
+            if not r in ITerm(otherTerm):
+                return False
+        return True
+
+    def subscribe(self,listener): pass
+    def unsubscribe(self,listener): pass
+
+
+def concatenate_ranges(range_map):
+    ranges = range_map.keys(); ranges.sort()
+    output = []
+    last = Min
+    for (l,h) in ranges:
+        if l<last or l==h:
+            continue
+        output.append((l,h))
+        last = h
+    return output
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -307,7 +430,7 @@ class ProtocolTerm(StickyAdapter):
     def unsubscribe(self,listener):
         self.notifier.unsubscribe(listener)
 
-    def seeds(self):
+    def seeds(self,table):
         return self.notifier._Protocol__adapters.keys() + [object]
 
     def __contains__(self,ob):
@@ -434,7 +557,7 @@ class NullTerm:
 
     dispatch_function = staticmethod(lambda ob,table: None)
 
-    def seeds(self):
+    def seeds(self,table):
         return ()
 
     def __contains__(self,ob):   return True
@@ -761,7 +884,7 @@ class GenericFunction:
 
             term = signature.get(disp_id)
 
-            for key in term.seeds():
+            for key in term.seeds(caselists):
                 if key not in caselists:
                     # Add in cases that didn't test this key  :(
                     caselists[key] = [
