@@ -6,7 +6,7 @@ import sys
 __all__ = [
     'addClassAdvisor', 'isClassAdvisor', 'metamethod', 'supermeta',
     'minimalBases', 'determineMetaclass', 'getFrameInfo', 'getMRO',
-    'classicMRO', 'mkRef', 'StrongRef'
+    'classicMRO', 'mkRef', 'StrongRef', 'add_assignment_advisor'
 ]
 
 
@@ -240,6 +240,88 @@ def addClassAdvisor(callback, depth=2):
 def isClassAdvisor(ob):
     """True if 'ob' is a class advisor function"""
     return isinstance(ob,FunctionType) and hasattr(ob,'previousMetaclass')
+
+
+
+
+def add_assignment_advisor(callback,depth=2):
+    """Invoke 'callback(frame,name,value)' on the next assignment in 'frame'
+
+    The frame monitored is determined by the 'depth' argument, which gets
+    passed to 'sys._getframe()'.  Note that when 'callback' is invoked, the
+    frame state will be as though the assignment hasn't happened yet, so any
+    previous value of the assigned variable will be available in the frame's
+    locals.  (Unless there's no previous value, in which case there will be
+    no such variable in the frame locals.)
+    """
+
+    frame = sys._getframe(depth)
+    oldtrace = [frame.f_trace]
+    old_locals = frame.f_locals.copy()
+
+    def tracer(frm,event,arg):
+        if event=='call':
+            # We don't want to trace into any calls
+            if oldtrace[0]:
+                # ...but give the previous tracer a chance to, if it wants
+                return oldtrace[0](frm,event,arg)
+            else:
+                return None
+
+        try:
+            if frm is frame and event !='exception':
+                # Aha, time to check for an assignment...
+                for k,v in frm.f_locals.items():
+                    if k not in old_locals:
+                        del frm.f_locals[k]
+                        break
+                    elif old_locals[k] is not v:
+                        frm.f_locals[k] = old_locals[k]
+                        break
+                else:
+                    # No luck, keep tracing
+                    return tracer
+
+                # Got it, fire the callback, then get the heck outta here...
+                callback(frm,k,v)
+
+        finally:
+            # Give the previous tracer a chance to run before we return
+            if oldtrace[0]:
+                # And allow it to replace our idea of the "previous" tracer
+                oldtrace[0] = oldtrace[0](frm,event,arg)
+
+        # Unlink ourselves from the trace chain.
+        frm.f_trace = oldtrace[0]
+        sys.settrace(oldtrace[0])
+        return oldtrace[0]
+
+    # Install the trace function
+    frame.f_trace = tracer
+    sys.settrace(tracer)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -1,4 +1,6 @@
-from dispatch import *
+from dispatch import IDispatchableExpression, ITest, ISignature
+from dispatch import IDispatchPredicate, NullTest, Inequality
+from dispatch import EXPR_GETTER_ID
 import protocols, operator
 from ast_builder import build
 from types import NoneType
@@ -33,8 +35,6 @@ def add_dict(d1,d2):
 # XXX Order-preserving signatures
 # XXX Need ordering constraints
 # XXX var, let, ???
-
-
 
 
 

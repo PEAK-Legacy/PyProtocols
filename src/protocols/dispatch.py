@@ -15,8 +15,6 @@
 
     * Expression/test ordering constraints
 
-    * Convenience API using function decorators
-
     * Support before/after/around methods, and result combination ala CLOS
 
     * Argument enhancements: variadic args, kw args, etc.
@@ -39,10 +37,12 @@
 
 
 
+
+
 from __future__ import generators
 from UserDict import UserDict
 from protocols import Interface, Attribute, Protocol, Adapter, StickyAdapter
-from protocols.advice import getMRO
+from protocols.advice import getMRO, add_assignment_advisor
 import protocols, operator, inspect
 from types import ClassType, InstanceType, FunctionType, NoneType
 ClassTypes = (ClassType, type)
@@ -56,7 +56,7 @@ __all__ = [
     'most_specific_signatures', 'ordered_signatures',
     'dispatch_by_mro', 'next_method', 'IDispatchableExpression',
     'IGenericFunction', 'Min', 'Max', 'Inequality', 'IDispatchTable',
-    'EXPR_GETTER_ID','RAW_VARARGS_ID','RAW_KWDARGS_ID', 'defmethod',
+    'EXPR_GETTER_ID','RAW_VARARGS_ID','RAW_KWDARGS_ID', 'defmethod', 'when',
 ]
 
 
@@ -1124,13 +1124,6 @@ def dm_string(gf,cond,func,local_dict=None,global_dict=None):
     return defmethod(gf,cond,func)
 
 
-def dm_create(gf,cond,func,local_dict=None,global_dict=None):
-    """Create a new generic function, using function to get args info"""
-    return defmethod(
-        GenericFunction.from_function(func), cond, func, local_dict,global_dict
-    )
-
-
 defmethod = GenericFunction.from_function(dm_simple)
 
 dm_simple(defmethod,
@@ -1140,7 +1133,55 @@ dm_simple(defmethod,
 
 dm_string(defmethod, "gf in IGenericFunction and cond in str", dm_string)
 
-defmethod(defmethod, "gf is None and func in FunctionType", dm_create)
+
+
+
+
+
+
+
+
+
+
+
+
+
+def when(cond):
+    """Add the following function to a generic function, w/'cond' as guard"""
+    def callback(frm,name,value):
+        frm.f_locals[name] = defmethod(
+            frm.f_locals.get(name), cond, value, frm.f_locals, frm.f_globals
+        )
+    add_assignment_advisor(callback)
+
+
+[when("gf is None and func in FunctionType")]
+def defmethod(gf,cond,func,local_dict=None,global_dict=None):
+    """Create a new generic function, using function to get args info"""
+    return defmethod(
+        GenericFunction.from_function(func), cond, func, local_dict,global_dict
+    )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -121,6 +121,47 @@ class SuperTest(TestCase):
 
 
 
+class DecoratorTests(TestCase):
+
+    def checkAssignAdvice(self):
+
+        log = []
+        def track(f,k,v):
+            log.append((f,k,v))
+
+        add_assignment_advisor(track,1)
+        test_var = 1
+        self.assertEqual(log, [(sys._getframe(),'test_var',1)])
+        log = []
+        add_assignment_advisor(track,1)
+        test2 = 42
+        self.assertEqual(log, [(sys._getframe(),'test2',42)])
+
+        # Try doing double duty, redefining an existing variable...
+        log = []
+        add_assignment_advisor(track,1)
+        add_assignment_advisor(track,1)
+
+        test2 = 42
+        self.assertEqual(log, [(sys._getframe(),'test2',42)]*2)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 moduleLevelFrameInfo = getFrameInfo(sys._getframe())
 
 class FrameInfoTest(TestCase):
@@ -300,7 +341,7 @@ class AdviceTests(TestCase):
 
 
 TestClasses = (
-    SuperTest, AdviceTests, FrameInfoTest, MROTests,
+    SuperTest, DecoratorTests, AdviceTests, FrameInfoTest, MROTests,
 )
 
 def test_suite():
