@@ -12,6 +12,7 @@ ClassTypes = (ClassType, type)
 
 __all__ = [
     'GenericFunction', 'NullTest', 'Dispatcher', 'DispatchNode',
+    'AbstractGeneric',
 ]
 
 
@@ -33,7 +34,6 @@ class DispatchNode(dict):
         if self.contents:
             self.update(dict(self.contents()))
             self.contents = None
-
 
 
 
@@ -531,9 +531,7 @@ class Dispatcher:
 
 
 
-class GenericFunction(Dispatcher):
-
-    """Extensible multi-dispatch generic function"""
+class AbstractGeneric(Dispatcher):
 
     protocols.advise(instancesProvide=[IGenericFunction])
 
@@ -554,22 +552,124 @@ class GenericFunction(Dispatcher):
     __get__ = None
 
 
-    def addMethod(self,predicate,function):
+    def addMethod(self,predicate,function,qualifier=None):
+        if qualifier is not None:
+            function = qualifier,function
         for signature in IDispatchPredicate(predicate):
             self[signature] = function
 
+
     def combine(self,cases):
-        import strategy
-        return strategy.method_chain(
-            strategy.safe_methods(
-                strategy.ordered_signatures(cases)
-            )
+        raise NotImplementedError(
+            "The purpose of this class is to support *custom* method combiners"
         )
 
 
 
 
 
+
+
+
+
+    def _decorate(self,cond,qualifier=None,frame=None,depth=2):   # XXX
+        frame = frame or sys._getframe(depth)
+        cond = self.parseRule(cond,frame=frame) or cond
+
+        def registerMethod(frm,name,value,old_locals):
+            if qualifier is None:
+                func = value
+            else:
+                func = qualifier,value
+
+            kind,module,locals_,globals_ = getFrameInfo(frm)
+            if kind=='class':
+                # 'when()' in class body; defer adding the method
+                def registerClassSpecificMethod(cls):
+                    import strategy
+                    req = strategy.Signature(
+                        [(strategy.Argument(0),ITest(cls))]
+                    )
+                    self.addMethod(req & cond, func)
+                    return cls
+
+                addClassAdvisor(registerClassSpecificMethod,frame=frm)
+            else:
+                self.addMethod(cond,func)
+
+            if old_locals.get(name) in (self,self.delegate):
+                return self.delegate
+
+            return value
+
+        return add_assignment_advisor(registerMethod,frame=frame)
+
+
+
+
+
+
+
+
+
+
+class GenericFunction(AbstractGeneric):
+
+    """Extensible predicate dispatch generic function"""
+
+    def combine(self,cases):
+        import strategy
+
+        cases = strategy.separate_qualifiers(cases,
+            primary=[strategy.ordered_signatures,strategy.safe_methods],
+            before =[strategy.ordered_signatures,strategy.all_methods],
+            after  =[strategy.ordered_signatures,strategy.all_methods],
+        )
+
+        primary = strategy.method_chain(cases.get('primary',[]))
+
+        if cases.get('after') or cases.get('before'):
+
+            befores = strategy.method_list(cases.get('before',[]))
+            afters = strategy.method_list(list(cases.get('after',[]))[::-1])
+
+            def wrapper(*args,**kw):
+                for tmp in befores(*args,**kw): pass  # toss return values
+                result = primary(*args,**kw)
+                for tmp in afters(*args,**kw): pass  # toss return values
+                return result
+
+            return wrapper
+
+        return primary
+
+
+
+
+
+
+
+
+
+
+
+
+    def before(self,cond):
+        """Add function as a "before" method w/'cond' as a guard
+
+        If 'cond' is parseable, it will be parsed using the caller's frame
+        locals and globals.
+        """
+        return self._decorate(cond,"before")
+
+
+    def after(self,cond):
+        """Add function as an "after" method w/'cond' as a guard
+
+        If 'cond' is parseable, it will be parsed using the caller's frame
+        locals and globals.
+        """
+        return self._decorate(cond,"after")
 
 
     def when(self,cond):
@@ -581,35 +681,17 @@ class GenericFunction(Dispatcher):
         return self._decorate(cond)
 
 
-    def _decorate(self,cond,frame=None,depth=2):   # XXX
 
-        frame = frame or sys._getframe(depth)
-        cond = self.parseRule(cond,frame=frame) or cond
 
-        def registerMethod(frm,name,value,old_locals):
-            kind,module,locals_,globals_ = getFrameInfo(frm)
 
-            if kind=='class':
-                # 'when()' in class body; defer adding the method
-                def registerClassSpecificMethod(cls):
-                    import strategy
-                    req = strategy.Signature(
-                        [(strategy.Argument(0),ITest(cls))]
-                    )
-                    self.addMethod(req & cond, value)
-                    return cls
 
-                addClassAdvisor(registerClassSpecificMethod,frame=frm)
 
-            else:
-                self.addMethod(cond,value)
 
-            if old_locals.get(name) in (self,self.delegate):
-                return self.delegate
 
-            return value
 
-        return add_assignment_advisor(registerMethod,frame=frame)
+
+
+
 
 
 

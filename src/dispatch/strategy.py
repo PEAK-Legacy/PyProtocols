@@ -15,8 +15,8 @@
         implement indexable multiple dispatch predicates
 
     most_specific_signatures, ordered_signatures, method_chain, method_list,
-        all_methods, safe_methods -- utility functions for creating method
-        combiners
+        all_methods, safe_methods, separate_qualifiers -- utility functions for
+        creating method combinations
 
 """
 
@@ -54,7 +54,7 @@ from new import instancemethod
 __all__ = [
     'ProtocolTest', 'ClassTest', 'Inequality', 'Min', 'Max',
     'Predicate', 'Signature', 'PositionalSignature', 'Argument',
-    'most_specific_signatures', 'ordered_signatures',
+    'most_specific_signatures', 'ordered_signatures', 'separate_qualifiers',
     'method_chain', 'method_list', 'all_methods', 'safe_methods',
     'default',
 ]
@@ -612,6 +612,47 @@ def method_chain(methods):
 
 
 
+
+def separate_qualifiers(qualified_cases, **postprocessors):
+    """list[qualified_case] -> dict[qualifier:list[unqualified_case]]
+
+    Turn a list of cases with possibly-qualified methods into a dictionary
+    mapping qualifiers to (possibly post-processed) case lists.  If a given
+    method is not qualified, it's treated as though it had the qualifier
+    '"primary"'.
+
+    Keyword arguments supplied to this function are treated as a mapping from
+    qualifiers to lists of functions that should be applied to the list of
+    cases to that qualifier.  So, for example, this::
+
+        cases = separate_qualifiers(cases,
+            primary=[strategy.ordered_signatures,strategy.safe_methods],
+        )
+
+    is equivalent to::
+
+        cases = separate_qualifiers(cases)
+        if "primary" in cases:
+            cases["primary"]=safe_methods(ordered_signatures(cases["primary"]))
+
+    Notice, by the way, that the postprocessing functions must be listed in
+    order of *application* (i.e. outermost last).
+    """
+
+    cases = {}
+    for signature,method in qualified_cases:
+        if isinstance(method,tuple):
+            qualifier,method = method
+        else:
+            qualifier="primary"
+        cases.setdefault(qualifier,[]).append((signature,method))
+
+    for k,v in cases.items():
+        if k in postprocessors:
+            for p in postprocessors[k]:
+                v = p(v)
+            cases[k] = v
+    return cases
 
 class ExprBase(object):
 

@@ -2,16 +2,173 @@
 Result Combination
 ==================
 
-Sometimes, the default strategy of selecting the "most-specific" method or
-result is inadequate for a particular task.  You may therefore wish to
-implement custom result combining strategies by subclassing ``Dispatcher`` or
-``GenericFunction``, and overriding the ``combine()`` method as appropriate.
+Sometimes, more than one method of a generic function (or ``Dispatcher`` entry)
+applies in a given circumstance.  For example, you might need to sum the
+results of a series of pricing rules in order to compute product's price.  Or,
+sometimes you'd like a method to be able to modify the result of a
+less-specific method.
 
-However, the ``dispatch.combiners`` module provides an assortment of useful
-already-written result combinations, which we will also cover here.
+For these scenarios, you will want to use one of several "result combination"
+techniques, ranging from using a provided subclass of ``GenericFunction`` or
+``Dispatcher``, to rolling your own entirely custom combination approach.
 
+>>> import dispatch
 >>> from dispatch import strategy, functions, combiners, NoApplicableMethods
 
+
+--------------------------
+The "Default" Combinations
+--------------------------
+
+
+Using ``next_method``
+=====================
+
+By default, ``GenericFunction`` will only invoke the most-specific applicable
+method.  However, if you add a ``next_method`` argument to the beginning of
+an individual method's signature, you can use it to call the "next method"
+that applies.  That is, the second-most-specific method.  If that method also
+has a ``next_method`` argument, it too will be able to invoke the next method
+after it, and so on, down through all the applicable methods.  For example::
+
+    >>> class NextMethodExample:
+    ...     [dispatch.generic()]
+    ...     def foo(self,bar,baz):
+    ...         """Foo bar and baz"""
+    ...
+    ...     [foo.when("bar>1 and baz=='spam'")]
+    ...     def foo_one_spam(next_method, self, bar, baz):
+    ...         return bar + next_method(self,bar,baz)
+    ...
+    ...     [foo.when("baz=='spam'")]
+    ...     def foo_spam(self, bar, baz):
+    ...         return 42
+    ...
+    ...     [foo.when("baz=='blue'")]
+    ...     def foo_spam(next_method, self, bar, baz):
+    ...         return 22 + next_method(self,bar,baz)
+
+    >>> NextMethodExample().foo(2,"spam")   # 2 + 42
+    44
+
+    >>> NextMethodExample().foo(2,"blue")   # 22 + ...no next method!
+    Traceback (most recent call last):
+      File ... combiners.txt... in foo_spam
+        return 22 + next_method(self,bar,baz)
+    ...
+    NoApplicableMethods: ...
+
+Notice that ``next_method`` comes *before* ``self`` in the arguments if the
+generic function is an instance method.  If used, it must be the very first
+argument of the method.  It is supplied automatically by the generic function
+machinery, so when you call ``next_method`` you do not have to care whether
+the next method needs to know *its* next method; just pass in all of the
+*other* arguments (including ``self`` if applicable) and the ``next_method``
+implementation will do the rest.
+
+Also notice that methods that do not call their next method do not need to have
+a ``next_method`` argument.  If a method calls ``next_method`` when there are
+no further methods available, ``NoApplicableMethods`` is raised.  Similarly,
+if there is more than one "next method" and they are all equally specific
+(i.e. ambiguous), then ``AmbiguousMethod`` is raised.  (XXX add a way to check
+if ``next_method`` is ambiguous or missing *without* calling it first.)
+
+The ``next_method`` technique is implemented by ``GenericFunction`` using the
+``strategy.method_chain()`` function, which we will cover later in the section
+on `Method Combination Utilities`_.
+
+
+
+Before/After Methods
+====================
+
+Sometimes you'd like for some additional validation or notification to occur
+before or after the "normal" or "primary" methods.  This is what "before",
+"after", and "around" methods are for.  For example::
+
+    >>> class BankAccount:
+    ...
+    ...     def __init__(self,balance,protection=0):
+    ...         self.balance = balance
+    ...         self.protection = protection
+    ...
+    ...     [dispatch.generic()]
+    ...     def withdraw(self,amount):
+    ...         """Withdraw 'amount' from bank"""
+    ...
+    ...     [withdraw.when(strategy.default)]   # nominal case
+    ...     def withdraw(self,amount):
+    ...         self.balance -= amount
+    ...
+    ...     [withdraw.before("amount>self.balance and self.protection==0")]
+    ...     def prevent_overdraft(self,amount):
+    ...         raise ValueError("Insufficient funds")
+    ...
+    ...     [withdraw.after("amount>self.balance")]
+    ...     def automatic_overdraft(self,amount):
+    ...         print "Transferring",-self.balance,"from overdraft protection"
+    ...         self.protection += self.balance
+    ...         self.balance = 0
+
+    >>> acct = BankAccount(200)
+    >>> acct.withdraw(400)
+    Traceback (most recent call last):
+    ...
+    ValueError: Insufficient funds
+
+    >>> acct.protection = 300
+    >>> acct.withdraw(400)
+    Transferring 200 from overdraft protection
+    >>> acct.balance
+    0
+    >>> acct.protection
+    100
+
+This specific example could have been written entirely with normal ``when()``
+methods, by using more complex conditions.  But, in more complex scenarios,
+where different modules may be adding rules to the same generic function, it's
+not possible for one module to predict whether its conditions will be more
+specific than another's, and whether it will need to call ``next_method``, etc.
+
+So, generic functions offer ``before()`` and ``after()`` methods, that run
+before and after the ``when()`` (aka "primary") methods, respectively.  Unlike
+primary methods, ``before()`` and ``after()`` methods:
+
+* Are allowed to have ambiguous conditions (and if they do, they execute in the
+  order in which they were added to the generic function)
+
+* Are *always* run when their conditions apply, with no need to call
+  ``next_method`` to invoke the next method
+
+* Cannot return a useful value and do not have access to the return value of
+  any other method
+
+The overall order of method execution is:
+
+1. All applicable ``before()`` methods, from most-specific to least-specific,
+   methods at the same level of specificity execute in the order they were
+   added.
+
+2. Most-specifc primary method, which may optionally chain to less-specific
+   primary methods.  ``AmbiguousMethod`` or ``NoApplicableMethods`` may be
+   raised if the most-specific method is ambiguous or no primary methods are
+   applicable.
+
+3. All applicable ``after()`` methods, from *least-specific* to most-specific,
+   with methods at the same level of specificity executing in the reverse order
+   from the order they were added.  (In other words, the more specific the
+   ``after()`` condition, the "more after" it gets run!)
+
+If any of these methods raises an uncaught exception, the overall function
+execution terminates at that point, and methods later in the order are not
+run.
+
+
+
+"Around" Methods
+================
+
+TODO: write text and implement.
 
 
 Default Result Combination
@@ -21,20 +178,15 @@ XXX need test for default Dispatcher combination strategy (i.e. most-specific
 only)
 
 
-Before/After/Around Methods
-===========================
 
-* Filter by qualifier (qualify(s,f) -> s,(q,f) -> {q: [(s,f)]})
-
-* Invoke before before, after after
 
 
 Custom Result Combination
 =========================
 
-To implement a custom result combination, you will subclass ``Dispatcher``
-or ``GenericFunction``, as appropriate, and overide the ``combine()`` method
-to implement your result combination algorithm.
+If none of the supplied ``Dispatcher`` or ``GenericFunction`` subclasses
+directly meet your needs, you'll want to implement a custom subclass that
+overides the ``combine()`` method to implement your custom algorithm.
 
 The ``combine()`` method takes one argument: a sequence of ``(signature,res)``
 tuples (also known as "cases"), where ``res`` is either a dispatcher result or
@@ -133,6 +285,47 @@ create interesting method combinations:
     []
 
 
+``separate_qualifiers(qualified_cases, **postprocess)``
+    Turn a list of cases with possibly-qualified methods into a dictionary
+    mapping qualifiers to (possibly post-processed) case lists.  If a given
+    method is not qualified, it's treated as though it had the qualifier
+    '"primary"'.
+
+    Keyword arguments supplied to this function are treated as a mapping from
+    qualifiers to lists of functions that should be applied to the list of
+    cases to that qualifier.  So, for example, this::
+
+        cases = separate_qualifiers(cases,
+            primary=[strategy.ordered_signatures,strategy.safe_methods],
+        )
+
+    is equivalent to::
+
+        cases = separate_qualifiers(cases)
+        if "primary" in cases:
+            cases["primary"]=safe_methods(ordered_signatures(cases["primary"]))
+
+    Notice, by the way, that the postprocessing functions must be listed in
+    order of *application* (i.e. outermost last).
+
+    Some examples/tests::
+
+    >>> def f1(x): pass
+    >>> def f2(x): pass
+    >>> def f3(x): pass
+
+    >>> mixed = [(1,("x",f1)),(2,("x",f2)),(3,("y",f3))]
+    >>> strategy.separate_qualifiers(mixed) # doctest: +NORMALIZE_WHITESPACE
+    {'y': [(3, <function f3...>)],
+     'x': [(1, <function f1...>), (2, <function f2...>)]}
+
+    >>> flat = [(1,f1),(2,f2),(3,("y",f3))]
+    >>> strategy.separate_qualifiers(flat) # doctest: +NORMALIZE_WHITESPACE
+    {'y': [(3, <function f3...>)],
+     'primary': [(1, <function f1...>), (2, <function f2...>)]}
+
+    >>> strategy.separate_qualifiers(flat,primary=[strategy.method_chain])
+    {'y': [(3, <function f3...>)], 'primary': (1, <function f1...>)}
 
 
 Map Dispatchers
