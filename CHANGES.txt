@@ -1,5 +1,12 @@
 Fixes and changes since PyProtocols 0.9.2
 
+ - 'setup.py' now accepts a '--without-speedups' global option to disable
+   the C speedups module.
+
+ - We now support the latest 'adapter_hooks' protocol provided by Zope X3
+   interfaces, allowing multiple interface registry systems to participate
+   in Zope interfaces' '__adapt__()' implementation.
+
  - Declaring an adapter from an instance to a protocol that was part
    of a circular implication path resulted in infinite recursion.
    Correcting the problem required a change in the return signature

@@ -2,15 +2,11 @@
 
 """Distutils setup file"""
 
-include_speedups  = True   # edit this to avoid building C speedups module
-
-
 execfile('src/setup/prologue.py')
-
 
 # Metadata
 PACKAGE_NAME = "PyProtocols"
-PACKAGE_VERSION = "0.9.2"
+PACKAGE_VERSION = "0.9.3"
 HAPPYDOC_IGNORE = ['-i', 'tests', '-i', 'setup']
 
 
@@ -19,27 +15,29 @@ packages = [
     'protocols', 'protocols.tests',
 ]
 
-if include_speedups:
-    extensions = [
-        Extension("protocols._speedups", ["src/protocols/_speedups" + EXT]),
-    ]
-else:
-    extensions = []
-
-
-# data files & scripts
-data_files = []
-scripts = []
-
 execfile('src/setup/common.py')
 
+speedups = Feature(
+    "optional C speed-enhancement module",
+    standard = True,
+    ext_modules = [
+        Extension("protocols._speedups", ["src/protocols/_speedups" + EXT]),
+    ]
+)
+    
 
 
 
 
 
 
-from setuptools import setup
+
+
+
+
+
+
+
 
 setup(
     name=PACKAGE_NAME,
@@ -52,13 +50,11 @@ setup(
 
     url="http://peak.telecommunity.com/PyProtocols.html",
 
-    test_suite = 'protocols.tests.test_suite',
+    test_suite  = 'protocols.tests.test_suite',
     package_dir = {'':'src'},
     packages    = packages,
-    cmdclass = SETUP_COMMANDS,
-    data_files = data_files,
-    ext_modules = extensions,
-    scripts = scripts,
+    cmdclass    = SETUP_COMMANDS,
+    features    = {'speedups': speedups}
 )
 
 

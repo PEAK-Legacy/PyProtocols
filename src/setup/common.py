@@ -15,11 +15,9 @@ if 'HAPPYDOC_TITLE' not in globals():
     HAPPYDOC_TITLE = PACKAGE_NAME + ' API Reference'
 
 
-from distutils.core import setup, Command, Extension
-from distutils.command.install_data import install_data
+from setuptools import setup, Command, Extension, Feature
 from distutils.command.sdist import sdist as old_sdist
 from distutils.command.build_ext import build_ext as old_build_ext
-import sys
 
 
 try:
@@ -29,6 +27,8 @@ try:
 except ImportError:
     build_ext = old_build_ext
     EXT = '.c'
+
+
 
 
 
@@ -83,7 +83,7 @@ class happy(Command):
 class sdist(old_sdist):
 
     """Variant of 'sdist' that (re)builds the documentation first"""
-   
+
     def run(self):
         # Build docs before source distribution
         try:

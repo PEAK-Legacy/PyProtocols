@@ -1,4 +1,4 @@
-PyProtocols Release 0.9.2
+PyProtocols Release 0.9.3
 
  Copyright (C) 2003 by Phillip J. Eby.  All rights reserved.  This software may
  be used under the same terms as Zope or Python.  THERE ARE ABSOLUTELY NO
@@ -50,7 +50,7 @@ PyProtocols Release 0.9.2
     and conditions as Python or Zope.
 
 
- Version 0.9.1 Release Notes
+ Version 0.9.3 Release Notes
 
     This version is a complete, working release, so you can download it and
     try it out.  But, the exact spellings of the API and other interfaces
@@ -59,7 +59,7 @@ PyProtocols Release 0.9.2
     Please contact the author with your input.
 
     If you'd like to use Zope interfaces with PyProtocols, you must
-    use Zope X3 Milestone 4 release, as PyProtocols' Zope support uses
+    use Zope X3 Milestone 4 or later, as PyProtocols' Zope support uses
     the latest Zope interface declaration API.
 
     If you'd like to use Twisted interfaces with PyProtocols, you must use
@@ -102,21 +102,21 @@ PyProtocols Release 0.9.2
 
   PyProtocols includes an optional speed-enhancing module written in Pyrex and
   C.  If you do not have a C compiler available, you can disable installation
-  of the C module by editing the 'setup.py' file and changing this line::
+  of the C module by invoking 'setup.py' with '--without-speedups', e.g.::
 
-    include_speedups  = True   # edit this to avoid building C speedups module
+    python setup.py --without-speedups install
 
-  to read::
+  or::
 
-    include_speedups  = False  # edit this to avoid building C speedups module
+    python setup.py --without-speedups test
 
-  instead.  You do not need to do this if you are using the Win32 binary
+  You do not need to worry about this if you are using the Win32 binary
   installer, since it includes a pre-compiled speedups module.
 
   Note: if you have installed Pyrex on your Python path, be sure it is Pyrex
   version 0.7.2.  You do *not* have to have Pyrex installed, even to build the
-  C extension, but if you do have it installed, make sure it's up to date before
-  building the C extension.
+  C extension, but if you do have it installed, make sure it's up to date
+  before building the C extension.
 
 
 

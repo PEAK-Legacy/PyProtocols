@@ -24,16 +24,16 @@ else:
     def __adapt__(self, obj):
         return adapt(self,IOpenProtocol).__adapt__(obj)
 
-    zi.Interface.__class__.__adapt__ = __adapt__
+    try:
+        from zope.interface import adapter_hooks
+    except ImportError:
+        zi.Interface.__class__.__adapt__ = __adapt__
+    else:
+        adapter_hooks.append(__adapt__)
+
     ZopeInterfaceTypes = [zi.Interface.__class__]
 
     del __adapt__
-
-
-
-
-
-
 
 
 
