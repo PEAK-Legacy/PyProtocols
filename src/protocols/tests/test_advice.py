@@ -59,17 +59,17 @@ class SuperTest(TestCase):
         assert ob.foo == 2
 
 
+    def checkSuperNotFound(self):
+       class Base(object):
+           pass
 
-
-
-
-
-
-
-
-
-
-
+       b = Base()
+       try:
+           supermeta(Base,b).foo
+       except AttributeError:
+           pass
+       else:
+           raise AssertionError("Shouldn't have returned a value")
 
 
 

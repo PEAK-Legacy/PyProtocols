@@ -60,6 +60,7 @@ def supermeta(typ,ob):
     typ = type(ob)
 
     class theSuper(object):
+
         def __getattribute__(self,name):
             for d in mro:
                 if name in d:
@@ -70,10 +71,9 @@ def supermeta(typ,ob):
                         return descr
                     else:
                         return descr(ob,typ)
+            return object.__getattribute__(self,name)
 
     return theSuper()
-
-
 
 
 
