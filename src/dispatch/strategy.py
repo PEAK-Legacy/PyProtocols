@@ -155,12 +155,12 @@ def dispatch_by_subclass(ob,table):
                 return table[ob]
             try:
                 ob, = ob.__bases__
-                return table[ob]
             except ValueError:
                 if ob.__bases__:
                     return table.reseed(ob)
                 break
     return table[None]
+
 
 class ClassCriterion(Adapter):
     """Criterion that indicates expr is of a particular class"""

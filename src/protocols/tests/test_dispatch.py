@@ -1213,19 +1213,19 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
         self.assertEqual(X().s(WaterVehicle()),"water")
 
 
+    def testSubclassDispatch(self):
+        [dispatch.generic()]
+        def gm (t) : pass
 
+        [gm.when(default)]
+        def gm (t) : return 'default'
 
+        [gm.when('issubclass(t,int)')]
+        def gm2 (t) : return 'int'
 
-
-
-
-
-
-
-
-
-
-
+        self.assertEqual(gm(int),"int")
+        self.assertEqual(gm(object),"default")
+        self.assertEqual(gm(float),"default")
 
 
     def testArgNormalization(self):
