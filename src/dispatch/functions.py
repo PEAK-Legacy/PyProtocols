@@ -163,6 +163,7 @@ declareForProto(protocols.IBasicSequence,proto,
 
 
 class ExprCache(object):
+
     __slots__ = 'cache','argtuple','expr_defs'
 
     def __init__(self,argtuple,expr_defs):
@@ -185,7 +186,6 @@ class ExprCache(object):
         f,args = self.expr_defs[item]
         f = self.cache[item] = f(*map(self.__getitem__,args))
         return f
-
 
 
 
@@ -374,7 +374,6 @@ class Dispatcher(BaseDispatcher):
             for ind in self.disp_indexes.values(): ind.clear()
             map(self._addCase, cases)
 
-
     def criterionChanged(self):
         self._acquire()    # XXX could deadlock if called during dispatch
         try:
@@ -383,14 +382,12 @@ class Dispatcher(BaseDispatcher):
         finally:
             self._release()
 
-
     def _setupArgs(self):
         self.expr_defs = [None]*self.argct  # skip defs for arguments
         for p,n in enumerate(self.args):
             self.expr_map[strategy.Argument(name=n)] = p
             self.expr_map[strategy.Argument(pos=p)] = p
             self.expr_map[strategy.Argument(name=n,pos=p)] = p
-
 
     def _startNode(self):
         self._acquire()
@@ -401,9 +398,12 @@ class Dispatcher(BaseDispatcher):
         finally:
             self._release()
 
+    def _addCase(self,case):
+        for disp_id, criterion in case[0].items():
+            self.disp_indexes[disp_id][criterion] = case
 
-
-
+        self.cases.append(case)
+        self._dispatcher = None
 
 
 
@@ -443,49 +443,8 @@ class Dispatcher(BaseDispatcher):
     def parseRule(self,rule,frame,depth):
         return None
 
-
-
-
-
-
-
     def combine(self,cases):
         return strategy.single_best(cases)
-
-    def _addCase(self,case):
-        for disp_id, criterion in case[0].items():
-            self.disp_indexes[disp_id][criterion] = case
-
-        self.cases.append(case)
-        self._dispatcher = None
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -536,11 +495,9 @@ class Dispatcher(BaseDispatcher):
 
         criterion.subscribe(self)
         expr = self.getExpressionId(expr)
-        disp = expr, criterion.dispatch_function
+        disp = expr, criterion.node_type
         if disp not in self.disp_indexes:
-            self.disp_indexes[disp] = strategy.CriterionIndex(
-                criterion.dispatch_function
-            )
+            self.disp_indexes[disp] = criterion.node_type.make_index()
         return expr
 
 
@@ -570,6 +527,8 @@ class Dispatcher(BaseDispatcher):
             if key[0] >= self.argct:    # constrain non-argument exprs
                 for item in pre: self.constraints.add(item,key)
             pre.append(key)
+
+
 
 
 class AbstractGeneric(Dispatcher):

@@ -5,6 +5,7 @@ __all__ = [
     'IDispatcher', 'AmbiguousMethod', 'NoApplicableMethods',
     'IDispatchableExpression', 'IGenericFunction', 'IDispatchTable',
     'EXPR_GETTER_ID','IExtensibleFunction', 'DispatchError',
+    'ISeededCriterion',
 ]
 
 class DispatchError(Exception):
@@ -38,16 +39,49 @@ EXPR_GETTER_ID = -1
 
 
 
-
 class ICriterion(Interface):
     """A criterion to be applied to an expression
 
-    A criterion comprises a "dispatch function" (that determines how the
+    A criterion comprises a "node type" (that determines how the
     criterion will be checked, such as an 'isinstance()' check or range
     comparison) and a value or values that the expression must match.  Note
     that a criterion describes only the check(s) to be performed, not the
     expression to be checked.
     """
+
+    node_type = Attribute(
+        """The type of object that will actually do the dispatching"""
+    )
+
+    def make_index():
+        """Return an 'ICriterionIndex' for indexing criteria of this kind"""
+
+    def __eq__(other):
+        """Return true if equal"""
+
+    def __ne__(other):
+        """Return false if equal"""
+
+    def __invert__():
+        """Return an inverse version of this criterion (i.e. '~criterion')"""
+
+    def implies(other):
+        """Return true if truth of this criterion implies truth of 'other'"""
+
+    def subscribe(listener):
+        """Call 'listener.criterionChanged()' if applicability changes
+
+        Multiple calls with the same listener should be treated as a no-op."""
+
+    def unsubscribe(listener):
+        """Stop calling 'listener.criterionChanged()'
+
+        Unsubscribing a listener that was not subscribed should be a no-op."""
+
+
+
+class ISeededCriterion(ICriterion):
+    """A criterion that works with a SeededIndex"""
 
     dispatch_function = Attribute(
         """'IDispatchFunction' that should be used for checking"""
@@ -67,32 +101,23 @@ class ICriterion(Interface):
         criteria with the same 'dispatch_function' that are being applied to
         the same expression."""
 
-    def __eq__(other):
-        """Return true if equal"""
-
-    def __ne__(other):
-        """Return false if equal"""
-
-    def __invert__():
-        """Return an inverse version of this criterion (i.e. '~criterion')"""
-
-    def implies(other):
-        """Return true if truth of this criterion implies truth of 'other'"""
-
-
     def matches(table):
         """Return iterable of keys from 'table' that this criterion matches"""
 
 
-    def subscribe(listener):
-        """Call 'listener.criterionChanged()' if applicability changes
 
-        Multiple calls with the same listener should be treated as a no-op."""
 
-    def unsubscribe(listener):
-        """Stop calling 'listener.criterionChanged()'
 
-        Unsubscribing a listener that was not subscribed should be a no-op."""
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -114,6 +139,22 @@ class IDispatchFunction(Interface):
 
     def __hash__():
         """Return hashcode"""
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

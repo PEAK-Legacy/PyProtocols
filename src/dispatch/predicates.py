@@ -412,13 +412,13 @@ class MultiCriterion(AbstractCriterion):
     """Abstract base for boolean combinations of criteria"""
 
     elim_single = True
-    __slots__ = 'dispatch_function','criteria'
+    __slots__ = 'node_type','criteria'
 
     def __new__(klass,*criteria):
         criteria, all = map(ICriterion,criteria), []
-        df = criteria[0].dispatch_function
+        nt = criteria[0].node_type
         for c in criteria:
-            if c.dispatch_function is not df:
+            if c.node_type is not nt:
                 raise ValueError("Mismatched dispatch types", criteria)
             if c.__class__ is klass and klass.elim_single:
                 # flatten nested criteria
@@ -428,7 +428,7 @@ class MultiCriterion(AbstractCriterion):
         if klass.elim_single and len(all)==1:
             return all[0]
         self = object.__new__(klass)
-        self.dispatch_function = df
+        self.node_type = nt
         self.criteria = tuple(all)
         return self
 
@@ -499,7 +499,7 @@ class NotCriterion(MultiCriterion):
     def __init__(self, criterion):
         criterion = ICriterion(criterion)
         self.criteria = criterion,
-        self.dispatch_function = criterion.dispatch_function
+        self.node_type = criterion.node_type
 
     def __invert__(self):
         return self.criteria[0]

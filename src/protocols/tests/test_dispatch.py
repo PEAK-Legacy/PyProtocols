@@ -171,7 +171,7 @@ class CriteriaTests(TestCase):
 
         for d in d1,d2,d3,d4:
             self.assertEqual( dict(Signature(d.items()).items()),
-                dict([((k,v.dispatch_function),v) for k,v in d.items()]) )
+                dict([((k,v.node_type),v) for k,v in d.items()]) )
 
         s1 = Signature(d1.items())
         s2 = Signature(d2.items())
@@ -273,8 +273,8 @@ class CriteriaTests(TestCase):
         i = ICriterion(i)
         self.assertEqual(list(i.seeds({})),[None,id(ob)])
 
-    def testCriterionIndex(self):
-        i = CriterionIndex(None)  # XXX
+    def testSeededIndex(self):
+        i = SeededIndex(None)  # XXX
         i[SubclassCriterion(int)] = 42
         self.assertEqual(i.casemap_for([42]), {int:[42],None:[]})
         i.addSeed(int)  # make sure seed isn't duplicated
@@ -637,7 +637,7 @@ class CriteriaTests(TestCase):
             # Verify both the raw signature, and an 'and'-ed version
             for s in Signature(data), Signature(data[:1])&Signature(data[1:]):
                 self.assertEqual(s.items(),
-                    [((k,v.dispatch_function),v) for k,v in data]
+                    [((k,v.node_type),v) for k,v in data]
                 )
 
 
@@ -1151,7 +1151,7 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
         g = GenericFunction(lambda x,y:None)
         self.assertEqual(g.constraints.items(),[])
 
-        df = Inequality.dispatch_function
+        df = strategy.make_node_type(Inequality.dispatch_function)
         yx = Call(operator.div, Argument(name='y'), Argument(name='x'))
         yxid = g.getExpressionId(yx), df
         xid = g.getExpressionId(Argument(name='x')), df

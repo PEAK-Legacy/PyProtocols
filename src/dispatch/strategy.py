@@ -49,6 +49,7 @@ from sys import _getframe
 from weakref import WeakKeyDictionary, ref
 from dispatch.interfaces import *
 from new import instancemethod
+import dispatch
 
 __all__ = [
     'ProtocolCriterion', 'ClassCriterion', 'SubclassCriterion', 'Inequality',
@@ -56,7 +57,7 @@ __all__ = [
     'most_specific_signatures', 'ordered_signatures', 'separate_qualifiers',
     'method_chain', 'method_list', 'all_methods', 'safe_methods', 'Pointer',
     'default', 'IdentityCriterion', 'NullCriterion', 'validateCriterion',
-    'DispatchNode', 'CriterionIndex',
+    'DispatchNode', 'SeededIndex',
 ]
 
 rev_ops = {
@@ -79,49 +80,7 @@ rev_ops = {
 
 
 
-
-class DispatchNode(dict):
-
-    """A mapping w/lazily population and supporting 'reseed()' operations"""
-
-    protocols.advise(instancesProvide=[IDispatchTable])
-
-    __slots__ = 'index','cases','build','lock'
-
-    def __init__(self, index, cases, build, lock):
-        self.index = index
-        self.cases = cases
-        self.build = build
-        self.lock = lock
-        dict.__init__(
-            self,
-            [(key,build(subcases))
-                for key,subcases in index.casemap_for(cases).items()]
-        )
-
-    def reseed(self,key):
-        self.lock.acquire()
-        try:
-            self.index.addSeed(key)
-            self[key] = retval = self.build(
-                self.index.casemap_for(self.cases)[key]
-            )
-            return retval
-        finally:
-            self.lock.release()
-
-
-
-
-
-
-
-
-
-
-
-
-class CriterionIndex:
+class SeededIndex:
     """Index connecting seeds and results"""
 
     def __init__(self,dispatch_function):
@@ -202,6 +161,47 @@ class CriterionIndex:
 
 
 
+
+class DispatchNode(dict):
+
+    """A mapping w/lazily population and supporting 'reseed()' operations"""
+
+    protocols.advise(instancesProvide=[IDispatchTable])
+
+    __slots__ = 'index','cases','build','lock'
+
+    def __init__(self, index, cases, build, lock):
+        self.index = index
+        self.cases = cases
+        self.build = build
+        self.lock = lock
+        dict.__init__(
+            self,
+            [(key,build(subcases))
+                for key,subcases in index.casemap_for(cases).items()]
+        )
+
+    def reseed(self,key):
+        self.lock.acquire()
+        try:
+            self.index.addSeed(key)
+            self[key] = retval = self.build(
+                self.index.casemap_for(self.cases)[key]
+            )
+            return retval
+        finally:
+            self.lock.release()
+
+_memo = {}
+
+def make_node_type(dispatch_function):
+    if dispatch_function not in _memo:
+        class Node(DispatchNode):
+            [dispatch.as(classmethod)]
+            def make_index(cls):
+                return SeededIndex(dispatch_function)
+        _memo[dispatch_function] = Node
+    return _memo[dispatch_function]
 
 def validateCriterion(criterion, dispatch_function):
     """Does 'criterion' have a sane implementation?"""
@@ -326,13 +326,54 @@ def dispatch_by_subclass(ob,table):
     return table[None]
 
 
-class AbstractCriterion(object):
+class CriterionClass(type):
 
+    def __init__(cls,name,bases,cdict):
+
+        if 'dispatch_function' in cdict:
+            cls.node_type = make_node_type(cls.dispatch_function)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class AbstractCriterion(object):
     """Common behaviors for typical criteria"""
 
-    protocols.advise(instancesProvide=[ICriterion])
-
+    __metaclass__ = CriterionClass
     __slots__ = ()
+
+    protocols.advise(instancesProvide=[ISeededCriterion])
 
     def matches(self,table):
         for key in table:
@@ -356,12 +397,12 @@ class AbstractCriterion(object):
     def __eq__(self,other):
         other = ICriterion(other,None)
         return other is not None and \
-            self.dispatch_function is other.dispatch_function and \
-            _seedMap(self)==_seedMap(other)
-
+            self.node_type is other.node_type and _seedMap(self)==_seedMap(other)
 
     def __ne__(self,other):
         return not self.__eq__(other)
+
+
 
 
 
@@ -378,11 +419,11 @@ class AbstractCriterion(object):
         return True
 
 
+
+
+
 def _seedMap(ob):
     return dict([(seed,seed in ob) for seed in ob.seeds({})])
-
-
-
 
 
 
@@ -520,7 +561,7 @@ class IdentityCriterion(AbstractCriterion):
 class NullCriterion(AbstractCriterion):
     """A "wildcard" Criterion that is always true"""
 
-    dispatch_function = staticmethod(lambda ob,table: None)
+    node_type = None
 
     def seeds(self,table):      return ()
     def __contains__(self,ob):  return True
@@ -1162,7 +1203,7 @@ class Signature(object):
         self.data = data = {}; self.keys = keys = []
         for k,v in items:
             v = ICriterion(v)
-            k = k,v.dispatch_function
+            k = k,v.node_type
             if k in data:
                 from predicates import AndCriterion
                 data[k] = AndCriterion(data[k],v)
