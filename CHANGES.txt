@@ -1,3 +1,13 @@
+Fixes and changes since PyProtocols 0.9.2
+
+ - Declaring an adapter from an instance to a protocol that was part
+   of a circular implication path resulted in infinite recursion.
+   Correcting the problem required a change in the return signature
+   of the 'declareProvides()' method in the 'IOpenProvider' interface.
+   Please see the docstring or the updated reference manual for details.
+   Thanks to Bob Ippolito for discovering the problem and bringing it to my
+   attention.
+
 Fixes since PyProtocols 0.9.2
 
  - Defining an adapter from one protocol to another, when that adapter does not

@@ -150,15 +150,15 @@ class Protocol:
 
     def registerObject(self, ob, adapter=NO_ADAPTER_NEEDED,depth=1):
         # Object needs to be able to handle registration
-        api.adapt(ob,IOpenProvider).declareProvides(self,adapter,depth)
-        if adapter is DOES_NOT_SUPPORT:
-            return  # non-support doesn't imply non-support of implied
+        if api.adapt(ob,IOpenProvider).declareProvides(self,adapter,depth):
+            if adapter is DOES_NOT_SUPPORT:
+                return  # non-support doesn't imply non-support of implied
 
-        # Handle implied protocols
-        for proto, (extender,d) in self.getImpliedProtocols():
-            api.declareAdapterForObject(
-                proto, composeAdapters(adapter,self,extender), ob, depth+d
-            )
+            # Handle implied protocols
+            for proto, (extender,d) in self.getImpliedProtocols():
+                api.declareAdapterForObject(
+                    proto, composeAdapters(adapter,self,extender), ob, depth+d
+                )
 
     registerObject = metamethod(registerObject)
 
@@ -368,15 +368,16 @@ class IConformingObject(Interface):
 
 
 class IOpenProvider(Interface):
-
     """An object that can be told how to adapt to protocols"""
 
     def declareProvides(protocol, adapter=NO_ADAPTER_NEEDED, depth=1):
-        """Register 'adapter' as providing 'protocol' for this object"""
+        """Register 'adapter' as providing 'protocol' for this object
 
+        Return a true value if the provided adapter is the "shortest path" to
+        'protocol' for the object, or false if a shorter path already existed.
+        """
 
 class IOpenImplementor(Interface):
-
     """Object/type that can be told how its instances adapt to protocols"""
 
     def declareClassImplements(protocol, adapter=NO_ADAPTER_NEEDED, depth=1):
@@ -384,7 +385,6 @@ class IOpenImplementor(Interface):
 
 
 class IOpenProtocol(IAdaptingProtocol):
-
     """A protocol that be told what it implies, and what supports it
 
     Note that these methods are for the use of the declaration APIs only,

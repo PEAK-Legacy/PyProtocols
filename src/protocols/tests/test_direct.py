@@ -22,7 +22,6 @@ class IPure(Interface):
 
 
 class BasicChecks(AdaptiveChecks, ProviderChecks):
-
     """Checks to be done on every object"""
 
     IA = IA
@@ -30,14 +29,15 @@ class BasicChecks(AdaptiveChecks, ProviderChecks):
     Interface = Interface
     IPure = IPure
 
+    def checkCircularRegister(self):      
+        P1 = Protocol()
+        P2 = Protocol()
+        declareAdapter(NO_ADAPTER_NEEDED,provides=[P2],forProtocols=[P1])
+        declareAdapter(NO_ADAPTER_NEEDED,provides=[P1],forProtocols=[P2])
+        self.declareObImplements([P1]) # implies P1->P2->P1
 
 class ClassChecks(ClassProvidesChecks, BasicChecks):
-
     """Checks to be done on classes and types"""
-
-
-
-
 
 class InstanceConformChecks:
     """Things to check on adapted instances"""

@@ -1762,7 +1762,7 @@ make these uses more convenient.
 
 
 \subsubsection{Defining a protocol based on a URI or UUID}\label{protocols-generated-uri}
-\begin{funcdesc}{protocolForURI}{uri}
+\begin{funcdesc}{protocolForURI}{uri}\versionadded{0.9.1}
 Return a protocol object that represents the supplied URI or UUID string.  It
 is guaranteed that you will receive the same protocol object if you call this
 routine more than once with equal strings.  This behavior is preserved even
@@ -2472,9 +2472,9 @@ automatically.
 \begin{methoddesc}{declareProvides}{protocol, adapter, depth}
 Declare that this object can provide \var{protocol} if adapted by the
 \class{IAdapterFactory} supplied in \var{adapter}, at implication level
-\var{depth}.  If the object already knew a way to adapt to \var{protocol}, this
-method should be a no-op unless the new \var{adapter} and \var{depth} represent
-a ``shorter path'' as described in section \ref{proto-implication}.  Typically,
+\var{depth}.  Return a true value if the new adapter was used, or a false
+value if the object already knew a ``shorter path'' for adapting to
+\var{protocol} (as described in section \ref{proto-implication}).  Typically,
 an implementation of this method will also adapt \var{protocol} to
 \class{IOpenProtocol}, and then register with \method{addImplicationListener()}
 to receive notice of any protocols that might be implied by \var{protocol}

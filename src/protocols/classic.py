@@ -53,6 +53,7 @@ class ProviderMixin:
             self.__protocols_provided__ = registry = {}
         if updateWithSimplestAdapter(registry,protocol,adapter,depth):
             adapt(protocol,IOpenProtocol).addImplicationListener(self)
+            return True
 
     declareProvides = metamethod(declareProvides)
 
@@ -78,7 +79,6 @@ class ProviderMixin:
                 return conf[protocol][0](self,protocol)
 
     __conform__ = metamethod(__conform__)
-
 
 class conformsRegistry(dict):
 
@@ -206,7 +206,7 @@ class MiscObjectsAsOpenProvider(object):
     def declareProvides(self, protocol, adapter=NO_ADAPTER_NEEDED, depth=1):
         if updateWithSimplestAdapter(self.reg, protocol, adapter, depth):
             adapt(protocol,IOpenProtocol).addImplicationListener(self.reg)
-
+            return True
 
     def newRegistry(self,subject):
 
