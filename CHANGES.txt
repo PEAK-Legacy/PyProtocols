@@ -2,6 +2,13 @@ Fixes and Enhancements since PyProtocols 0.9
 
  - Added the 'factoryMethod' and 'equivalentProtocols' keywords to 'advise()'.
 
+ - (NEEDS DOC) Added 'sequenceOf()', allowing you to easily create a protocol
+   that represents a sequence of some base protocol, and automatically adapt
+   basic sequences (e.g. lists and tuples) to a "sequence of" the base
+   protocol, as long as all members of the input sequence can be adapted to the
+   base protocol.  By default, only lists and tuples are considered to support
+   'IBasicSequence'.
+
  - (NEEDS DOC) Added 'protocolForType()' and 'protocolForURI()', that allow you
    to link interfaces by intended semantics, not just by having identical
    instances.  For example, you can use 'protocolForType(file,["read"])' to

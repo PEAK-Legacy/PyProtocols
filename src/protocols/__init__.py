@@ -6,3 +6,4 @@ from interfaces import *
 from advice import metamethod, supermeta
 from classic import ProviderMixin
 from generate import protocolForType, protocolForURI
+from generate import sequenceOf, IBasicSequence

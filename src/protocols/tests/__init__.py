@@ -162,7 +162,7 @@ class APITests(TestCase):
 
 
 
-from protocols.generate import protocolForType, protocolForURI
+from protocols import protocolForType, protocolForURI, sequenceOf
 from protocols import declareImplementation
 from UserDict import UserDict
 
@@ -174,7 +174,34 @@ IImplicitRead   = protocolForType(file,['read'], implicit=True)
 
 IProtocol1 = protocolForURI("http://peak.telecommunity.com/PyProtocols")
 
+multimap = sequenceOf(IGetMapping)
+
 declareImplementation(UserDict,[IGetSetMapping])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 class GenerationTests(TestCase):
 
@@ -199,6 +226,20 @@ class GenerationTests(TestCase):
         assert p is not IProtocol1
         p = protocolForURI("http://peak.telecommunity.com/PyProtocols")
         assert p is IProtocol1
+
+    def checkSequence(self):
+        d1 = {}
+        d2 = {}
+        seq = adapt([d1,d2], multimap)
+        assert seq == [d1,d2]
+        assert seq[0] is d1 and seq[1] is d2
+
+
+
+
+
+
+
 
 
 
