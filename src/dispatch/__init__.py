@@ -153,10 +153,10 @@ def on(argument_name):
             # do something to a 'y' that has been adapted to 'IFoo'
     """
 
-    def callback(frm,name,value,old_locals):
-        from dispatch.functions import _mkGeneric
+    def callback(frm,name,value,old_locals):       
         return _mkGeneric(value,argument_name)
 
+    from dispatch.functions import _mkGeneric
     from protocols.advice import add_assignment_advisor
     return add_assignment_advisor(callback)
     
