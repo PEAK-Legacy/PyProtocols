@@ -43,6 +43,12 @@ Fixes and Enhancements since PyProtocols 0.9
    could raise bizarre errors and/or behave strangely when 'adapt()' was called
    on 'ExtensionClass' instances.
 
+ - Fixed some problems with the test suite when running under Python 2.3.
+   PyProtocols itself worked fine, but the test suite was bitten by two minor
+   semantic changes that took effect in 2.3, resulting in lots of error
+   messages about ModuleType needing a parameter, and a test failure for
+   'checkClassInfo' in the 'FrameInfoTest' test class.
+
  - Fixed a memory leak in the C "speedups" module that leaked unbound
    '__conform__' and '__adapt__' methods, as well as '__class__' and '__mro__'
    references.  Also, fixed the C code potentially reraising invalid error
