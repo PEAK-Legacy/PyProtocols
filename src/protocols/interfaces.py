@@ -73,7 +73,7 @@ class Protocol:
             )
 
         if self.__listeners:
-            for listener in self.__listeners:
+            for listener in self.__listeners.keys():    # Must use keys()!
                 listener.newProtocolImplied(self, proto, adapter, depth)
 
         return adapter
@@ -107,11 +107,11 @@ class Protocol:
 
     registerImplementation = metamethod(registerImplementation)
 
-
     def registerObject(self, ob, adapter=NO_ADAPTER_NEEDED,depth=1):
-
         # Object needs to be able to handle registration
         api.adapt(ob,IOpenProvider).declareProvides(self,adapter,depth)
+        if adapter is DOES_NOT_SUPPORT:
+            return  # non-support doesn't imply non-support of implied
 
         # Handle implied protocols
         for proto, (extender,d) in self.getImpliedProtocols():

@@ -175,10 +175,11 @@ class MiscObjectsAsOpenProvider(object):
 
 
     def __init__(self,ob,proto):
-        for item in getMRO(ob):
+        obs = list(getMRO(ob))
+        for item in obs:
             try:
                 reg = item.__dict__.get('__conform__')
-                if reg is None:
+                if reg is None and obs==[ob]:
                     # Make sure we don't obscure a method from the class!
                     reg = getattr(item,'__conform__',None)
             except AttributeError:
@@ -198,7 +199,6 @@ class MiscObjectsAsOpenProvider(object):
 
         self.ob = ob
         self.reg = reg
-
 
 
 

@@ -80,6 +80,34 @@ class SuperTest(TestCase):
 
 
 
+moduleLevelFrameInfo = getFrameInfo(sys._getframe())
+
+class FrameInfoTest(TestCase):
+
+    classLevelFrameInfo = getFrameInfo(sys._getframe())
+
+    def checkModuleInfo(self):
+        kind,module,f_locals,f_globals = moduleLevelFrameInfo
+        assert kind=="module"
+        for d in module.__dict__, f_locals, f_globals:
+            assert d is globals()
+
+    def checkClassInfo(self):
+        kind,module,f_locals,f_globals = self.classLevelFrameInfo
+        assert kind=="class"
+        assert f_locals is self.__class__.__dict__  # ???
+        for d in module.__dict__, f_globals:
+            assert d is globals()
+
+
+    def checkCallInfo(self):
+        kind,module,f_locals,f_globals = getFrameInfo(sys._getframe())       
+        assert kind=="function call"
+        assert f_locals is locals() # ???        
+        for d in module.__dict__, f_globals:
+            assert d is globals()
+
+
 def ping(log, value):
 
     def pong(klass):
@@ -87,34 +115,6 @@ def ping(log, value):
         return [klass]
 
     addClassAdvisor(pong)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -215,7 +215,7 @@ class AdviceTests(TestCase):
 
 
 TestClasses = (
-    SuperTest, AdviceTests,
+    SuperTest, AdviceTests, FrameInfoTest,
 )
 
 def test_suite():
