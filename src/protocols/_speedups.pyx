@@ -55,7 +55,7 @@ cdef extern from "Python.h":
     PyTypeObject PyBaseObject_Type
 
     void Py_DECREF(PyObject *p)
-
+    object __Pyx_GetExcValue()
 
 cdef object _marker, __conform, __adapt, __mro
 from sys import exc_info
@@ -157,8 +157,8 @@ def adapt(obj, protocol, default=_marker, factory=IMPLEMENTATION_ERROR):
     elif PyErr_ExceptionMatches(PyExc_AttributeError):
         PyErr_Clear()
     else:
+        err = __Pyx_GetExcValue()
         raise
-
 
 
 
@@ -176,13 +176,13 @@ def adapt(obj, protocol, default=_marker, factory=IMPLEMENTATION_ERROR):
     elif PyErr_ExceptionMatches(PyExc_AttributeError):
         PyErr_Clear()
     else:
+        err = __Pyx_GetExcValue()
         raise
 
     if default is _marker:
         return factory(obj, protocol)
 
     return default
-
 
 
 
@@ -245,7 +245,6 @@ def getMRO(ob, extendedClassic=False):
 
 
 def Protocol__adapt__(self, obj):
-
     cdef void *tmp
     cdef int i
 
@@ -260,6 +259,7 @@ def Protocol__adapt__(self, obj):
             PyErr_Clear()
             cls = <object> (<PyObject *>obj).ob_type
         else:
+            err = __Pyx_GetExcValue()
             raise
 
     tmp = <void *>0
@@ -280,10 +280,10 @@ def Protocol__adapt__(self, obj):
             mro = <object> tmp
             Py_DECREF(<PyObject *>tmp)
         else:
+            err = __Pyx_GetExcValue()
             raise
 
     get = self._Protocol__adapters.get
-
 
     if PyTuple_Check(mro):
         #print "tuple",mro
