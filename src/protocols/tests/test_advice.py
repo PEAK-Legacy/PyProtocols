@@ -231,15 +231,15 @@ class FrameInfoTest(TestCase):
             assert d is globals()
 
 
+    def checkClassExec(self):
+        d = {'sys':sys, 'getFrameInfo':getFrameInfo}
+        exec "class Foo: info=getFrameInfo(sys._getframe())" in d
+        kind,module,f_locals,f_globals = d['Foo'].info
+        assert kind=="class-exec", kind
 
 
-
-
-
-
-
-
-
+        
+        
 
 
 

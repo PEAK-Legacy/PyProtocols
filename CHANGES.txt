@@ -1,5 +1,9 @@
 Fixes and changes since PyProtocols 0.9.3
 
+ - Added support to make 'protocols.advise()' operate correctly in a doctest
+   or other 'exec' scenario.  'protocols.advice.getFrameInfo()' now returns
+   a 'kind' of '"class-exec"' for that situation.
+
  - There is a new 'protocols.advice.add_assignment_advisor' function that
    allows you to implement PEP 318-like decorators in Python 2.2 and 2.3.
    There is also a convenience function, 'as', that lets you use PEP 318-style

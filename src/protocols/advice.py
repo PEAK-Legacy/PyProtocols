@@ -124,7 +124,8 @@ def supermeta(typ,ob):
 def getFrameInfo(frame):
     """Return (kind,module,locals,globals) for a frame
 
-    'kind' is one of "exec", "module", "class", "function call", or "unknown".
+    'kind' is one of "exec", "module", "class", "function call", "class-exec",
+    or "unknown".
     """
 
     f_locals = frame.f_locals
@@ -144,6 +145,8 @@ def getFrameInfo(frame):
     if not namespaceIsModule:
         # some kind of funky exec
         kind = "exec"
+        if hasModule and not sameNamespace:
+            kind="class-exec"
     elif sameNamespace and not hasModule:
         kind = "module"
     elif sameName and not sameNamespace:
@@ -156,9 +159,6 @@ def getFrameInfo(frame):
         kind = "unknown"
 
     return kind,module,f_locals,f_globals
-
-
-
 
 
 
