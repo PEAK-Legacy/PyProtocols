@@ -1,37 +1,37 @@
 """Basic Adapters and Adapter Operations"""
 
 __all__ = [
-    'IMPLEMENTATION_ERROR','NO_ADAPTER_NEEDED','DOES_NOT_SUPPORT', 'Adapter',
+    'NO_ADAPTER_NEEDED','DOES_NOT_SUPPORT', 'Adapter',
     'minimumAdapter', 'composeAdapters', 'updateWithSimplestAdapter',
-    'StickyAdapter', 'AdaptationFailure',
+    'StickyAdapter', 'AdaptationFailure', 'bindAdapter',
 ]
+
+from types import FunctionType,ClassType,MethodType
+
+try:
+    PendingDeprecationWarning
+except NameError:
+    class PendingDeprecationWarning(Warning):
+        'Base class for warnings about features which will be deprecated in the future.'
 
 class AdaptationFailure(NotImplementedError,TypeError):
     """A suitable implementation/adapter could not be found"""
-    
+
 # Fundamental Adapters
 
-def IMPLEMENTATION_ERROR(obj, protocol):
-    """Raise 'AdaptationFailure' when adapting 'obj' to 'protocol'"""
-    raise AdaptationFailure("Can't adapt", obj, protocol)
-
-def NO_ADAPTER_NEEDED(obj, protocol):
+def NO_ADAPTER_NEEDED(obj, protocol=None):
     """Assume 'obj' implements 'protocol' directly"""
     return obj
 
-def DOES_NOT_SUPPORT(obj, protocol):
+def DOES_NOT_SUPPORT(obj, protocol=None):
     """Prevent 'obj' from supporting 'protocol'"""
     return None
 
 
 try:
-    from _speedups import IMPLEMENTATION_ERROR, NO_ADAPTER_NEEDED, \
-        DOES_NOT_SUPPORT
+    from _speedups import NO_ADAPTER_NEEDED, DOES_NOT_SUPPORT
 except ImportError:
     pass
-
-
-
 
 
 
@@ -43,10 +43,8 @@ class Adapter(object):
 
     """Convenient base class for adapters"""
 
-    def __init__(self, ob, proto):
+    def __init__(self, ob):
         self.subject = ob
-        self.protocol = proto
-
 
 
 class StickyAdapter(object):
@@ -64,11 +62,13 @@ class StickyAdapter(object):
         # given protocol
 
         provides = list(self.attachForProtocols)
-        if proto not in provides:
+        if proto is not None and proto not in provides:
             provides.append(proto)
-        
+
         from protocols.api import declareAdapter
-        declareAdapter(lambda s,p: self, provides, forObjects=[ob])
+        declareAdapter(lambda s: self, provides, forObjects=[ob])
+
+
 
 
 
@@ -101,7 +101,7 @@ def minimumAdapter(a1,a2,d1=0,d2=0):
     elif d2<d1:
         return a2
 
-    if a1 is a2:
+    if getattr(a1,'__unbound_adapter__',a1) is getattr(a2,'__unbound_adapter__',a2):
         return a1   # don't care which
 
     a1ct = getattr(a1,'__adapterCount__',1)
@@ -135,10 +135,10 @@ def composeAdapters(baseAdapter, baseProtocol, extendingAdapter):
     if extendingAdapter is NO_ADAPTER_NEEDED:
         return baseAdapter
 
-    def newAdapter(ob,proto):
-        ob = baseAdapter(ob,baseProtocol)
+    def newAdapter(ob):
+        ob = baseAdapter(ob)
         if ob is not None:
-            return extendingAdapter(ob,proto)
+            return extendingAdapter(ob)
 
     newAdapter.__adapterCount__ = (
         getattr(extendingAdapter,'__adapterCount__',1)+
@@ -159,6 +159,47 @@ def composeAdapters(baseAdapter, baseProtocol, extendingAdapter):
 
 
 
+
+
+
+def bindAdapter(adapter,proto):
+    """Backward compatibility: wrap 'adapter' to support old 2-arg signature"""
+
+    maxargs = 2; f = adapter; tries = 10
+
+    while not isinstance(f,FunctionType) and tries:
+        if isinstance(f,MethodType):
+            maxargs += (f.im_self is not None)
+            f = f.im_func
+            tries = 10
+        elif isinstance(f,(ClassType,type)):
+            maxargs += 1
+            f = f.__init__
+            tries -=1
+        else:
+            f = f.__call__
+            tries -=1
+
+    if isinstance(f,FunctionType):
+
+        from inspect import getargspec
+        args, varargs, varkw, defaults = getargspec(f)
+
+        if defaults:
+            args = args[:-len(defaults)]
+
+        if len(args)>=maxargs:
+            newAdapter = lambda ob: adapter(ob,proto)
+            newAdapter.__adapterCount__ = getattr(
+                adapter,'__adapterCount__',1
+            )
+            newAdapter.__unbound_adapter__ = adapter
+            from warnings import warn
+            warn("Adapter %r to protocol %r needs multiple arguments"
+                % (adapter,proto), PendingDeprecationWarning, 6)
+            return newAdapter
+
+    return adapter
 
 
 

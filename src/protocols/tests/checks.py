@@ -13,10 +13,10 @@ from protocols import *
 
 # Dummy interfaces and adapters used in tests
 
-def a1(ob,p):
+def a1(ob):
     return 'a1',ob
 
-def a2(ob,p):
+def a2(ob):
     return 'a2',ob
 
 

@@ -131,7 +131,7 @@ class TwistedInterfaceAsProtocol(object):
     )
 
 
-    def __init__(self, iface, proto):
+    def __init__(self, iface):
         self.iface = iface
 
 

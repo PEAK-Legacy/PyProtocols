@@ -1,28 +1,26 @@
 Items needing investigation or implementation for PyProtocols 1.0
 
- * Add a "single-dispatch generic function" demo/example
-
- * Get rid of the second parameter passed to adapters, preferably w/backward
-   compatibility.  That is, instead of calling 'someadapter(ob,proto)', 
-   just call 'someadapter(ob)'.  This would give PyProtocols adapters the same 
-   calling signature as e.g. Zope adapters.
-
- * Release 0.9.3, after testing against the latest Zope X3 and updating docs 
+ * Release 0.9.3, after testing against the latest Zope X3 and updating docs
    to reflect what version of Zope X3 is supported/tested.
+
+ * Fully drop the 'factory' argument to 'adapt', and upgrade the two-argument
+   adapter warning to a DeprecationWarning (for complete removal in 1.1).
+
+ * Add a "single-dispatch generic function" demo/example
 
  * Produce an updated version of PEP 246
 
- * Consider changing "adapter algebra" to allow OR-ing adapters as well as 
-   chaining them, using some sort of implicative partial ordering.  This would 
-   allow (for example) substituting one adapter for another, by specifying 
-   that one adapter "is better than" another, but *without* using depth 
-   numbers.  Instead, an implication graph would be kept, and 
-   ambiguously-ordered adapters would be disallowed.  This needs some API 
+ * Consider changing "adapter algebra" to allow OR-ing adapters as well as
+   chaining them, using some sort of implicative partial ordering.  This would
+   allow (for example) substituting one adapter for another, by specifying
+   that one adapter "is better than" another, but *without* using depth
+   numbers.  Instead, an implication graph would be kept, and
+   ambiguously-ordered adapters would be disallowed.  This needs some API
    design work, though.
 
- * Add a 'protocols.tupleOf(*protocols)' type, for matching tuples of a 
-   given size and set of protocols.  E.g. 'protocols.tupleOf(int,str)' would 
-   match tuples whose first element is an 'int' and second element is a 
-   'str'.  (Note that this type is of very limited use without the ability to 
-   "OR" adapters, since multiple adaptations from the 'tuple' type are 
+ * Add a 'protocols.tupleOf(*protocols)' type, for matching tuples of a
+   given size and set of protocols.  E.g. 'protocols.tupleOf(int,str)' would
+   match tuples whose first element is an 'int' and second element is a
+   'str'.  (Note that this type is of very limited use without the ability to
+   "OR" adapters, since multiple adaptations from the 'tuple' type are
    ambiguous in PyProtocols' current scheme.)

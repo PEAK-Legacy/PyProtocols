@@ -82,15 +82,11 @@ __mro      = PyString_InternFromString("__mro__")
 
 # Fundamental Adapters
 
-def IMPLEMENTATION_ERROR(obj, protocol):
-    """Raise 'AdaptationFailure' when adapting 'obj' to 'protocol'"""
-    raise AdaptationFailure("Can't adapt", obj, protocol)
-
-def NO_ADAPTER_NEEDED(obj, protocol):
+def NO_ADAPTER_NEEDED(obj, protocol=None):
     """Assume 'obj' implements 'protocol' directly"""
     return obj
 
-def DOES_NOT_SUPPORT(obj, protocol):
+def DOES_NOT_SUPPORT(obj, protocol=None):
     """Prevent 'obj' from supporting 'protocol'"""
     return None
 
@@ -121,7 +117,11 @@ cdef class metamethod:
 
 
 
-cdef _adapt(obj, protocol, default):
+
+
+
+
+cdef object _adapt(obj, protocol, default, factory):
 
     # We use nested 'if' blocks here because using 'and' causes Pyrex to
     # convert the return values to Python ints, and then back to booleans!
@@ -180,27 +180,27 @@ cdef _adapt(obj, protocol, default):
         raise
 
     if default is _marker:
-        return IMPLEMENTATION_ERROR(obj, protocol)
+        if factory is not _marker:
+            from warnings import warn
+            warn("The 'factory' argument to 'adapt()' will be removed in 1.0",
+                DeprecationWarning, 1)
+            return factory(obj, protocol)
+        raise AdaptationFailure("Can't adapt", obj, protocol)
 
     return default
 
-    
-def adapt(obj, protocol, default=_marker):
 
+def adapt(obj, protocol, default=_marker, factory=_marker):
     """PEP 246-alike: Adapt 'obj' to 'protocol', return 'default'
 
     If 'default' is not supplied and no implementation is found,
     raise 'AdaptationFailure'."""
 
-    return _adapt(obj,protocol,default)
-
+    return _adapt(obj,protocol,default,factory)
 
 def Protocol__call__(self, ob, default=_marker):
     """Adapt to this protocol"""
-    return _adapt(ob,self,default)
-
-
-
+    return _adapt(ob,self,default,_marker)
 
 
 cdef buildClassicMRO(PyClassObject *cls, PyListObject *list):
@@ -375,7 +375,7 @@ def Protocol__adapt__(self, obj):
             cls = <object> PyTuple_GET_ITEM(<PyTupleObject *>mro, i)
             factory=get(cls)
             if factory is not None:
-                return factory[0](obj,self)
+                return factory[0](obj)
 
     elif PyList_Check(mro):
         #print "list",mro
@@ -383,7 +383,7 @@ def Protocol__adapt__(self, obj):
             cls = <object> PyList_GET_ITEM(<PyListObject *>mro, i)
             factory=get(cls)
             if factory is not None:
-                return factory[0](obj,self)
+                return factory[0](obj)
 
     else:
         #print "other",mro
@@ -391,7 +391,7 @@ def Protocol__adapt__(self, obj):
         for cls in mro:
             factory=get(cls)
             if factory is not None:
-                return factory[0](obj,self)
+                return factory[0](obj)
 
 
 

@@ -113,7 +113,7 @@ class APITests(TestCase):
     def checkImplicationBug(self):
         class I1(Interface): pass
         class I2(I1): pass
-        declareAdapter(lambda o,p: o, provides=[I1],forProtocols=[I2])
+        declareAdapter(lambda o: o, provides=[I1],forProtocols=[I2])
 
 
 

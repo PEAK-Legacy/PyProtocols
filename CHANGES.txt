@@ -1,12 +1,27 @@
 Fixes and changes since PyProtocols 0.9.2
 
- - Fixed 'protocols.sequenceOf()' being unable to directly imply a non-sequence
-   protocol.
+ - Adapter factories are now only called with one argument: the object to
+   adapt.  For backward compatibility, any adapter factories that require
+   more than one argument are wrapped in a converter.  It's highly recommended
+   that you transition to one-argument adapters as soon as practical, since
+   using two-argument adapters will cause deprecation warnings in PyProtocols
+   version 1.0  (and causes PendingDeprecationWarnings in 0.9.3).  This change
+   was made for symmetry with Zope and Twisted adapters, as well as Pythonic
+   adapter factories like 'int' et al.
 
- - The 'factory' parameter to 'adapt()' was REMOVED.  An informal survey of
+   (Note that as a result of this change, 'Adapter' objects no longer have a
+   'protocol' attribute, and 'StickyAdapter' objects will also lose their
+   'protocol' attribute in 1.0.)
+
+ - The 'factory' parameter to 'adapt()' is DEPRECATED.  An informal survey of
    PyProtocols' users indicated that nobody was using it to any significant
    degree, and its removal was unopposed.  This feature was an extension to
    PEP 246, so this brings PyProtocols into closer conformance with the PEP.
+   If you are currently using it, you will receive a 'DeprecationWarning', and
+   in PyProtocols 1.0 your code will break.
+
+ - Fixed 'protocols.sequenceOf()' being unable to directly imply a non-sequence
+   protocol.
 
  - Raise 'AdaptationFailure' instead of 'NotImplementedError' when adaptation
    is unsuccessful.  'AdaptationFailure' is a subclass of both 'TypeError' and

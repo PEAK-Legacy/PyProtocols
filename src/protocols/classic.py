@@ -76,7 +76,7 @@ class ProviderMixin:
         for cls in getMRO(self):
             conf = cls.__dict__.get('__protocols_provided__',())
             if protocol in conf:
-                return conf[protocol][0](self,protocol)
+                return conf[protocol][0](self)
 
     __conform__ = metamethod(__conform__)
 
@@ -93,7 +93,7 @@ class conformsRegistry(dict):
             subject = self.subject()
 
             if subject is not None:
-                return self[protocol][0](subject,protocol)
+                return self[protocol][0](subject)
 
 
     def findImplementation(self, subject, protocol, checkSelf=True):
@@ -111,7 +111,7 @@ class conformsRegistry(dict):
                 )
 
             if protocol in conf:
-                return conf[protocol][0](subject,protocol)
+                return conf[protocol][0](subject)
 
 
 
@@ -174,7 +174,7 @@ class MiscObjectsAsOpenProvider(object):
     )
 
 
-    def __init__(self,ob,proto):
+    def __init__(self,ob):
         obs = list(getMRO(ob))
         for item in obs:
             try:

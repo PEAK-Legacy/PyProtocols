@@ -260,7 +260,7 @@ def sequenceOf(baseProtocol):
         except KeyError:
             proto = registry[key] = SequenceProtocol(baseProtocol)
             declareAdapterForProtocol(
-                proto, lambda o,p: ADAPT_SEQUENCE(o,proto), IBasicSequence
+                proto, lambda o: ADAPT_SEQUENCE(o,proto), IBasicSequence
             )
             return proto
 

@@ -12,7 +12,8 @@ from sys import _getframe, exc_info, modules
 from types import ClassType
 ClassTypes = ClassType, type
 
-from adapters import NO_ADAPTER_NEEDED, DOES_NOT_SUPPORT, IMPLEMENTATION_ERROR
+from adapters import NO_ADAPTER_NEEDED, DOES_NOT_SUPPORT
+from adapters import bindAdapter
 from advice import addClassAdvisor, getFrameInfo
 from interfaces import IOpenProtocol, IOpenProvider, IOpenImplementor
 from interfaces import Protocol, InterfaceClass
@@ -38,8 +39,7 @@ from interfaces import Protocol, InterfaceClass
 
 
 
-
-def adapt(obj, protocol, default=_marker):
+def adapt(obj, protocol, default=_marker, factory=_marker):
 
     """PEP 246-alike: Adapt 'obj' to 'protocol', return 'default'
 
@@ -76,8 +76,20 @@ def adapt(obj, protocol, default=_marker):
             if exc_info()[2].tb_next is not None:
                 raise
 
+
+
+
+
     if default is _marker:
-        return IMPLEMENTATION_ERROR(obj, protocol)
+
+        if factory is not _marker:
+            from warnings import warn
+            warn("The 'factory' argument to 'adapt()' will be removed in 1.0",
+                DeprecationWarning, 2)
+            return factory(obj, protocol)
+
+        raise AdaptationFailure("Can't adapt", obj, protocol)
+
     return default
 
 try:
@@ -85,12 +97,36 @@ try:
 except ImportError:
     pass
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Fundamental, explicit interface/adapter declaration API:
 #   All declarations should end up passing through these three routines.
 
 def declareAdapterForType(protocol, adapter, typ, depth=1):
     """Declare that 'adapter' adapts instances of 'typ' to 'protocol'"""
-
+    adapter = bindAdapter(adapter,protocol)
     adapter = adapt(protocol, IOpenProtocol).registerImplementation(
         typ, adapter, depth
     )
@@ -104,12 +140,12 @@ def declareAdapterForType(protocol, adapter, typ, depth=1):
 def declareAdapterForProtocol(protocol, adapter, proto, depth=1):
     """Declare that 'adapter' adapts 'proto' to 'protocol'"""
     adapt(protocol, IOpenProtocol)  # src and dest must support IOpenProtocol
-    adapt(proto, IOpenProtocol).addImpliedProtocol(protocol, adapter, depth)
+    adapt(proto, IOpenProtocol).addImpliedProtocol(protocol, bindAdapter(adapter,protocol), depth)
 
 
 def declareAdapterForObject(protocol, adapter, ob, depth=1):
     """Declare that 'adapter' adapts 'ob' to 'protocol'"""
-    adapt(protocol,IOpenProtocol).registerObject(ob,adapter,depth)
+    adapt(protocol,IOpenProtocol).registerObject(ob,bindAdapter(adapter,protocol),depth)
 
 # Bootstrap APIs to work with Protocol and InterfaceClass, without needing to
 # give Protocol a '__conform__' method that's hardwired to IOpenProtocol.
@@ -120,6 +156,11 @@ def declareAdapterForObject(protocol, adapter, ob, depth=1):
 IOpenProtocol.registerImplementation(InterfaceClass)    # VERY BAD!!
 IOpenProtocol.registerImplementation(Protocol)          # NEVER DO THIS!!
 # From this line forward, the declaration APIs can work.  Use them instead!
+
+
+
+
+
 
 # Interface and adapter declarations - convenience forms, explicit targets
 

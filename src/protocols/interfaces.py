@@ -180,7 +180,7 @@ class Protocol:
         for klass in mro:
             factory=get(klass)
             if factory is not None:
-                return factory[0](obj,self)
+                return factory[0](obj)
 
     try:
         from _speedups import Protocol__adapt__ as __adapt__
@@ -414,8 +414,8 @@ class IAdapterFactory(Interface):
 
     """Callable that can adapt an object to a protocol"""
 
-    def __call__(ob, protocol):
-        """Return an implementation of 'protocol' for 'ob'"""
+    def __call__(ob):
+        """Return an implementation of protocol for 'ob'"""
 
 
 class IProtocol(Interface):

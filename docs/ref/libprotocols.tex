@@ -258,7 +258,7 @@ class FunctionAsDocumentable(object):
         asAdapterForTypes = [FunctionType],
     )
 
-    def __init__(self, ob, protocol):
+    def __init__(self, ob):
         self.func = ob
 
     def getKind(self):
@@ -824,8 +824,8 @@ As of version 0.9.3, PyProtocols supports the simplified adaptation API that
 was pioneered by Twisted, and later adopted by Zope.  In this simplified API,
 a protocol can be called, passing in the object to be adapted.  So, for example,
 instead of calling \code{adapt(foo,IBar)}, one may call \code{IBar(foo)}.  The
-optional \var{default} and \var{factory} arguments may also be supplied,
-following the \var{component} parameter.
+optional \var{default} arguments can also be supplied, following the
+\var{component} parameter.
 
 All of the protocol types supplied by PyProtocols now support this simpler
 calling scheme, except for \class{AbstractBase} subclasses, because calling
@@ -1045,10 +1045,10 @@ for you to declare that an object supports these interfaces, and the
 \item[IAdapterFactory] \hfill \\
 Up until this point, we've been talking about ``adapters'' rather loosely.  The
 \class{IAdapterFactory} interface formalizes the concept.  An \strong{adapter
-factory} is a callable object that takes two arguments (an object and a
-protocol, in that order) and returns an object that provides the protocol on
-behalf of the passed-in object.  Declaration API functions that take ``adapter''
-or ``factory'' arguments must be adapter factories.
+factory} is a callable object that accepts an object to be adapted, and returns
+an object that provides the protocol on behalf of the passed-in object.
+Declaration API functions that take ``adapter'' or ``factory'' arguments must
+be adapter factories.
 
 The \module{protocols} package supplies two functions that provide
 this interface: \function{NO_ADAPTER_NEEDED} and \function{DOES_NOT_SUPPORT}.
@@ -1374,8 +1374,7 @@ Supplying this argument is equivalent to calling
 \code{declareAdapter(\var{containing class}, \var{instancesProvide},
 forTypes=\var{types})}.  (Note that this means the containing class must be an
 object that provides \class{IAdapterFactory}; i.e., its constructor should
-accept being called with two arguments: the object to be adapted, and the
-target protocol.)
+accept being called with a single argument: the object to be adapted.)
 
 \item[asAdapterForProtocols = \var{protocols}] \hfill \\
 Declare the containing class as an adapter for \var{protocols}, to the
@@ -1384,13 +1383,14 @@ supplied).  Supplying this argument is equivalent to calling
 \code{declareAdapter(\var{containing class}, \var{instancesProvide},
 forProtocols=\var{types})}.  (Note that this means the containing class must be
 an object that provides \class{IAdapterFactory}; i.e., its constructor should
-accept being called with two arguments: the object to be adapted, and the
-target protocol.)
+accept being called with a single argument: the object to be adapted.)
 
 \item[factoryMethod = \var{methodName}] \hfill \\ \versionadded{0.9.1}
 When using \code{asAdapterForTypes} or \code{asAdapterForProtocols}, you can
 also supply a factory method name, using this keyword.  The method named must be
-a \emph{class} method, and it will be used in place the class' normal constructor.
+a \emph{class} method, and it will be used in place of the class' normal
+constructor.  (Note that this means the named method must be able to be called
+with a single argument: the object to be adapted.)
 
 \item[protocolExtends = \var{protocols}] \hfill \\
 Declare that the containing class is a protocol that extends (i.e., implies)
@@ -1996,27 +1996,16 @@ This base class provides a convenient \method{__init__} method for adapter
 classes.  To use it, just subclass \class{protocols.Adapter} and add methods
 to implement the desired interface(s).  (And of course, declare what interfaces
 the adapter provides, for what types, and so on.)  Your subclass' methods can
-use the following attributes, which will have been set by the \method{__init__}
+use the following attribute, which will have been set by the \method{__init__}
 method:
-
-
-
-
-
-
-
-
 
 \begin{memberdesc}{subject}
 The \member{subject} attribute of an \class{Adapter} instance is the \var{ob}
 supplied to its constructor.  That is, it is the object being adapted.
 \end{memberdesc}
 
-\begin{memberdesc}{protocol} The \member{subject} attribute of an
-\class{Adapter} instance is the \var{proto} supplied to its constructor.  That
-is, it is the protocol to which the \member{subject} is being adapted.
-\end{memberdesc}
 \end{classdesc}
+
 
 \begin{funcdesc}{advise}{**kw}
 Declare protocol relationships for the containing class or module.  All
@@ -2047,6 +2036,17 @@ must be adaptable to \class{IOpenProtocol}.  See section
 \ref{protocols-instances}, ``Protocol Declarations for Individual Objects'',
 for more information on using \function{adviseObject}.
 \end{funcdesc}
+
+
+
+
+
+
+
+
+
+
+
 
 \begin{classdesc}{Attribute}{doc\optional{,name=\constant{None}, value=\constant{None}}}
 This class is used to document attributes required by an interface.  An example
@@ -2236,13 +2236,13 @@ and protocol.
 \class{StickyAdapter} adds one attribute to those defined by \class{Adapter}:
 
 \begin{memberdesc}{attachForProtocols}
-A tuple of additional protocols to be declared by the constructor, in
-addition to the protocol the adapter class was invoked by.  Define this in
-your subclass' body if it is providing multiple protocols, and wants to
-use the same instance to supply them.
+A tuple of protocols to be declared by the constructor.  Define this in
+your subclass' body to indicate what protocols it should attach itself for.
 \end{memberdesc}
 
 \end{classdesc}
+
+
 
 
 
@@ -2624,9 +2624,9 @@ the \class{IAdapterFactory} supplied in \var{adapter}, at implication level
 
 \begin{classdesc*}{IAdapterFactory}
 An interface documenting the requirements for an object to be used as an
-adapter factory: i.e., that it be a callable accepting an object and a
-protocol.)  This interface is not used by the \module{protocols} package except
-as documentation.
+adapter factory: i.e., that it be a callable accepting an object to be adapted.)
+This interface is not used by the \module{protocols} package except as
+documentation.
 \end{classdesc*}
 
 
@@ -2710,8 +2710,8 @@ Return a new \class{IAdapterFactory} composed of the input adapter factories
 \function{DOES_NOT_SUPPORT}, \function{DOES_NOT_SUPPORT} is returned.  If
 either input adapter is \function{NO_ADAPTER_NEEDED}, the other input adapter
 is returned.  Otherwise, a new adapter factory is created that will return
-\code{\var{extendingAdapter}(\var{baseAdapter}(object,\var{baseProtocol}),protocol)}
-when called with an \code{object, protocol} pair.  (Note: the actual
+\code{\var{extendingAdapter}(\var{baseAdapter}(object))}
+when called with \code{object}.  (Note: the actual
 implementation verifies that \var{baseAdapter} didn't return \constant{None}
 before it calls \var{extendingAdapter}).
 
@@ -2824,8 +2824,8 @@ limitation.
 
 The current implementation of support for Zope X3 interfaces is currently based
 on Zope X3 alpha 1; it will not work with older releases.  Zope
-X3 requires Python 2.3.3 or better, so even though PyProtocols works
-with 2.2.2 and up in general, you will need 2.3.3 to use PyProtocols with Zope X3.
+X3 requires Python 2.3.4 or better, so even though PyProtocols works
+with 2.2.2 and up in general, you will need 2.3.4 to use PyProtocols with Zope X3.
 \newpage
 \subsubsection{\module{protocols.twisted_support} --- Support for Twisted Interfaces}
 \declaremodule[protocols.twistedsupport]{}{protocols.twisted_support}
@@ -3226,16 +3226,6 @@ Here's what we'd like it to do instead.  We'd like it to say something like
 
 What does this do for us?  Aside from debugging, it gives us a chance to find
 related interfaces, or access methods or data available from the context.
-Let's suppose our \class{specialFunctionAdapter} class needs to be able to
-adapt to \class{ISignature}.  If it uses the global \class{ISignature}, it
-won't have access to any context-specific adapters for \class{ISignature}.  How
-can we get it to use the \emph{local} \class{ISignature} instead?
-
-Remember that every adapter factory is passed two arguments: the component to
-adapt, and the protocol to adapt it to.  If the protocol is a local one, and it
-knows its ``context'' object, then the adapter could access other interfaces by
-retrieving them from the context.  (Along with anything else it needs from
-the context!)
 
 So, let's create a \class{LocalProtocol} class:
 
@@ -3270,13 +3260,7 @@ with this one:
 \end{verbatim}
 
 Thus, the new local protocol will know its context is the instance it was
-retrieved from.  Context-sensitive adapters will be able to retrieve their
-context from it, and if we are debugging, we'll be able to know what the
-original protocol was.
-
-
-
-
+retrieved from.
 
 Of course, to make this new extension really robust, we would need to add some
 more documentation.  For example, it might be good to add an
@@ -3288,6 +3272,11 @@ objects, and authors of context-sensitive adapters need to document what
 interface they expect their local protocols' \member{context} attribute to
 supply!  Also, see below for a web site with some interesting papers on
 patterns for using localized adaptation of this kind.
+
+
+
+
+
 
 \note{In practice, the idea of having local protocols turned out to be useful enough
 that as of version 0.9.1, our \class{LocalProtocol} example class was added to
@@ -3310,6 +3299,17 @@ object so that the adapter can be informed when the adapted object's methods
 are called directly by other code.)}
 
 \end{seealso}
+
+
+
+
+
+
+
+
+
+
+
 
 
 
