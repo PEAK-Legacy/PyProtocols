@@ -9,7 +9,7 @@ from api import declareImplementation, advise, declareAdapterForObject, adapt
 from interfaces import *
 from new import instancemethod
 from advice import getMRO, metamethod, mkRef
-
+from weakref import WeakKeyDictionary
 
 
 
@@ -267,6 +267,9 @@ class TwistedAdaptMethod(object):
         if TwistedImplements(obj, self.iface):
             return obj
 
+        # Get Twisted to try and adapt
+        return self.iface(ob, None)
+
 
     def im_func(self, ob, default):
 
@@ -279,9 +282,6 @@ class TwistedAdaptMethod(object):
             return default
 
         return meth(ob,default)
-
-
-
 
 
 
@@ -339,6 +339,7 @@ class TwistedInterfaceAsProtocol(object):
     def __init__(self, iface, proto):
         self.iface = iface
 
+
     def __adapt__(self, obj):
         return self.iface.__adapt__(obj)
 
@@ -366,20 +367,20 @@ class TwistedInterfaceAsProtocol(object):
 
 
 
-
     def addImpliedProtocol(self, proto, adapter=NO_ADAPTER_NEEDED, depth=1):
 
         iface = self.iface
+
+        # XXX need to ensure 'proto' is usable w/Twisted!
         self.iface.adaptWith(lambda o: adapter(o, iface), proto)
 
-        # XXX We can't notify others unless we have a registry in iface
-
-        # XXX Do we need to recurse, or is adding the protocol sufficient?
-
+        # XXX is the above sufficient?
         # XXX What are Twisted's adapter override semantics?
         
-        # XXX Note that only implication between Twisted protocols is
-        # XXX supportable!
+        listeners = iface.__dict__.get('_Protocol__listeners',{})
+
+        for listener in listeners.keys():    # Must use keys()!
+            listener.newProtocolImplied(self, proto, adapter, depth)
 
 
     def registerObject(self, ob, adapter=NO_ADAPTER_NEEDED, depth=1):
@@ -402,11 +403,10 @@ class TwistedInterfaceAsProtocol(object):
         
 
     def addImplicationListener(self, listener):
-        pass    # XXX We need a registry, since adaptation is possible
-
-
-
-
+        listeners = self.iface.__dict__.setdefault(
+            '_Protocol__listeners',WeakKeyDictionary()
+        )
+        listeners[listener] = True
 
 # Monkeypatch Zope Interfaces
 
