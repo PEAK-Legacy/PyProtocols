@@ -196,7 +196,7 @@ have more specialized abilities.
 An \strong{adapting protocol} is a protocol object that is potentially able to
 adapt components to support the protocol it represents, or at least to
 recognize that a component supports (or claims to support) the protocol.  To
-do this, an adapting protocol must have an \function{__adapt__} method, as
+do this, an adapting protocol must have an \method{__adapt__} method, as
 will be described in section \ref{adapt-protocol}.  (Often, this method
 can be added to an existing class, or patched into an interface object
 implementation.)
@@ -281,11 +281,11 @@ in four steps:
 of that class or type, the component is returned unchanged.  (This quickly
 disposes of the most trivial cases).
 
-\item If the component has a \function{__conform__} method, it is called,
+\item If the component has a \method{__conform__} method, it is called,
 passing in the protocol.  If the method returns a value other than
 \constant{None}, it is returned as the result of \function{adapt()}.
 
-\item If the protocol has an \function{__adapt__} method, it is called,
+\item If the protocol has an \method{__adapt__} method, it is called,
 passing in the component.  If the method returns a value other than
 \constant{None}, it is returned as the result of \function{adapt()}.
 
@@ -300,14 +300,14 @@ that it can be useful even in the case where neither the component nor the
 protocol object are aware that the adaptation protocol exists, and it
 gracefully degrades to a kind of \function{isinstance()} check in that
 case.  However, if either the component or the protocol object has been
-constructed (or altered) so that it has the appropriate \function{__conform__}
-or \function{__adapt__} method, then much more meaningful results can be
+constructed (or altered) so that it has the appropriate \method{__conform__}
+or \method{__adapt__} method, then much more meaningful results can be
 achieved.
 
 Throughout the rest of this document, we will say that a component
 \strong{supports} a protocol, if calling \code{adapt(component,protocol)} does
 not raise an error.  That is, a component supports a protocol if its
-\function{__conform__} method or the protocol's \function{__adapt__} method
+\method{__conform__} method or the protocol's \method{__adapt__} method
 return a non-\constant{None} value.
 
 This is different from saying that an object \strong{provides} a protocol.  An
@@ -318,7 +318,7 @@ protocol on its behalf.
 
 Now that you know how \function{adapt()} works, you can actually make use of it
 without any of the other tools in the \module{protocols} package.  Just define
-your own \function{__conform__} and \function{__adapt__} methods, and off
+your own \method{__conform__} and \method{__adapt__} methods, and off
 you go!
 
 
@@ -459,8 +459,8 @@ proceed directly to section \ref{protocols-defining}, ``Defining and Subclassing
 Interfaces''.
 
 The first difference is that \exception{TypeError} is treated differently in
-each implementation.  \pep{246} says that if a \function{__conform__} or
-\function{__adapt__} method raises a \exception{TypeError}, it should be
+each implementation.  \pep{246} says that if a \method{__conform__} or
+\method{__adapt__} method raises a \exception{TypeError}, it should be
 treated in the same way as if the method returned \constant{None}.  This was
 a workaround for the issue of accidentally calling an unbound class
 method, in the case where a component or protocol supplied to
@@ -468,8 +468,8 @@ method, in the case where a component or protocol supplied to
 
 The \module{protocols} implementation of \function{adapt()} attempts to catch
 such errors also, but will reraise any exception that appears to come from
-\emph{within} the execution of the \function{__conform__} or
-\function{__adapt__} method.  So if these methods raise a \exception{TypeError},
+\emph{within} the execution of the \method{__conform__} or
+\method{__adapt__} method.  So if these methods raise a \exception{TypeError},
 it will be passed through to the caller of \function{adapt}.  Thus, if you
 are writing one of these methods, you should not raise a \exception{TypeError}
 to signal the lack of an adaptation.  Rather, you should return \constant{None}.
@@ -705,7 +705,7 @@ that can be used as a Python dictionary key.  The second argument to
 \item[IAdaptingProtocol] \hfill \\
 This interface formalizes the idea of an ``adapting protocol'', specifically
 that it is a protocol object (i.e., it provides \class{IProtocol}) that also
-has an \function{__adapt__} method as described in section \ref{adapt-protocol}.
+has an \method{__adapt__} method as described in section \ref{adapt-protocol}.
 \class{IAdaptingProtocol} is a subclass of \class{IProtocol}, so of course
 \function{adapt()} accepts such objects as protocols.
 
@@ -764,7 +764,7 @@ to their frameworks.
 An \class{IOpenImplementor} is a class or type that can be told (via the
 declaration API) what protocols its instances provide (or support via an
 \class{IAdapterFactory}).  Note that this implies that the instances have
-a \function{__conform__} method, or else they would not be able to tell
+a \method{__conform__} method, or else they would not be able to tell
 \function{adapt()} about the declared support!
 
 Support for this interface is optional, since types that don't support it
@@ -1082,7 +1082,7 @@ protocols.  Supplying this argument is equivalent to calling
 means that the containing class must support the \class{IOpenProvider}
 interface.  The \module{protocols} package supplies default adapters to
 support \class{IOpenProvider} for both classic and new-style classes, as long
-as they do not have custom \function{__conform__} methods.  See section
+as they do not have custom \method{__conform__} methods.  See section
 \ref{protocols-instances}, ``Protocol Declarations for Individual Objects''
 for more details.
 
@@ -1149,7 +1149,8 @@ subsetting, extending...
 \subsection{Package Contents and Contained Modules\label{protocols-contents}}
 
 The following functions, classes, and interfaces are available from the
-top-level \module{protocols} package:
+top-level \module{protocols} package.  (The list is arranged in order of
+their expected frequency of use, with most frequently used items listed first.)
 
 \begin{funcdesc}{adapt}{component, protocol,
 \optional{, default \optional{, factory}}}
@@ -1174,7 +1175,6 @@ section \ref{adapt-protocol}.
 Subclass this to create an interface.  See section \ref{protocols-defining}
 for more details.
 \end{classdesc*}
-
 
 
 
@@ -1269,7 +1269,7 @@ for more information on using \function{adviseObject}.
 
 
 
-\begin{funcdesc}{declareAdapter}{factory, provides,
+\begin{funcdesc}{declareAdapter}{factory, provides
 \optional{, forTypes=[ ]} \optional{, forProtocols=[ ]}
 \optional{, forObjects=[ ]}}
 
@@ -1351,19 +1351,33 @@ metaclass, in a subclass of \class{Interface}.
 
 
 
-ProviderMixin
+\begin{classdesc*}{ProviderMixin}
+If you have a class with a \method{__conform__} method for its instances, but
+you also want the instances to support \class{IOpenprovider} (so that
+\function{adviseObject} can be used on them), you may want to include this
+class as one of your class' bases.  The default adapters for
+\class{IOpenprovider} can only adapt objects that do not already have a
+\method{__conform__} method of their own.
+
+So, to support \class{IOpenprovider} with a custom \method{__conform__}
+method, subclass \class{ProviderMixin}, and have your \method{__conform__}
+method invoke the base \method{__conform__} method as a default, using
+\function{supermeta()}.  (E.g. \code{return
+supermeta(MyClass,self).__conform__(protocol)}.)  See below for more on
+the \function{supermeta()} function.
+\end{classdesc*}
 
 
 \begin{funcdesc}{metamethod}{func}
 Wrap \var{func} in a manner analagous to \function{classmethod} or
 \function{staticmethod}, but as a metaclass-level method that may be redefined
 by metaclass instances for their instances.  For example, if a metaclass wants
-to define a \function{__conform__} method for its instances (i.e. classes), and
-those instances (classes) want to define a \function{__conform__} method for
-\emph{their} instances, the metaclass should wrap its \function{__conform__}
+to define a \method{__conform__} method for its instances (i.e. classes), and
+those instances (classes) want to define a \method{__conform__} method for
+\emph{their} instances, the metaclass should wrap its \method{__conform__}
 method with \function{metamethod}.  Otherwise, the metaclass'
-\function{__conform__} method will be hidden by the class-level
-\function{__conform__} defined for the class' instances.
+\method{__conform__} method will be hidden by the class-level
+\method{__conform__} defined for the class' instances.
 \end{funcdesc}
 
 
@@ -1373,23 +1387,9 @@ metamethods.  If you ordinarily would use \function{super()}, but are calling a
 \function{metamethod}, you should use \function{supermeta()} instead.  This is
 because Python 2.2 does not support using super with properties (which is
 effectively what metamethods are).
+
+Note that if you are subclassing \class{ProviderMixin}
 \end{funcdesc}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 \begin{funcdesc}{declareAdapterForType}{protocol, adapter, typ \optional{,
@@ -1419,9 +1419,255 @@ calling its \function{addImpliedProtocol} method.
 \end{funcdesc}
 
 
-the 7 I* interfaces
 
-Attribute  (needs tests!)
+
+
+
+
+
+
+
+
+
+
+
+
+
+\begin{classdesc*}{IOpenProtocol}
+This interface documents the behavior required of protocol objects in order to
+be used with the \module{protocols} declaration API (the functions whose names
+begin with \code{declare} or \code{advise}.)  The declaration API functions
+will attempt to \function{adapt()} supplied protocols to this interface.
+
+The methods an \class{IOpenProtocol} implementation must supply are:
+
+
+\begin{methoddesc}{addImpliedProtocol}{proto, adapter, depth}
+Declare that this protocol can be adapted to protocol \var{proto} via the
+\class{IAdapterFactory} supplied in \var{adapter}, at the specified implication
+level \var{depth}.  The protocol object should ensure that the implied protocol
+is able to adapt objects implementing its protocol (typically by recursively
+invoking \function{declareAdapterForType()} with increased depth and
+appropriately composed adapters), and notify any registered implication
+listeners via their \method{newProtocolImplied()} methods.  If the protocol
+already implied \var{proto}, this method should have no effect and send no
+notifications unless the new \var{adapter} and \var{depth} represent a
+``shorter path'' as described in section \ref{proto-implication}.
+\end{methoddesc}
+
+
+\begin{methoddesc}{registerImplementation}{klass, adapter, depth}
+Declare that instances of type or class \var{klass} can be adapted to this
+protocol via the \class{IAdapterFactory} supplied in \var{adapter}, at the
+specified implication level \var{depth}.  Unless \var{adapter} is
+\function{DOES_NOT_SUPPORT}, the protocol object must ensure that
+any protocols it implies are also able to perform the adaptation (typically
+by recursively invoking \function{declareAdapterForType()} with increased depth
+and appropriately composed adapters for its implied protocols).  If the
+protocol already knew a way to adapt instances of \var{klass}, this method
+should be a no-op unless the new \var{adapter} and \var{depth} represent a
+``shorter path'' as described in section \ref{proto-implication}.
+\end{methoddesc}
+
+
+
+
+
+
+\begin{methoddesc}{registerObject}{ob, adapter, depth}
+Ensure that the specific object \var{ob} will be adapted to this protocol via
+the \class{IAdapterFactory} supplied in \var{adapter}, at the specified
+implication level \var{depth}.  The protocol object must also ensure that the
+object can be adapted to any protocols it implies.  This method may be
+implemented by adapting \var{ob} to \class{IOpenProvider}, calling the
+\method{declareProvides()} method, and then recursively invoking
+\function{declareAdapterForObject} with increased depth and appropriately
+composed adapters for the protocols' implied protocols.
+\end{methoddesc}
+
+\begin{methoddesc}{addImplicationListener}{listener}
+Ensure that \var{listener} (an \class{IImplicationListener}) will be notified
+whenever an implied protocol is added to this protocol, or an implication path
+from this protocol is shortened.  The protocol should at most retain a weak
+reference to \var{listener}.  Note that if a protocol can guarantee that no
+notices will ever need to be sent, it is free to implement this method as a
+no-op.  For example, Zope interfaces cannot imply any protocols besides their
+base interfaces, which are not allowed to change.  Therefore, no change
+notifications would ever need to be sent, so the \class{IOpenProtocol} adapter
+for Zope interfaces implements this method as a no-op.
+\end{methoddesc}
+
+
+\note{\class{IOpenProtocol} is a subclass of \class{IAdaptingProtocol}, which
+means that implementations must therefore meet its requirements as well, such
+as having an \method{__adapt__()} method.
+
+\end{classdesc*}
+
+
+
+
+
+
+
+
+
+
+
+
+\begin{classdesc*}{IOpenProvider}
+This interface documents the behavior required of an object to be usable with
+\function{adviseObject()}.  Note that some protocol objects, such as the
+\class{IOpenProtocol} adapter for Zope interfaces, can handle
+\function{adviseObject()} operations without adpating the target object to
+\class{IOpenProvider}.  This should be considered an exception, rather than the
+rule.  However, the \module{protocols} package declares default adapters so
+that virtually any Python object that doesn't already have a
+\method{__conform__()} method can be adapted to \class{IOpenProvider}
+automatically.
+
+\begin{methoddesc}{declareProvides}{protocol, adapter, depth}
+Declare that this object can provide \var{protocol} if adapted by the
+\class{IAdapterFactory} supplied in \var{adapter}, at implication level
+\var{depth}.  If the object already knew a way to adapt to \var{protocol}, this
+method should be a no-op unless the new \var{adapter} and \var{depth} represent
+a ``shorter path'' as described in section \ref{proto-implication}.  Typically,
+an implementation of this method will also adapt \var{protocol} to
+\class{IOpenProtocol}, and then register with \method{addImplicationListener()}
+to receive notice of any protocols that might be implied by \var{protocol}
+in future.
+\end{methoddesc}
+
+\end{classdesc*}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\begin{classdesc*}{IImplicationListener}
+This interface documents the behavior required of an object supplied to
+the \method{IOpenProtocol.addImplicationListener()} method.  Such objects must
+be weak-referenceable, usable as a dictionary key, and supply the following
+method:
+
+\begin{methoddesc}{newProtocolImplied}{srcProto, destProto, adapter, depth}
+Receive notice that an adaptation was declared from \var{srcProto} to
+\var{destProto}, using the \class{IAdapterFactory} \var{adapter}, at
+implication level \var{depth}.
+
+When used as part of an \class{IOpenProvider} implementation, this method is
+usually used to recursively invoke \function{declareAdapterForObject()} with
+increased depth and appropriately composed adapters from protocols already
+supported by the object.
+\end{methoddesc}
+
+\end{classdesc*}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\begin{classdesc*}{IOpenImplementor}
+If an class or type supplied to \function{declareAdapterForType} supports
+this interface, it will be notified of the declaration and any future
+declarations that affect the class, due to current or future protocol
+implication relationships.  Supporting this interface is not necessary; it is
+provided as a hook for advanced users.  Note that to declare a class or type
+as an \class{IOpenImplementor}, you must call \code{adviseObject(theClass,
+provides=[IOpenImplementor])} after the class definition or place
+\code{advise(classProvides=[IOpenImplementor])} in the body of the class, since
+this interface must be provided by the class itself, not by its instances.  (Of
+course, if you implement this interface via a metaclass, you can declare that
+the metaclass' instances provide the interface.)
+
+Notification to classes supporting \class{IOpenImplementor} occurs via the
+following method:
+
+\begin{methoddesc}{declareClassImplements}{protocol, adapter, depth}
+Receive notice that instances of the class support \var{protocol} via the
+the \class{IAdapterFactory} supplied in \var{adapter}, at implication level
+\var{depth}.
+\end{methoddesc}
+
+\end{classdesc*}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\begin{classdesc*}{IAdapterFactory}
+An interface documenting the requirements for an object to be used as an
+adapter factory: i.e., that it be a callable accepting an object and a
+protocol.)  This interface is not used by the \module{protocols} package except
+as documentation.
+\end{classdesc*}
+
+
+\begin{classdesc*}{IProtocol}
+An interface documenting the basic requirements for an object to be used as
+a protocol for \function{adapt()}: i.e., that it be usable as a dictionary
+key.  This interface is not used by the \module{protocols} package except as
+documentation.
+\end{classdesc*}
+
+
+\begin{classdesc*}{IAdaptingProtocol}
+An interface documenting the requirements for a protocol object to be able to
+adapt objects when used with \function{adapt()}: i.e., that it have a
+\method{__adapt__} method that accepts the object to be adapted and returns
+either an object providing the protocol or \constant{None}.  This interface is
+not used by the \module{protocols} package except as documentation.  It is a
+subclass of \var{IProtocol}, so any implementation of this interface must
+support the requirements defined by \var{IProtocol} as well.
+\end{classdesc*}
+
+
+
+
+
 
 
 
