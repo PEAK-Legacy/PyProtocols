@@ -392,12 +392,53 @@ class ExprBuilderTests(TestCase):
         self.assertEqual(pe("not a"), Call(operator.not_,a))
         self.assertEqual(pe("`a`"), Call(repr,a))
 
+        self.assertEqual(pe("a and b"), AndExpr(a,b))
+        self.assertEqual(pe("a or b"), OrExpr(a,b))
 
 
 
 
 
 
+
+
+
+
+
+
+
+
+    def testConstantFolding(self):
+
+        pe = self.parse
+
+        self.assertEqual(pe("1+2"), Const(3))
+        self.assertEqual(pe("2-1"), Const(1))
+        self.assertEqual(pe("7*9"), Const(63))
+        self.assertEqual(pe("25/10.0"), Const(2.5))
+        self.assertEqual(pe("25%3"), Const(1))
+        self.assertEqual(pe("25//10.0"), Const(2))
+        self.assertEqual(pe("16<<4"), Const(256))
+        self.assertEqual(pe("256>>4"), Const(16))
+        self.assertEqual(pe("2**4"), Const(16))
+        self.assertEqual(pe("dict.__class__"), Const(type))
+        self.assertEqual(pe("1|5"),  Const(5))
+        self.assertEqual(pe("5&1"),  Const(1))
+        self.assertEqual(pe("1^2"),  Const(3))
+
+        self.assertEqual(pe("~1"), Const(-2))
+        self.assertEqual(pe("+1"), Const(1))
+        self.assertEqual(pe("-1"), Const(-1))
+        self.assertEqual(pe("not True"), Const(False))
+        self.assertEqual(pe("`27`"), Const("27"))
+
+        self.assertEqual(pe('1,2'), Const((1,2)))
+        self.assertEqual(pe('[1,2]'), Const([1,2]))
+        self.assertEqual(pe('{1:2}'), Const({1:2}))
+
+        self.assertEqual(pe('1 and 2'), Const(2))
+        self.assertEqual(pe('"" and 2'), Const(""))
+        self.assertEqual(pe('"" or 53 or 27'), Const(53))
 
 
 
@@ -457,12 +498,12 @@ class ExprBuilderTests(TestCase):
 
         md = lambda k,v: Call(dict,Call(zip,Tuple(tuple,*k),Tuple(tuple,*v)))
 
-        one_two = Tuple(tuple,Const(1),Const(2))    # const
-        b_three = md([Const('b')],[Const(3)])       # const
+        one_two = Const((1,2))
+        b_three = Const({'b':3})
         empty = Const(())
 
         self.assertEqual(pe("a()"), Call(apply,a))
-        self.assertEqual(pe("dict()"), Call(dict))      # const
+        self.assertEqual(pe("dict()"), Const({}))
         self.assertEqual(pe("int(a)"), Call(int,a))
 
         self.assertEqual(pe("a(1,2)"), Call(apply,a,one_two))
@@ -502,26 +543,26 @@ class ExprBuilderTests(TestCase):
         self.assertEqual(pe("a(1,2,*x,**y)"),
             Call(apply,a,Call(operator.add,one_two,Call(tuple,x)),y))
 
-        self.assertRaises(SyntaxError, pe, "a(1=2)")    # expr as kw
-        self.assertRaises(SyntaxError, pe, "a(b=2,c)")  # kw before positional
 
+    def testMultiOps(self):
 
+        pe = self.parse
+        a,b,c = Argument(name='a'), Argument(name='b'), Argument(name='c')
+        d = Argument(name='d')
 
+        self.assertEqual(pe("a and b and c"), AndExpr(a,b,c))
+        self.assertEqual(pe("a or b or c"), OrExpr(a,b,c))
+        self.assertEqual(pe("a and b and c and d"), AndExpr(a,b,c,d))
+        self.assertEqual(pe("a or b or c or d"), OrExpr(a,b,c,d))
 
+        self.assertEqual(pe("a&b&c"),
+            Call(operator.and_,Call(operator.and_,a,b),c))
 
+        self.assertEqual(pe("a|b|c"),
+            Call(operator.or_,Call(operator.or_,a,b),c))
 
-
-
-
-
-
-
-
-
-
-
-
-
+        self.assertEqual(pe("a^b^c"),
+            Call(operator.xor,Call(operator.xor,a,b),c))
 
 
 
@@ -575,6 +616,7 @@ class ExprBuilderTests(TestCase):
     def testCompare(self):
         pe = self.parse
         a,b,c = Argument(name='a'), Argument(name='b'), Argument(name='c')
+        d = Argument(name='d')
 
         self.assertEqual(pe("a>b"), Call(operator.gt,a,b))
         self.assertEqual(pe("a>=b"), Call(operator.ge,a,b))
@@ -589,14 +631,13 @@ class ExprBuilderTests(TestCase):
         self.assertEqual(pe("a not in b"), Call(predicates.not_in,a,b))
         self.assertEqual(pe("a is not b"), Call(predicates.is_not,a,b))
 
-        # These need 'And' to work
-        #self.assertEqual(pe("1<2<3"), "And(Compare(1 < 2),Compare(2 < 3))")
-        #self.assertEqual(pe("a>=b>c<d"), "And(Compare(a >= b),Compare(b > c),Compare(c < d))")
-
-
-
-
-
+        self.assertEqual(pe("1<2<3"), Const(True))
+        self.assertEqual(pe("a>=b>c<d"),
+            AndExpr(
+                Call(operator.ge,a,b),Call(operator.gt,b,c),
+                Call(operator.lt,c,d)
+            )
+        )
 
 
 

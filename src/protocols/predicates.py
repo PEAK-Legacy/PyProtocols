@@ -6,6 +6,7 @@ __all__ = [
     'Call', 'Argument', 'Signature', 'PositionalSignature',
     'AndTest', 'OrTest', 'NotTest', 'TruthTest', 'ExprBuilder',
     'Const', 'Getattr', 'Tuple', 'Var', 'dispatch_by_truth',
+    'OrExpr', 'AndExpr',
 ]
 
 
@@ -24,7 +25,6 @@ def add_dict(d1,d2):
     d1 = d1.copy()
     d1.update(d2)
     return d1
-
 
 
 
@@ -62,9 +62,6 @@ class ExprBuilder:
     def Const(self,value):
         return Const(value)
 
-    def Getattr(self,expr,attr):
-        return Getattr(build(self,expr),attr)
-
     _cmp_ops = {
         '>': operator.gt, '>=': operator.ge,
         '<': operator.lt, '<=': operator.le,
@@ -77,6 +74,9 @@ class ExprBuilder:
         return Call(
             self._cmp_ops[op], build(self,initExpr), build(self,other)
         )
+
+
+
 
 
 
@@ -126,8 +126,8 @@ class ExprBuilder:
             return Tuple(op,*[build(self,item) for item in items])
         return method
 
-    Tuple      = tupleOp(tuple)
-    List       = tupleOp(list)
+    Tuple = tupleOp(tuple)
+    List  = tupleOp(list)
 
     def Dict(self, items):
         keys = Tuple(tuple, *[build(self,k) for k,v in items])
@@ -147,17 +147,17 @@ class ExprBuilder:
     def Sliceobj(self,*args):
         return Call(slice,*[build(self,arg) for arg in args])
 
-    #And        = multiOp('And(%s)')
-    #Or         = multiOp('Or(%s)')
+    def Getattr(self,expr,attr):
+        expr = build(self,expr)
+        if isinstance(expr,Const):
+            return Const(getattr(expr.value,attr))
+        return Getattr(expr,attr)
 
+    def And(self,items):
+        return AndExpr(*[build(self,expr) for expr in items])
 
-
-
-
-
-
-
-
+    def Or(self,items):
+        return OrExpr(*[build(self,expr) for expr in items])
 
 
 
@@ -217,6 +217,20 @@ class ExprBase(object):
         raise NotImplementedError
 
 
+class LogicalExpr(ExprBase):
+
+    def __new__(klass,*argexprs):
+        for arg in argexprs:
+            if not isinstance(arg,Const):
+                return ExprBase.__new__(klass,*argexprs)
+        return Const(klass.immediate([arg.value for arg in argexprs]))
+
+    def __init__(self,*argexprs):
+        self.argexprs = argexprs
+        self.hash = hash((type(self),argexprs))
+
+    def __eq__(self,other):
+        return type(self) is type(other) and other.argexprs == self.argexprs
 
 
 
@@ -227,6 +241,74 @@ class ExprBase(object):
 
 
 
+
+
+
+class OrExpr(LogicalExpr):
+
+    """Lazily compute logical 'or' of exprs"""
+
+    def asFuncAndIds(self,generic):
+
+        argIds = map(generic.getExpressionId,self.argexprs)
+
+        def or_(get):
+            for arg in argIds:
+                val = get(arg)
+                if val:
+                    break
+            return val
+
+        return or_, (EXPR_GETTER_ID,)
+
+    def immediate(klass,seq):
+        for item in seq:
+            if item:
+                break
+        return item
+
+    immediate = classmethod(immediate)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class AndExpr(LogicalExpr):
+
+    """Lazily compute logical 'and' of exprs"""
+
+    def asFuncAndIds(self,generic):
+
+        argIds = map(generic.getExpressionId,self.argexprs)
+
+        def and_(get):
+            for arg in argIds:
+                val = get(arg)
+                if not val:
+                    break
+            return val
+
+        return and_, (EXPR_GETTER_ID,)
+
+    def immediate(klass,seq):
+        for item in seq:
+            if not item:
+                break
+        return item
+
+    immediate = classmethod(immediate)
 
 
 
@@ -288,6 +370,12 @@ class Var(ExprBase):
 class Tuple(ExprBase):
     """Compute an expression by calling a function with an argument tuple"""
 
+    def __new__(klass,function=tuple,*argexprs):
+        for arg in argexprs:
+            if not isinstance(arg,Const):
+                return ExprBase.__new__(klass,function,*argexprs)
+        return Const(function([arg.value for arg in argexprs]))
+
     def __init__(self,function=tuple,*argexprs):
         self.function = function
         self.argexprs = argexprs
@@ -305,6 +393,19 @@ class Tuple(ExprBase):
 
     def __repr__(self):
         return 'Tuple%r' % (((self.function,)+self.argexprs),)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class Getattr(ExprBase):
@@ -346,8 +447,17 @@ class Const(ExprBase):
         return 'Const(%r)' % (self.value,)
 
 
+
+
 class Call(ExprBase):
+
     """Compute an expression by calling a function with 0 or more arguments"""
+
+    def __new__(klass,function,*argexprs):
+        for arg in argexprs:
+            if not isinstance(arg,Const):
+                return ExprBase.__new__(klass,function,*argexprs)
+        return Const(function(*[arg.value for arg in argexprs]))
 
     def __init__(self,function,*argexprs):
         self.function = function
@@ -364,6 +474,19 @@ class Call(ExprBase):
 
     def __repr__(self):
         return 'Call%r' % (((self.function,)+self.argexprs),)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -613,6 +613,103 @@ class ExpressionTests(TestCase):
             self.assertNotEqual(hash(x), hash(item))
 
 
+    def testOrExpr(self):
+        x, y = Argument(name='x'), Argument(name='y')
+        z = Call(operator.div,Argument(name='y'),Argument(name='z'))
+
+        xyz = OrExpr(x,y,z)
+        or_ = GenericFunction(args=['x','y','z'])
+        or_[Signature([(xyz,TruthTest())])] = lambda x,y,z:True
+        or_[Signature([])] = lambda x,y,z: False
+
+        self.failUnless(or_(1,0,1))
+        self.failIf(or_(0,0,1))
+        self.assertRaises(ZeroDivisionError,or_,0,0,0)
+
+        zyx = OrExpr(z,y,x)
+        xyz2 = OrExpr(x,y,z)
+        xy  = OrExpr(x,y)
+
+        self.assertEqual(xyz, xyz2)
+        self.assertEqual(hash(xyz), hash(xyz2))
+        for item in xy,zyx:
+            self.assertNotEqual(xyz, item)
+            self.assertNotEqual(hash(xyz), hash(item))
+
+        or_eq_23 = GenericFunction(args=['x','y'])
+        or_eq_23[Signature([(xy,Inequality('==',23))])] = lambda x,y:True
+        or_eq_23[Signature([])] = lambda x,y: False
+        self.failUnless(or_eq_23(23,0))
+        self.failUnless(or_eq_23(0,23))
+        self.failIf(or_eq_23(0,0))
+        self.failIf(or_eq_23(15,15))
+
+        or_eq_None = GenericFunction(args=['x','y'])
+        or_eq_None[Signature([(xy,Inequality('==',None))])] = lambda x,y:True
+        or_eq_None[Signature([])] = lambda x,y: False
+        self.failUnless(or_eq_None(None,None))
+        self.failUnless(or_eq_None(0,None))
+        self.failIf(or_eq_None(1,None))
+        self.failIf(or_eq_None(None,1))
+
+
+
+    def testAndExpr(self):
+        x, y = Argument(name='x'), Argument(name='y')
+        z = Call(operator.div,Argument(name='y'),Argument(name='z'))
+
+        xyz = AndExpr(x,y,z)
+        and_ = GenericFunction(args=['x','y','z'])
+        and_[Signature([(xyz,TruthTest())])] = lambda x,y,z:True
+        and_[Signature([])] = lambda x,y,z: False
+
+        self.failUnless(and_(True,True,True))
+        self.failIf(and_(False,True,True))
+        self.failIf(and_(False,27,0))
+        self.assertRaises(ZeroDivisionError,and_,15,27,0)
+
+        zyx = AndExpr(z,y,x)
+        xyz2 = AndExpr(x,y,z)
+        xy  = AndExpr(x,y)
+
+        self.assertEqual(xyz, xyz2)
+        self.assertEqual(hash(xyz), hash(xyz2))
+        for item in xy,zyx:
+            self.assertNotEqual(xyz, item)
+            self.assertNotEqual(hash(xyz), hash(item))
+
+        and_eq_23 = GenericFunction(args=['x','y'])
+        and_eq_23[Signature([(xy,Inequality('==',23))])] = lambda x,y:True
+        and_eq_23[Signature([])] = lambda x,y: False
+        self.failUnless(and_eq_23(3,23))
+        self.failUnless(and_eq_23(23,23))
+        self.failIf(and_eq_23(23,15))
+        self.failIf(and_eq_23(23,0))
+
+        and_eq_None = GenericFunction(args=['x','y'])
+        and_eq_None[Signature([(xy,Inequality('==',None))])] = lambda x,y:True
+        and_eq_None[Signature([])] = lambda x,y: False
+        self.failUnless(and_eq_None(None,None))
+        self.failUnless(and_eq_None(1,None))
+        self.failIf(and_eq_None(0,1))
+        self.failIf(and_eq_None(1,0))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class GenericTests(TestCase):
 
     def testBasicSingleDispatch(self):
