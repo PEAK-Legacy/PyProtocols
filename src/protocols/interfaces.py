@@ -4,6 +4,7 @@ from __future__ import generators
 
 __all__ = [
     'Protocol', 'InterfaceClass', 'Interface',
+    'AbstractBase', 'AbstractBaseMeta',
     'IAdapterFactory', 'IProtocol',
     'IAdaptingProtocol', 'IOpenProtocol', 'IOpenProvider',
     'IOpenImplementor', 'IImplicationListener', 'Attribute', 'Variation'
@@ -31,7 +32,6 @@ except ImportError:
             __slots__ = ()
             def acquire(*args): pass
             def release(*args): pass
-
 
 
 
@@ -80,6 +80,16 @@ class Protocol:
 
 
 
+    def __call__(self, ob, default=api._marker, factory=api.IMPLEMENTATION_ERROR):
+        """Adapt to this protocol"""
+        return api.adapt(ob,self,default,factory)
+
+    try:
+        from _speedups import Protocol__call__ as __call__
+    except ImportError:
+        pass
+
+
     def addImpliedProtocol(self,proto,adapter=NO_ADAPTER_NEEDED,depth=1):
 
         self.__lock.acquire()
@@ -106,16 +116,6 @@ class Protocol:
         return adapter
 
     addImpliedProtocol = metamethod(addImpliedProtocol)
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -203,7 +203,13 @@ class Protocol:
 
     addImplicationListener = metamethod(addImplicationListener)
 
-class InterfaceClass(Protocol, type):
+class AbstractBaseMeta(Protocol, type):
+
+    """Metaclass for 'AbstractBase' - a protocol that's also a class
+
+    (Note that this should not be used as an explicit metaclass - always
+    subclass from 'AbstractBase' or 'Interface' instead.)
+    """
 
     def __init__(self, __name__, __bases__, __dict__):
 
@@ -211,15 +217,8 @@ class InterfaceClass(Protocol, type):
         Protocol.__init__(self)
 
         for b in __bases__:
-            if isinstance(b,Protocol) and b is not Interface:
+            if isinstance(b,self.__class__) and '__metaclass__' not in b.__dict__:
                 self.addImpliedProtocol(b)
-
-
-    def getBases(self):
-        return [
-            b for b in self.__bases__
-                if isinstance(b,Protocol) and b is not Interface
-        ]
 
 
     def __setattr__(self,attr,val):
@@ -236,9 +235,51 @@ class InterfaceClass(Protocol, type):
 
         type.__setattr__(self,attr,val)
 
+    __call__ = type.__call__
+
+
+class AbstractBase(object):
+    """Base class for a protocol that's a class"""
+
+    __metaclass__ = AbstractBaseMeta
+
+
+class InterfaceClass(AbstractBaseMeta):
+
+    """Metaclass for 'Interface' - a non-instantiable protocol
+
+    (Note that this should not be used as an explicit metaclass - always
+    subclass from 'AbstractBase' or 'Interface' instead.)
+    """
+
+    __call__ = Protocol.__call__
+
+    def getBases(self):
+        return [
+            b for b in self.__bases__
+                if isinstance(b,Protocol) and b is not Interface
+        ]
+
 
 class Interface(object):
     __metaclass__ = InterfaceClass
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -47,15 +47,15 @@ class TestBase(TestCase):
     a2 = staticmethod(a2)
 
     def assertObProvidesOnlyA(self):
-        assert adapt(self.ob, self.IA, None) is self.ob
-        assert adapt(self.ob, self.IB, None) is None
-        assert adapt(self.IA, None, None) is None
+        assert self.IA(self.ob, None) is self.ob
+        assert self.IB(self.ob, None) is None
+        assert self.IA(None, None) is None
         assert adapt(self.IB, None, None) is None
         assert adapt(self.ob, None, None) is None
 
     def assertObProvidesAandB(self):
-        assert adapt(self.ob, self.IA, None) is self.ob
-        assert adapt(self.ob, self.IB, None) is self.ob
+        assert self.IA(self.ob, None) is self.ob
+        assert self.IB(self.ob, None) is self.ob
         assert adapt(self.IA, None, None) is None
         assert adapt(self.IB, None, None) is None
         assert adapt(self.ob, None, None) is None
@@ -77,7 +77,7 @@ class TestBase(TestCase):
             advise(protocolIsSubsetOf=[self.IA])
             if 'self' in locals():
                 del locals()['self']  # how the heck???
-        assert adapt(self.ob, IC, None) is self.ob
+        assert IC(self.ob, None) is self.ob
 
 
     def setupBases(self,base):
@@ -87,9 +87,9 @@ class TestBase(TestCase):
 
 
     def assertM1ProvidesOnlyAandM2ProvidesB(self,M1,M2):
-        assert adapt(M1,self.IA,None) is M1
-        assert adapt(M1,self.IB,None) is None
-        assert adapt(M2,self.IB,None) is M2
+        assert self.IA(M1,None) is M1
+        assert self.IB(M1,None) is None
+        assert self.IB(M2,None) is M2
 
 
     def assertChangingBasesChangesInterface(self,M1,M2,m1,m2):
@@ -98,20 +98,20 @@ class TestBase(TestCase):
         except TypeError:   # XXX 2.2 doesn't let newstyle __bases__ change
             pass
         else:
-            assert adapt(m1,self.IA,None) is m1
-            assert adapt(m1,self.IB,None) is m1
+            assert self.IA(m1,None) is m1
+            assert self.IB(m1,None) is m1
 
     def assertObProvidesABCD(self,IC,ID):
-        assert adapt(self.ob, self.IA, None) is self.ob
-        assert adapt(self.ob, self.IB, None) is self.ob
-        assert adapt(self.ob, IC, None) is self.ob
-        assert adapt(self.ob, ID, None) is self.ob
+        assert self.IA(self.ob, None) is self.ob
+        assert self.IB(self.ob, None) is self.ob
+        assert IC(self.ob, None) is self.ob
+        assert ID(self.ob, None) is self.ob
 
     def assertObProvidesCandDnotAorB(self,IC,ID):
-        assert adapt(self.ob, self.IA, None) is None
-        assert adapt(self.ob, self.IB, None) is None
-        assert adapt(self.ob, IC, None) is self.ob
-        assert adapt(self.ob, ID, None) is self.ob
+        assert self.IA(self.ob, None) is None
+        assert self.IB(self.ob, None) is None
+        assert IC(self.ob, None) is self.ob
+        assert ID(self.ob, None) is self.ob
 
 
 
@@ -215,31 +215,31 @@ class AdaptiveChecks(SimpleAdaptiveChecks):
 
     def checkOverrideDepth(self):
         self.declareObAdapts(self.a1,[self.IB])
-        assert adapt(self.ob,self.IA,None) == ('a1',self.ob)
+        assert self.IA(self.ob,None) == ('a1',self.ob)
 
         self.declareObAdapts(self.a2,[self.IA])
-        assert adapt(self.ob,self.IA,None) == ('a2',self.ob)
+        assert self.IA(self.ob,None) == ('a2',self.ob)
 
 
     def checkComposed(self):
         class IC(self.Interface): pass
         declareAdapter(self.a2,provides=[IC],forProtocols=[self.IA])
         self.declareObAdapts(self.a1,[self.IA])
-        assert adapt(self.ob,IC,None) == ('a2',('a1',self.ob))
+        assert IC(self.ob,None) == ('a2',('a1',self.ob))
 
 
     def checkLateDefinition(self):
         # Zope fails this because it has different override semantics
 
         self.declareObAdapts(DOES_NOT_SUPPORT, [self.IA])
-        assert adapt(self.ob,self.IA,None) is None
+        assert self.IA(self.ob,None) is None
 
         self.declareObImplements([self.IA])
-        assert adapt(self.ob,self.IA,None) is self.ob
+        assert self.IA(self.ob,None) is self.ob
 
         # NO_ADAPTER_NEEDED at same depth should override DOES_NOT_SUPPORT
         self.declareObAdapts(DOES_NOT_SUPPORT, [self.IA])
-        assert adapt(self.ob,self.IA,None) is self.ob
+        assert self.IA(self.ob,None) is self.ob
 
 
 
@@ -274,27 +274,27 @@ class ImplementationChecks(InstanceImplementationChecks):
 
     def checkNoClassPassThru(self):
         self.declareObImplements([self.IA])
-        assert adapt(self.klass, self.IA, None) is None
+        assert self.IA(self.klass, None) is None
 
     def checkInheritedDeclaration(self):
         self.declareObImplements([self.IB])
         class Sub(self.klass): pass
         inst = self.make(Sub)
-        assert adapt(inst,self.IB,None) is inst
-        assert adapt(inst,self.IA,None) is inst
-        assert adapt(Sub,self.IA,None) is None   # check not passed up to class
-        assert adapt(Sub,self.IB,None) is None
+        assert self.IB(inst,None) is inst
+        assert self.IA(inst,None) is inst
+        assert self.IA(Sub,None) is None   # check not passed up to class
+        assert self.IB(Sub,None) is None
 
     def checkRejectInheritanceAndReplace(self):
         self.declareObImplements([self.IB])
 
         class Sub(self.klass): advise(instancesDoNotProvide=[self.IB])
         inst = self.make(Sub)
-        assert adapt(inst,self.IA,None) is inst
-        assert adapt(inst,self.IB,None) is None
+        assert self.IA(inst,None) is inst
+        assert self.IB(inst,None) is None
 
         declareImplementation(Sub, instancesProvide=[self.IB])
-        assert adapt(inst,self.IB,None) is inst
+        assert self.IB(inst,None) is inst
 
 
 
@@ -335,7 +335,7 @@ class BasicClassProvidesChecks:
     def checkNoInstancePassThru(self):
         inst = self.ob()
         adviseObject(self.ob, provides=[self.IA])
-        assert adapt(inst, self.IA, None) is None
+        assert self.IA(inst, None) is None
 
     def checkChangingBases(self):
         M1, M2 = self.setupBases(self.ob)
@@ -352,8 +352,8 @@ class ClassProvidesChecks(BasicClassProvidesChecks):
     def checkInheritedDeclaration(self):
         class Sub(self.ob): pass
         adviseObject(self.ob, provides=[self.IB])
-        assert adapt(Sub, self.IB, None) is Sub
-        assert adapt(Sub, self.IA, None) is Sub
+        assert self.IB(Sub, None) is Sub
+        assert self.IA(Sub, None) is Sub
 
 
     def checkRejectInheritanceAndReplace(self):
@@ -361,11 +361,11 @@ class ClassProvidesChecks(BasicClassProvidesChecks):
 
         class Sub(self.ob): advise(classDoesNotProvide=[self.IB])
 
-        assert adapt(Sub,self.IA,None) is Sub
-        assert adapt(Sub,self.IB,None) is None
+        assert self.IA(Sub,None) is Sub
+        assert self.IB(Sub,None) is None
 
         adviseObject(Sub,provides=[self.IB])
-        assert adapt(Sub,self.IB,None) is Sub
+        assert self.IB(Sub,None) is Sub
 
 def makeInstanceTests(base,Picklable,NewStyle):
 
@@ -390,7 +390,7 @@ def makeInstanceTests(base,Picklable,NewStyle):
             from cPickle import loads,dumps     # pickle has a bug!
             adviseObject(self.ob, provides=[self.IPure])
             newOb = loads(dumps(self.ob))
-            assert adapt(newOb,self.IPure,None) is newOb
+            assert self.IPure(newOb,None) is newOb
 
     class AdviseNewInstance(AdviseInstance):
         def setUp(self):

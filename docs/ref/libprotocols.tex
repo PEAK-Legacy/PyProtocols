@@ -817,6 +817,47 @@ its most common applications.
 
 
 
+
+\subsubsection{Convenience Adaptation API (NEW in 0.9.3)\label{protocols-calling}}
+
+As of version 0.9.3, PyProtocols supports the simplified adaptation API that
+was pioneered by Twisted, and later adopted by Zope.  In this simplified API,
+a protocol can be called, passing in the object to be adapted.  So, for example,
+instead of calling \code{adapt(foo,IBar)}, one may call \code{IBar(foo)}.  The
+optional \var{default} and \var{factory} arguments may also be supplied,
+following the \var{component} parameter.
+
+All of the protocol types supplied by PyProtocols now support this simpler
+calling scheme, except for \class{AbstractBase} subclasses, because calling
+an \class{AbstractBase} subclass should create an instance of that subclass,
+not attempt to adapt an arbitrary object.
+
+Notice, by the way, that you should only use this simplified API if you know
+for certain that the protocol supports it.  For example, it's safe to invoke
+a known, constant interface object in this way.  But if you're writing code that
+may receive a protocol object as a parameter or via another object, you should
+use \function{adapt()} instead, because you may receive a protocol object that
+does not support this shortcut API.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 \newpage
 \subsection{Defining and Subclassing Interfaces \label{protocols-defining}}
 
@@ -826,7 +867,7 @@ data or methods of its own, so you are free to define whatever you need. There
 are two common styles of defining interfaces, illustrated below:
 
 \begin{verbatim%
-}from protocols import Interface
+}from protocols import Interface, AbstractBase
 
 # "Pure" interface style
 
@@ -840,7 +881,7 @@ class IReadMapping(Interface):
 
 # Abstract Base Class (ABC) style
 
-class AbstractMapping(Interface):
+class AbstractMapping(AbstractBase):
 
     """A getitem-only mapping"""
 
@@ -859,17 +900,20 @@ methods.  Each style has different uses: ``ABC'' is a popular rapid development
 style, while the ``pure'' approach has some distinct documentation advantages.
 
 
-\class{protocols.Interface} may be used as a base class for either style.  You
-should be aware, however, that Interface objects use an explicit metaclass,
-\class{protocols.InterfaceClass}.  This means that if you want to subclass an
-interface for implementation using another metaclass, you may need to create a
-third metaclass that combines \class{InterfaceClass} with your desired
-metaclass.
+\class{protocols.AbstractBase} may be used as a base class for either style, but
+\class{protocols.Interface} is only usable for the "pure" interface style, as it
+supports the convenience adaptation API (see section \ref{protocols-calling}).
+
+(\note{both base classes use an explicit metaclass, so keep in mind that if
+you want to subclass an abstract base for implementation using a different
+metaclass, you may need to create a third metaclass that combines
+\class{protocols.AbstractBaseMeta} with your desired metaclass.})
 
 Subclassing a subclass of \class{Interface} creates a new \class{Interface}
 that implies the first interface.  This means that any object that supports
 the second interface, is considered to implicitly support the first
-interface.  For example:
+interface.  (And the same relationship holds true for \class{AbstractBase}
+subclasses that are subclassed.)  For example:
 
 \begin{verbatim%
 }class IReadWriteMapping(IReadMapping):
@@ -897,9 +941,6 @@ us that \code{IReadWriteMapping} implies \code{IReadMapping}, because we
 understand what they do.  But there is no way for Python to know this, unless
 we explicitly state it, like this:
 
-
-
-
 \begin{verbatim%
 }import protocols
 from A import IReadWriteMapping
@@ -918,8 +959,8 @@ objects that already support the \code{A.IReadWriteMapping} interface.
 
 At this point, if we supply an object that supports \code{IReadWriteMapping},
 to a function that expects an \code{IReadMapping}, it should work, as long as
-we either call \code{adapt(ob,IReadMapping)} first, or the code we're
-calling does so.
+we call \code{adapt(ob,IReadMapping)} (or \code{IReadMapping(ob)}) first,
+or the code we're calling does so.
 
 There are still other ways to declare that one interface implies another.  For
 example, if the author of our example package \code{B} knew about package {A}
@@ -2077,15 +2118,15 @@ are unable to handle adapters other than \function{NO_ADAPTER_NEEDED} and
 
 
 \begin{classdesc*}{Interface}
-Subclass this to create an interface.  See section \ref{protocols-defining}
+Subclass this to create a "pure" interface.  See section \ref{protocols-defining}
 for more details.
 \end{classdesc*}
 
-
-
-
-
-
+\begin{classdesc*}{AbstractBase}
+\versionadded{0.9.3}
+Subclass this to create an "abstract base class" or "ABC" interface.  See
+section \ref{protocols-defining} for more details.
+\end{classdesc*}
 
 
 
@@ -2253,13 +2294,21 @@ see section \ref{protocols-context}.
 \end{classdesc}
 
 
+\begin{classdesc}{AbstractBaseMeta}{name, bases, dictionary}\versionadded{0.9.3}
+\class{AbstractBaseMeta}, a subclass of \class{Protocol} and \class{type}, is a
+metaclass used to create new "ABC-style" protocol objects, using class
+statements.  You can use this metaclass directly, but it's generally simpler to
+just subclass \class{AbstractBase} instead.  Normally, you will only use
+\class{AbstractBaseMeta} if you need to combine it with another metaclass.
+\end{classdesc}
+
 \begin{classdesc}{InterfaceClass}{name, bases, dictionary}
-\class{InterfaceClass}, a subclass of \class{Protocol} and \class{type}, is a
-metaclass used to create new interfaces (i.e., protocol objects) using class
-statements.  You may set a class' \code{__metaclass__} to
-\class{InterfaceClass}, or simply subclass \class{Interface}.  Normally, you
-will only use \class{InterfaceClass} if you need to combine it with another
-metaclass, in a subclass of \class{Interface}.
+\class{InterfaceClass is a subclass of \class{AbstractBaseMeta} that implements
+the convenience adapation API (see section \ref{protocols-calling}) for its
+instances.  This metaclass is used to create new "pure-style" interfaces (i.e.,
+protocol objects) using class statements.  Normally, you will only use
+\class{InterfaceClass} directly if you need to combine it with another
+metaclass, as it is usually easier just to subclass \class{Interface}.
 \end{classdesc}
 
 \begin{classdesc}{IBasicSequence} \versionadded{0.9.1}
@@ -2286,14 +2335,6 @@ method invoke the base \method{__conform__} method as a default, using
 supermeta(MyClass,self).__conform__(protocol)}.)  See below for more on
 the \function{supermeta()} function.
 \end{classdesc*}
-
-
-
-
-
-
-
-
 \begin{funcdesc}{metamethod}{func}
 Wrap \var{func} in a manner analagous to \function{classmethod} or
 \function{staticmethod}, but as a metaclass-level method that may be redefined
@@ -2782,9 +2823,9 @@ limitation.
 \end{itemize}
 
 The current implementation of support for Zope X3 interfaces is currently based
-on the Zope X3 Milestone 4 version; it will not work with older releases.  Zope
-X3 Milestone 4 requires Python 2.3.2 or better, so even though PyProtocols works
-with 2.2.2 and up in general, you will need 2.3.2 to use PyProtocols with Zope X3.
+on Zope X3 alpha 1; it will not work with older releases.  Zope
+X3 requires Python 2.3.3 or better, so even though PyProtocols works
+with 2.2.2 and up in general, you will need 2.3.3 to use PyProtocols with Zope X3.
 \newpage
 \subsubsection{\module{protocols.twisted_support} --- Support for Twisted Interfaces}
 \declaremodule[protocols.twistedsupport]{}{protocols.twisted_support}

@@ -3,6 +3,7 @@
 __all__ = [
     'IMPLEMENTATION_ERROR', 'NO_ADAPTER_NEEDED', 'DOES_NOT_SUPPORT',
     'adapt', 'Protocol__adapt__', 'metamethod', 'classicMRO', 'getMRO',
+    'Protocol__call__',
 ]
 
 cdef extern from "Python.h":
@@ -38,7 +39,6 @@ cdef extern from "Python.h":
     ctypedef struct PyInstanceObject:
         PyClassObject *in_class
 
-
     int PyObject_IsSubclass(PyClassObject *derived, object cls)
     int PyList_Append(PyListObject *list, object item) except -1
     int PyTuple_GET_SIZE(PyTupleObject *p)
@@ -59,6 +59,8 @@ cdef extern from "Python.h":
 
 cdef object _marker, __conform, __adapt, __mro, __ECType
 from sys import exc_info
+from new import instancemethod
+
 
 try:
     from ExtensionClass import ExtensionClass
@@ -71,8 +73,6 @@ __conform  = PyString_InternFromString("__conform__")
 __adapt    = PyString_InternFromString("__adapt__")
 __class    = PyString_InternFromString("__class__")
 __mro      = PyString_InternFromString("__mro__")
-
-
 
 
 
@@ -121,13 +121,7 @@ cdef class metamethod:
 
 
 
-def adapt(obj, protocol, default=_marker, factory=IMPLEMENTATION_ERROR):
-
-    """PEP 246-alike: Adapt 'obj' to 'protocol', return 'default'
-
-    If 'default' is not supplied and no implementation is found,
-    the result of 'factory(obj,protocol)' is returned.  If 'factory'
-    is also not supplied, 'NotImplementedError' is then raised."""
+cdef _adapt(obj, protocol, default, factory):
 
     # We use nested 'if' blocks here because using 'and' causes Pyrex to
     # convert the return values to Python ints, and then back to booleans!
@@ -162,6 +156,12 @@ def adapt(obj, protocol, default=_marker, factory=IMPLEMENTATION_ERROR):
 
 
 
+
+
+
+
+
+
     tmp = PyObject_GetAttr(protocol, __adapt)
     if tmp:
         meth = <object> tmp
@@ -184,23 +184,23 @@ def adapt(obj, protocol, default=_marker, factory=IMPLEMENTATION_ERROR):
 
     return default
 
+    
+def adapt(obj, protocol, default=_marker, factory=IMPLEMENTATION_ERROR):
+
+    """PEP 246-alike: Adapt 'obj' to 'protocol', return 'default'
+
+    If 'default' is not supplied and no implementation is found,
+    the result of 'factory(obj,protocol)' is returned.  If 'factory'
+    is also not supplied, 'NotImplementedError' is then raised."""
+
+    return _adapt(obj,protocol,default,factory)
 
 
+def Protocol__call__(self, ob, default=_marker, factory=IMPLEMENTATION_ERROR):
+    """Adapt to this protocol"""
+    return adapt(ob,self,default,factory)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Protocol__call__ = instancemethod(Protocol__call__,None,None)
 
 
 cdef buildClassicMRO(PyClassObject *cls, PyListObject *list):

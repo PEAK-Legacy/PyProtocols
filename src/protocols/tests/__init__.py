@@ -1,5 +1,6 @@
 from unittest import TestSuite, TestCase, makeSuite
 from protocols import adapt, advise, Interface, Attribute, declareAdapter
+from protocols import AbstractBase
 
 class APITests(TestCase):
 
@@ -36,7 +37,6 @@ class APITests(TestCase):
             )
         else:
             raise AssertionError("Should've caught invalid keyword")
-
 
 
     def checkAdviseClassKeywordsValidated(self):
@@ -125,10 +125,10 @@ class APITests(TestCase):
 
         for i in range(10)+[None]:
 
-            class AbstractBase(Interface):
+            class Abstract(AbstractBase):
                 value = Attribute("testing", "value", i)
 
-            ob = AbstractBase()
+            ob = Abstract()
             assert ob.value == i
 
             for j in range(10):
@@ -145,13 +145,13 @@ class APITests(TestCase):
             attachForProtocols = I,
             advise(instancesProvide=[I], asAdapterForTypes=[T])
 
-        a = adapt(t, I)
+        a = I(t)
         assert adapt(t, I) is a
         assert a.subject is t
         assert a.protocol is I
 
         n = T()
-        a2 = adapt(n, I)
+        a2 = I(n)
         assert a2 is not a
         assert a2.subject is n
         assert a2.protocol is I
@@ -207,19 +207,19 @@ class GenerationTests(TestCase):
 
     def checkTypeSubset(self):
         d = {}
-        assert adapt(d,IGetSetMapping,None) is d
-        assert adapt(d,IGetMapping,None) is d
+        assert IGetSetMapping(d,None) is d
+        assert IGetMapping(d,None) is d
 
     def checkImplications(self):
         d = UserDict()
-        assert adapt(d,IGetMapping,None) is d
-        assert adapt(d,IImplicitRead,None) is None
+        assert IGetMapping(d,None) is d
+        assert IImplicitRead(d,None) is None
 
     def checkWeak(self):
         from cStringIO import StringIO
         s = StringIO("foo")
-        assert adapt(s,ISimpleReadFile,None) is None
-        assert adapt(s,IImplicitRead,None) is s
+        assert ISimpleReadFile(s,None) is None
+        assert IImplicitRead(s,None) is s
 
     def checkURI(self):
         p = protocolForURI("http://www.python.org/")
@@ -230,15 +230,15 @@ class GenerationTests(TestCase):
     def checkSequence(self):
         d1 = {}
         d2 = {}
-        seq = adapt([d1,d2], multimap)
+        seq = multimap([d1,d2])
         assert seq == [d1,d2]
         assert seq[0] is d1 and seq[1] is d2
 
     def checkVariation(self):
         d = {}
-        assert adapt(d,IMyUnusualMapping,None) is d # GetSet implies variation
-        d = MyUserMapping(); assert adapt(d,IMyUnusualMapping,None) is d
-        assert adapt(d,IGetSetMapping,None) is None # but not the other way
+        assert IMyUnusualMapping(d,None) is d # GetSet implies variation
+        d = MyUserMapping(); assert IMyUnusualMapping(d,None) is d
+        assert IGetSetMapping(d,None) is None # but not the other way
         self.assertEqual(repr(IMyUnusualMapping),
           "Variation(TypeSubset(<type 'dict'>,('__getitem__', '__setitem__')))")
         self.assertEqual(repr(Variation(Interface,42)),
