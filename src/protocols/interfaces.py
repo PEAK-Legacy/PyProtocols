@@ -203,9 +203,9 @@ class Protocol:
 
     addImplicationListener = metamethod(addImplicationListener)
 
-    def __call__(self, ob, default=api._marker, factory=api.IMPLEMENTATION_ERROR):
+    def __call__(self, ob, default=api._marker):
         """Adapt to this protocol"""
-        return api.adapt(ob,self,default,factory)
+        return api.adapt(ob,self,default)
 
 
 # Use faster __call__ method, if possible

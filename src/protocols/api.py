@@ -39,7 +39,7 @@ from interfaces import Protocol, InterfaceClass
 
 
 
-def adapt(obj, protocol, default=_marker, factory=IMPLEMENTATION_ERROR):
+def adapt(obj, protocol, default=_marker):
 
     """PEP 246-alike: Adapt 'obj' to 'protocol', return 'default'
 
@@ -77,7 +77,7 @@ def adapt(obj, protocol, default=_marker, factory=IMPLEMENTATION_ERROR):
                 raise
 
     if default is _marker:
-        return factory(obj, protocol)
+        return IMPLEMENTATION_ERROR(obj, protocol)
     return default
 
 try:

@@ -502,20 +502,14 @@ programs.
 Component adaptation is performed by calling the \function{adapt()} function,
 whose design is based largely on the specification presented in \pep{246}:
 
-\begin{funcdesc}{adapt}{component, protocol,
-\optional{, default \optional{, factory}}}
+\begin{funcdesc}{adapt}{component, protocol, \optional{, default}}
 
 Return an implementation of \var{protocol} (a protocol object) for
 \var{component} (any object).  The implementation returned may be
 \var{component}, or a wrapper that implements the protocol on its
 behalf.  If no implementation is available, return \var{default}.  If no
-\var{default} is provided, call \code{\var{factory}(\var{component},
-\var{protocol})} and return the result.  If no \var{factory} is supplied,
-raise \exception{protocols.AdaptationFailure}.
+\var{default} is provided, raise \exception{protocols.AdaptationFailure}.
 
-\var{default} may be supplied as a positional or keyword argument.
-\var{factory}, however, must be supplied as a keyword argument in order
-to be used.
 \end{funcdesc}
 
 The component adaptation process performed by \function{adapt()} proceeds
@@ -535,8 +529,10 @@ passing in the protocol.  If the method returns a value other than
 passing in \var{component}.  If the method returns a value other than
 \constant{None}, it is returned as the result of \function{adapt()}.
 
-\item Perform default processing as described above, returning \var{default},
-invoking \var{factory}, or raising \exception{protocols.AdaptationFailure} as
+
+
+\item Perform default processing as described above, returning \var{default}
+or raising \exception{protocols.AdaptationFailure} as
 appropriate.
 
 \end{enumerate}
@@ -566,6 +562,10 @@ Now that you know how \function{adapt()} works, you can actually make use of it
 without any of the other tools in the \module{protocols} package.  Just define
 your own \method{__conform__} and \method{__adapt__} methods, and off
 you go!
+
+
+
+
 
 
 
@@ -808,14 +808,14 @@ specified by \pep{246}.  (\note{\exception{protocols.AdaptationFailure} is a
 subclass of \exception{TypeError} and \exception{NotImplementedError}, so code
 written to catch either of these errors will work.})
 
-And third, \function{protocols.adapt()} has an optional
-\var{factory} argument that the \pep{246} \function{adapt()} does not.
-
 These differences are the result of experience using the \module{protocols}
 package with PEAK, and advances in the Python state-of-the-art since
 \pep{246} was written (over two years ago).  We believe that they make the
 adaptation protocol more robust, more predictable, and easier to use for
 its most common applications.
+
+
+
 
 
 \subsubsection{Convenience Adaptation API (NEW in 0.9.3)\label{protocols-calling}}
@@ -1047,12 +1047,8 @@ Up until this point, we've been talking about ``adapters'' rather loosely.  The
 \class{IAdapterFactory} interface formalizes the concept.  An \strong{adapter
 factory} is a callable object that takes two arguments (an object and a
 protocol, in that order) and returns an object that provides the protocol on
-behalf of the passed-in object.
-
-You'll notice that this is the same signature required of the optional
-\var{factory} argument to \function{adapt()}.  It is also the signature required
-of objects supplied as ``adapter'' or ``factory'' arguments to the declaration
-API functions.
+behalf of the passed-in object.  Declaration API functions that take ``adapter''
+or ``factory'' arguments must be adapter factories.
 
 The \module{protocols} package supplies two functions that provide
 this interface: \function{NO_ADAPTER_NEEDED} and \function{DOES_NOT_SUPPORT}.
@@ -1063,6 +1059,10 @@ object does not support a protocol, even with an adapter.  (Since this is the
 default case, \function{DOES_NOT_SUPPORT} is rarely used, except to indicate
 that a subclass does not support an interface that one of its superclasses
 does.)
+
+
+
+
 
 \item[IProtocol] \hfill \\
 This interface formalizes the idea of a ``protocol object''.  As you will
@@ -1971,20 +1971,13 @@ see section \ref{protocols-context}.
 The following functions, classes, and interfaces are available from the
 top-level \module{protocols} package.
 
-\begin{funcdesc}{adapt}{component, protocol,
-\optional{, default \optional{, factory}}}
+\begin{funcdesc}{adapt}{component, protocol \optional{, default}}
 
 Return an implementation of \var{protocol} (a protocol object) for
 \var{component} (any object).  The implementation returned may be
 \var{component}, or an adapter that implements the protocol on its
 behalf.  If no implementation is available, return \var{default}.  If no
-\var{default} is provided, call \code{\var{factory}(\var{component},
-\var{protocol})} and return the result.  If no \var{factory} is supplied,
-raise \exception{protocols.AdaptationFailure}.
-
-\var{default} may be supplied as a positional or keyword argument.
-\var{factory}, however, must be supplied as a keyword argument in order
-to be used.
+\var{default} is provided, raise \exception{protocols.AdaptationFailure}.
 
 A detailed description of this function's operations and purpose may be found in
 section \ref{adapt-protocol}.
@@ -1994,7 +1987,7 @@ section \ref{adapt-protocol}.
 \versionadded{0.9.3}
 A subclass of \exception{TypeError} and \exception{NotImplementedError}, this
 exception type is raised by \function{adapt()} when no implementation can be
-found, and no \var{default} or \var{factory} was supplied.
+found, and no \var{default} was supplied.
 \end{excdesc}
 
 \begin{classdesc}{Adapter}{ob, proto}
@@ -2005,6 +1998,13 @@ to implement the desired interface(s).  (And of course, declare what interfaces
 the adapter provides, for what types, and so on.)  Your subclass' methods can
 use the following attributes, which will have been set by the \method{__init__}
 method:
+
+
+
+
+
+
+
 
 
 \begin{memberdesc}{subject}
@@ -3408,40 +3408,53 @@ approach:
 \begin{verbatim%
 }class Printer:
     def drop(self,thing):
-        adapt(thing,IPrintable,factory=Unprintable).printOn(self)
+        IPrintable(thing).printOn(self)
 
 class Trashcan:
     def drop(self,thing):
-        adapt(thing,IDeletable,factory=Undeleteable).delete(self)
+        IDeletable(thing).delete(self)
 
 class User:
-    advise(instancesProvide=[IDeletable,IPrintable])
+    protocols.advise(instancesProvide=[IDeletable,IPrintable])
     def drop(self,thing):
-        adapt(thing,IMailable,factory=Unmailable).mailTo(self)
+        IMailable(thing).mailTo(self)
 
 class File:
-    advise(instancesProvide=[IDeletable,IMailable,IPrintable])
+    protocols.advise(instancesProvide=[IDeletable,IMailable,IPrintable])
     def drop(self,thing):
-        adapt(thing,IInsertable,factory=Uninsertable).insertInto(self)
+        IInsertable(thing).insertInto(self)
+
+class Undroppable(protocols.Adapter):
+    protocols.advise(
+        instancesProvide=[IPrintable,IDeletable,IMailable,IInsertable],
+        asAdapterForTypes=[object]
+    )
+
+    def printOn(self,printer):
+        print "Can't print", self.subject
+
+    def mailTo(self,user):
+        print "Can't mail", self.subject
+
+    # ... etc.
 \end{verbatim}
 
-\class{Unprintable}, \class{Undeletable}, \class{Umailable}, and
-\class{Uninsertable} are classes that implement the \method{printOn()},
-\method{delete()}, \method{mailTo()}, and \method{insertInto()} methods by
-giving the user feedback that the operation isn't possible.  Because they are
-adapter factories, they have access to the dropped object, and because they have
-methods that accept the drop target, they can present a meaningful error.  (This
-technique of using a \var{factory} argument that provides an empty or
-error-raising implementation of an interface, is an example of the \strong{null
-object pattern}.)
+
+
+
+Notice how our default \class{Undroppable} adapter class implements the
+\class{IPrintable}, \class{IDeletable}, \class{IMailable}, and
+\class{IInsertable} protocols on behalf of arbitrary objects, by giving user
+feedback that the operation isn't possible.  (This technique of using a default
+adapter factory that provides an empty or error-raising implementation of an
+interface, is an example of the \strong{null object pattern}.)
 
 Notice that the adaptation approach is much more scalable, because new methods
 are not required for every new droppable item.  Third parties can declare
 adaptations between two other developers' objects, making drag and drop between
 them possible.
 
-
-
+Now let's look at the ``Visitor'' pattern.
 The ``Visitor'' pattern is a specialized form of double dispatch, used to apply
 an algorithm to a structured collection of objects.  For example, the Python
 \program{docutils} tookit implements the visitor pattern to create various
@@ -3463,13 +3476,20 @@ types like \class{Shape} and \class{Square}, you must write \method{visit_Shape}
 and \method{visit_Square} methods, even if you would like to treat all subtypes
 of \class{Shape} the same.
 
+
+
+
+
+
+
+
 The object adaptation approach to this, is to define visitor(s) as adapters from
 the objects being traversed, to an interface that supplies the desired behavior.
 For example, one might define \class{IHTMLWriter} and \class{ILaTeXWriter}
 interfaces, with \class{writeHTML()} and \class{writeLaTeX()} methods.  Then, by
 defining adapters from the appropriate node base types to these interfaces, the
-desired behavior is achieved.  Just
-\code{adapt(document,IHTMLWriter).writeHTML()}, and off you go.
+desired behavior is achieved.  Just use
+\code{IHTMLWriter(document).writeHTML()}, and off you go.
 
 This approach is far less fragile, since new node types do not require new
 methods in the visitors, and if the new node type specializes an existing type,
@@ -3478,10 +3498,6 @@ so it can be applied to existing frameworks that don't support the visitor
 pattern (such as \module{xml.dom.minidom}).  Further, the adapters can exercise
 fine-grained control over any traversal that takes place, since it is the
 adapter rather than the adaptee that controls the visiting order.
-
-
-
-
 
 Last, but not least, notice that by adapting from interfaces rather than
 types, one can apply this pattern to multiple implementations of the interface.
@@ -3493,16 +3509,20 @@ Are there any downsides to using adaptation over double-dispatch or the Visitor
 pattern?  The total size of your program may be larger, because you'll be
 writing lots of adapter classes.  But, your program will also be more modular,
 and you'll be able to group the classes in ways that make more sense for the
-reader.  Using adaptation also may or may not be slower than the simpler
-patterns, depending on various implementation factors.
+reader.  Using adaptation also may be faster or slower than not using it,
+depending on various implementation factors.
 
-It's rare that the overhead is significant, however.  In most uses of these
+It's rare that the difference is significant, however.  In most uses of these
 patterns, runtime is dominated by the useful work being done, not by the
 dispatching.  The exception is when a structure to be visited contains many
-thousands of elements that need virtually no work done to them.  For example,
+thousands of elements that need virtually no work done to them.  (For example,
 if an XML visitor wrote text nodes out unchanged, and the input was mostly text
-nodes.  Under such conditions, the time taken by the dispatch mechanism (whether
+nodes.) Under such conditions, the time taken by the dispatch mechanism (whether
 name-based or adapter-based) would be more visible.
+
+
+
+
 
 The author has found, however, that in that situation, one can gain more speed
 by registering null adapter factories or \function{DOES_NOT_SUPPORT} for the
@@ -3524,6 +3544,27 @@ framework code.}
 \end{seealso}
 
 \newpage
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 \subsubsection{Replacing introspection with Adaptation, Revisited\label{introspect-elim}}
 
 \begin{quotation}

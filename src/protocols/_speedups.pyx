@@ -121,7 +121,7 @@ cdef class metamethod:
 
 
 
-cdef _adapt(obj, protocol, default, factory):
+cdef _adapt(obj, protocol, default):
 
     # We use nested 'if' blocks here because using 'and' causes Pyrex to
     # convert the return values to Python ints, and then back to booleans!
@@ -180,25 +180,25 @@ cdef _adapt(obj, protocol, default, factory):
         raise
 
     if default is _marker:
-        return factory(obj, protocol)
+        return IMPLEMENTATION_ERROR(obj, protocol)
 
     return default
 
     
-def adapt(obj, protocol, default=_marker, factory=IMPLEMENTATION_ERROR):
+def adapt(obj, protocol, default=_marker):
 
     """PEP 246-alike: Adapt 'obj' to 'protocol', return 'default'
 
     If 'default' is not supplied and no implementation is found,
-    the result of 'factory(obj,protocol)' is returned.  If 'factory'
-    is also not supplied, 'AdaptationFailure' is then raised."""
+    raise 'AdaptationFailure'."""
 
-    return _adapt(obj,protocol,default,factory)
+    return _adapt(obj,protocol,default)
 
 
-def Protocol__call__(self, ob, default=_marker, factory=IMPLEMENTATION_ERROR):
+def Protocol__call__(self, ob, default=_marker):
     """Adapt to this protocol"""
-    return adapt(ob,self,default,factory)
+    return _adapt(ob,self,default)
+
 
 
 

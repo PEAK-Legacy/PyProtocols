@@ -1,5 +1,10 @@
 Fixes and changes since PyProtocols 0.9.2
 
+ - The 'factory' parameter to 'adapt()' was REMOVED.  An informal survey of
+   PyProtocols' users indicated that nobody was using it to any significant
+   degree, and its removal was unopposed.  This feature was an extension to
+   PEP 246, so this brings PyProtocols into closer conformance with the PEP.
+
  - Raise 'AdaptationFailure' instead of 'NotImplementedError' when adaptation
    is unsuccessful.  'AdaptationFailure' is a subclass of both 'TypeError' and
    'NotImplementedError', so code written according to either PEP 246 or older
@@ -11,14 +16,14 @@ Fixes and changes since PyProtocols 0.9.2
    concrete implementations.  In previous versions, you could use 'Interface'
    as such a base class, but now calling an 'Interface' object performs
    adaptation, rather than instantiation.
-   
+
  - 'Protocol' instances (except for 'AbstractBase' subclasses) are now callable
    with a signature similar to 'adapt()'.  E.g. 'ISomething(foo,*args)' is
    equivalent to 'adapt(foo,ISomething,*args)'.  This convenient API, pioneered
    by Twisted and later adopted by Zope X3, is now available in PyProtocols as
    well.  (Note that as a result of this change, the PyProtocols test suite now
    requires a Zope X3 alpha release or better.)
-   
+
  - 'setup.py' now accepts a '--without-speedups' global option to disable
    the C speedups module.
 

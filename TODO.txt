@@ -1,10 +1,9 @@
 Items needing investigation or implementation for PyProtocols 1.0
 
- * Check if anybody's using the 'factory' argument to 'adapt()', and if not, 
-   get rid of it.
+ * Add a "single-dispatch generic function" demo/example
 
- * If 'factory' isn't used anywhere, consider ditching the second parameter 
-   passed to adapters.  That is, instead of calling 'someadapter(ob,proto)', 
+ * Get rid of the second parameter passed to adapters, preferably w/backward
+   compatibility.  That is, instead of calling 'someadapter(ob,proto)', 
    just call 'someadapter(ob)'.  This would give PyProtocols adapters the same 
    calling signature as e.g. Zope adapters.
 
@@ -12,8 +11,6 @@ Items needing investigation or implementation for PyProtocols 1.0
    to reflect what version of Zope X3 is supported/tested.
 
  * Produce an updated version of PEP 246
-
- * Add a "single-dispatch generic function" demo/example
 
  * Consider changing "adapter algebra" to allow OR-ing adapters as well as 
    chaining them, using some sort of implicative partial ordering.  This would 
