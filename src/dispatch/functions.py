@@ -21,18 +21,18 @@ class DispatchNode(dict):
 
     protocols.advise(instancesProvide=[IDispatchTable])
 
-    __slots__ = 'expr_id','contents','reseed'
+    __slots__ = 'reseed'
 
-    def __init__(self, best_id, contents, reseed):
+    def __init__(self, contents, reseed):
         self.reseed = reseed
-        self.expr_id = best_id
-        self.contents = contents
-        dict.__init__(self)
+        dict.__init__(self,contents())
 
-    def build(self):
-        if self.contents:
-            self.update(dict(self.contents()))
-            self.contents = None
+
+_NF = (None,None, NoApplicableMethods, (None,None))
+
+
+
+
 
 
 
@@ -330,13 +330,13 @@ class Dispatcher:
         if state is None:
             self._rebuild_indexes()
             state = self.cases, tuple(self.disp_indexes), {}
-
         (cases,disp_ids,memo) = state
         key = (tuple(cases), disp_ids)
         if key in memo:
             return memo[key]
         elif not disp_ids:
-            node = self.combine(cases)  # No more criteria, so make a leaf node
+            # No more criteria, so make a leaf node
+            node = [None,None, self.combine(cases), None]
         else:
             best_id, case_map, remaining_ids = self._best_split(cases,disp_ids)
             if best_id is None:
@@ -356,56 +356,56 @@ class Dispatcher:
                         case_map[key] = [
                             sm for sm in cases if key in sm[0].get(best_id)
                         ]
-                        node[key] = retval = self._build_dispatcher(
+                        node[2][key] = retval = self._build_dispatcher(
                             (case_map[key], remaining_ids, memo)
                         )
                         return retval
                     finally:
                         self._release()
-                node = DispatchNode(best_id, dispatch_table, reseed)
+                node = [best_id[0],best_id[1], None, (dispatch_table, reseed)]
 
         memo[key] = node
         return node
 
     def __getitem__(self,argtuple):
         argct = self.argct
-        node = self._dispatcher
-        if node is None:
-            node = self._startNode()
-
-        while type(node) is DispatchNode:
-            (expr, dispatch_function) = node.expr_id
-            if node.contents:
+        node = self._dispatcher or self._startNode() or _NF
+        expr, dispatch_function, val, init = node
+        while dispatch_function is not None:
+            if val is None:
                 self._acquire()
                 try:
-                    if node.contents: node.build()
+                    if node[2] is None: node[2] = val = DispatchNode(*init)
                 finally:
                     self._release()
             if expr<argct:
-                node = dispatch_function(argtuple[expr], node)
+                expr, dispatch_function, val, init = node = \
+                    dispatch_function(argtuple[expr], val) or _NF
             else:
                 cache = ExprCache(argtuple,self.expr_defs)
                 try:
-                    node = dispatch_function(cache[expr], node)
-                    while type(node) is DispatchNode:
-                        (expr, dispatch_function) = node.expr_id
-                        if node.contents:
+                    expr, dispatch_function, val, init = node = \
+                        dispatch_function(cache[expr], val) or _NF
+                    while dispatch_function is not None:
+                        if val is None:
                             self._acquire()
                             try:
-                                if node.contents: node.build()
+                                if node[2] is None:
+                                    node[2] = val = DispatchNode(*init)
                             finally:
                                 self._release()
                         if expr<argct:
-                            node = dispatch_function(argtuple[expr], node)
+                            expr, dispatch_function, val, init = node = \
+                                dispatch_function(argtuple[expr], val) or _NF
                         else:
-                            node = dispatch_function(cache[expr], node)
+                            expr, dispatch_function, val, init = node = \
+                                dispatch_function(cache[expr], val) or _NF
                     break
-                finally:                    
+                finally:
                     cache = None    # GC of values computed during dispatch
-
-        if node is not None:
-            return node
-        raise NoApplicableMethods
+        if val is NoApplicableMethods:
+            raise NoApplicableMethods
+        return val
 
 
     def _rebuild_indexes(self):
@@ -808,12 +808,12 @@ def _mkNormalizer(func,dispatcher):
 def setup(__dispatcher,__gfDefaults):
 
     def %(funcname)s%(argspec)s:
-        return __dispatcher[(%(outargs)s)]%(allargs)s
+        return __dispatcher((%(outargs)s))%(allargs)s
 
     return %(funcname)s
 """ % locals()
     exec s in globals(),d
-    return d['setup'](dispatcher,defaults), retargs
+    return d['setup'](dispatcher.__getitem__,defaults), retargs
 
 defaultNormalize = lambda *__args: __args
 
