@@ -122,11 +122,11 @@ class TermTests(TestCase):
         self.failIf(BrokenBike in ITerm(Wheeled))
 
     def testSignatures(self):
-
-        d1 = {0:ITerm(LandVehicle), 1:ITerm(WaterVehicle)}
-        d2 = {0:ITerm(Hummer), 1:ITerm(Speedboat)}
-        d3 = {0:ITerm(WaterVehicle), 1:ITerm(LandVehicle)}
-        d4 = {0:ITerm(LandVehicle), 1:ITerm(LandVehicle)}
+        a0 = Argument(0); a1 = Argument(1)
+        d1 = {a0:ITerm(LandVehicle), a1:ITerm(WaterVehicle)}
+        d2 = {a0:ITerm(Hummer), a1:ITerm(Speedboat)}
+        d3 = {a0:ITerm(WaterVehicle), a1:ITerm(LandVehicle)}
+        d4 = {a0:ITerm(LandVehicle), a1:ITerm(LandVehicle)}
 
         for d in d1,d2,d3,d4:
             self.assertEqual( dict(Signature(d.items()).items()), d )
@@ -162,38 +162,120 @@ class TermTests(TestCase):
         )
 
 
-class GenericTest(TestCase):
+class ExpressionTests(TestCase):
+
+    def testArgumentBasics(self):
+
+        self.assertRaises(ValueError, Argument)     # must specify name or posn
+
+        self.failUnless(Argument(0) == Argument(0))
+        self.failIf(    Argument(0) == Argument(1))
+
+        self.failUnless(Argument(name="x") == Argument(name="x"))
+        self.failIf(    Argument(name="x") == Argument(name="y"))
+
+        self.failIf(    Argument(name="x") == Argument(1,"x"))
+        self.failIf(    Argument(1,"x")    == Argument(name="x"))
+        self.failIf(    Argument(1)        == Argument(1,"x"))
+        self.failIf(    Argument(1,"x")    == Argument(1))
+
+        self.failUnless(Argument(0,"x")    == Argument(0,"x"))
+        self.failIf(    Argument(0,"x")    == Argument(0,"y"))
+        self.failIf(    Argument(0,"x")    == Argument(1,"x"))
+        self.failIf(    Argument(0,"x")    == Argument(1,"y"))
+
+        a1 = Argument(0,"x"); a2 = Argument(0,"x")
+        self.assertEqual(hash(a1), hash(a2))
+
+        a1 = Argument(1); a2 = Argument(1)
+        self.assertEqual(hash(a1), hash(a2))
+
+        a1 = Argument(name="x"); a2 = Argument(name="x")
+        self.assertEqual(hash(a1), hash(a2))
+
+
+
+
+
+
+
+
+
+
+
+    def testFunctionArguments(self):
+
+        f = GenericFunction(args=['a','b','c'])
+
+        fa,arga = f.argByName('a')
+        fb,argb = f.argByName('b')
+        fc,argc = f.argByName('c')
+
+        self.assertEqual(f.argByName('a'), f.argByName('a'))
+
+        for arg in arga,argb,argc:
+            self.assertEqual(arg, (0,1))
+
+        args = (1,2,3); kw={'a':1, 'b':2, 'c':3}
+
+        self.assertEqual(fa(args,{}), 1)
+        self.assertEqual(fb(args,{}), 2)
+        self.assertEqual(fc(args,{}), 3)
+
+        self.assertEqual(fa((),kw), 1)
+        self.assertEqual(fb((),kw), 2)
+        self.assertEqual(fc((),kw), 3)
+
+        self.assertRaises(KeyError, f.argByName, 'x')
+
+
+    def testArgumentCanonicalization(self):
+        f = GenericFunction(args=['v1','v2'])
+        self.assertEqual(
+            f.getExpressionId(Argument(name='v1')),
+            f.getExpressionId(Argument(0))
+        )
+        self.assertEqual(
+            f.getExpressionId(Argument(name='v2')),
+            f.getExpressionId(Argument(1))
+        )
+
+
+
+
+
+class GenericTests(TestCase):
 
     def testBasicSingleDispatch(self):
-        m = PositionalGenericFunction()
+        m = GenericFunction(args=['v'])
         m[(LandVehicle,)] = lambda v: "land"
         m[(WaterVehicle,)] = lambda v: "water"
 
         self.assertEquals(m(Hummer()), "land")
         self.assertEquals(m(Speedboat()), "water")
-        self.assertRaises(MessageNotUnderstood, m, GasPowered())
+        self.assertRaises(NoApplicableMethods, m, GasPowered())
 
 
-    def testSimpleDoubleDispatch(self):
-        faster = PositionalGenericFunction()
-        faster[(GasPowered,HumanPowered)] = lambda v1,v2: True
-        faster[(Hummer,Speedboat)] = lambda v1,v2: True
+    def testSimpleDoubleDispatchAndNamedArgs(self):
+        faster = GenericFunction(args=['v1','v2'])
+        faster[Signature(v1=GasPowered,v2=HumanPowered)] = lambda v1,v2: True
+        faster[Signature(v1=Hummer,v2=Speedboat)] = lambda v1,v2: True
         faster[(object,object)] = lambda v1,v2: "dunno"
-        faster[(HumanPowered,GasPowered)] = lambda v1,v2: False
-        faster[(Speedboat,Hummer)] = lambda v1,v2: False
+        faster[Signature(v1=HumanPowered,v2=GasPowered)] = lambda v1,v2: False
+        faster[Signature(v2=Hummer,v1=Speedboat)] = lambda v1,v2: False
         self.assertEqual(faster(Hummer(),Bicycle()), True)
 
     def testAmbiguity(self):
-        add = PositionalGenericFunction()
+        add = GenericFunction(args=['addend','augend'])
         add[(object, int)] = operator.add
         add[(int, object)] = operator.sub
         self.assertRaises(AmbiguousMethod, add, 1, 2)
 
     def testDynamic(self):
-        roll = PositionalGenericFunction()
+        roll = GenericFunction(args=['vehicle'])
         class Tricycle(HumanPowered,LandVehicle): pass
-        roll[(Wheeled,)] = lambda ob: "We're rolling"
-        self.assertRaises(MessageNotUnderstood, roll, Tricycle())
+        roll[Signature(vehicle=Wheeled)] = lambda ob: "We're rolling"
+        self.assertRaises(NoApplicableMethods, roll, Tricycle())
         declareImplementation(Tricycle,[Wheeled])
         self.assertEqual(roll(Tricycle()),"We're rolling")
 
@@ -218,7 +300,7 @@ class GenericTest(TestCase):
             return next_method(ob1,ob2)+ \
                 "  One vehicle is a land vehicle, the other is a sea vehicle."
 
-        compare = PositionalGenericFunction(method_combiner = chained_methods)
+        compare = GenericFunction(args=['v1','v2'], method_combiner = chained_methods)
         compare.addMethod([(Vehicle, Vehicle)], both_vehicles)
         compare.addMethod([(LandVehicle, LandVehicle)],both_land)
         compare.addMethod([(WaterVehicle, WaterVehicle)],both_sea)
@@ -261,7 +343,7 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
 
         tf = [F(),T()]
 
-        g = PositionalGenericFunction()
+        g = GenericFunction(args=['f1','f1.x','f2','f1x@!B', 'f1.y==f2.y'])
 
         # f1, f1.x, f2, f1.x@!B, f1.y=f2.y
 
@@ -286,7 +368,7 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
 
 
 TestClasses = (
-    TermTests, GenericTest,
+    TermTests, ExpressionTests, GenericTests,
 )
 
 def test_suite():

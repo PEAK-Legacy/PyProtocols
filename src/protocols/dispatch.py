@@ -14,24 +14,24 @@
 
  TODO
 
-    * Support before/after/around methods, and result combination ala CLOS
+    * Functional expressions
 
-    * Support arbitrary expressions via canonicalization
+    * Boolean terms, value comparison terms
 
-    * Support ordering constraints and costs on expressions
+    * Expression/term ordering constraints
+
+    * Support costs on expressions
+
+    * Add C speedups
 
     * Express arbitrary predicates as Python expressions (in string form)
 
     * Convenience API using function decorators
 
+    * Support before/after/around methods, and result combination ala CLOS
+
     * Support DAG-walking for visualization, debugging, and ambiguity detection
 """
-
-
-
-
-
-
 
 
 
@@ -50,23 +50,95 @@ from sys import _getframe
 from weakref import WeakKeyDictionary
 
 __all__ = [
-    'IDispatchFunction', 'ITerm', 'ISignature', 'IPositionalSignature',
-    'AmbiguousMethod', 'MessageNotUnderstood', 'NullTerm', 'ProtocolTerm',
-    'PositionalGenericFunction', 'chained_methods', 'ClassTerm', 'Signature',
+    'IDispatchFunction', 'ITerm', 'ISignature', 'IDispatchPredicate',
+    'AmbiguousMethod', 'NoApplicableMethods', 'NullTerm', 'ProtocolTerm',
+    'GenericFunction', 'chained_methods', 'ClassTerm', 'Signature',
     'PositionalSignature', 'most_specific_signatures', 'ordered_signatures',
-    'dispatch_by_mro', 'next_method',
+    'dispatch_by_mro', 'next_method', 'Argument', 'IDispatchableExpression',
+    'IGenericFunction',
 ]
+
+
+class AmbiguousMethod(Exception):
+    """More than one choice of method is possible"""
+
+
+class NoApplicableMethods(Exception):
+    """No applicable method has been defined for the given arguments"""
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class ITerm(Interface):
+    """A test+value combination to be applied to an expression
+
+    A term comprises a "dispatch function" (the kind of test to be applied,
+    such as an 'isinstance()' test or range comparison) and a value or values
+    that the expression must match.  Note that a term describes only the
+    test(s) to be performed, not the expression to be tested.
+    """
+
+    dispatch_function = Attribute(
+        """'IDispatchFunction' that should be used for testing this term"""
+    )
+
+    def seeds():
+        """Return iterable of known-good keys
+
+        The keys returned will be used to build outgoing edges in generic
+        functions' dispatch tables, which will be passed to the
+        'dispatch_function' for interpretation."""
+
+    def __contains__(key):
+        """Return true if term applies to 'key'
+
+        This method will be passed each seed provided by this or any other
+        terms with the same 'dispatch_function' that are being applied to the
+        same expression."""
+
+    def implies(otherTerm):
+        """Return true if this term implies 'otherTerm'"""
+
+    def subscribe(listener):
+        """Call 'listener.termChanged()' if term's applicability changes
+
+        Multiple calls with the same listener should be treated as a no-op."""
+
+    def unsubscribe(listener):
+        """Stop calling 'listener.termChanged()'
+
+        Unsubscribing a listener that was not subscribed should be a no-op."""
 
 
 class IDispatchFunction(Interface):
     """Test to be applied to an expression to navigate a dispatch node"""
 
     def __call__(ob,table):
-        """Return entry from 'table' that matches 'ob' ('None' if not found)"""
+        """Return entry from 'table' that matches 'ob' ('None' if not found)
+
+        'table' is a dictionary mapping term seeds to dispatch nodes.  The
+        dispatch function should return the appropriate entry from the
+        dictionary.
+        """
 
 
 class ISignature(Interface):
-    """Mapping from expr_id # -> applicable class/dispatch test"""
+    """Mapping from expression id -> applicable class/dispatch test
+
+    Note that signatures do not/should not interpret expression IDs; the IDs
+    may be any object that can be used as a dictionary key.
+    """
 
     def items():
         """Iterable of all '(id,term)' pairs for this signature"""
@@ -78,42 +150,52 @@ class ISignature(Interface):
         """Return true if this signature implies 'otherSig'"""
 
 
+class IDispatchPredicate(Interface):
+    """Sequence of signatures"""
+    protocols.advise(protocolIsSubsetOf = [protocols.sequenceOf(ISignature)])
 
 
-class ITerm(Interface):
-
-    dispatch_function = Attribute(
-        """IDispatchFunction that should be used for testing this term"""
-    )
-
-    def seeds():
-        """Return iterable of known-good keys"""
-
-    def __contains__(key):
-        """Return true if term applies to 'key'"""
-
-    def implies(otherTerm):
-        """Return true if this term implies 'otherTerm'"""
-
-    def subscribe(listener):
-        """Call 'listener.termChanged()' if term's applicability changes"""
-
-    def unsubscribe(listener):
-        """Stop calling 'listener.termChanged()'"""
 
 
-class IPositionalSignature(ISignature):
-    """Signature that maps argument positions to class terms"""
 
 
-class AmbiguousMethod(Exception):
-    """More than one choice of method is possible"""
 
 
-class MessageNotUnderstood(Exception):
-    """No applicable method has been defined for the given arguments"""
+
+class IDispatchableExpression(Interface):
+    """Expression definition suitable for dispatching"""
+
+    def asFuncAndIds(generic):
+        """Return '(func,idtuple)' pair for expression computation"""
 
 
+class IGenericFunction(Interface):
+
+    def __call__(*__args,**__kw):
+        """Invoke the function and return results"""
+
+    def __setitem__(signature,method):
+        """Call 'method' when input matches 'ISignature(signature)'"""
+
+    def addMethod(predicate,method):
+        """Call 'method' when input matches 'IDispatchPredicate(predicate)'"""
+
+    def argByName(name):
+        """Return 'asFuncAndIds()' for argument 'name'"""
+
+    def argByPos(pos):
+        """Return 'asFuncAndIds()' for argument number 'pos'"""
+
+    def getExpressionId(expr):
+        """Return an expression ID for use in 'asFuncAndIds()' 'idtuple'"""
+
+    def termChanged():
+        """Notify that a term has changed meaning, invalidating any indexes"""
+
+    def clear():
+        """Empty all signatures, methods, terms, expressions, etc."""
+
+    # copy() ?
 
 
 
@@ -293,8 +375,11 @@ class Signature(object):
 
     __slots__ = 'data'
 
-    def __init__(self, id_to_term):
-        self.data = dict(id_to_term)
+    def __init__(self, __id_to_term=(), **kw):
+        self.data = dict(__id_to_term)
+        if kw:
+            for k,v in kw.items():
+                self.data[Argument(name=k)] = ITerm(v)
 
     def implies(self,otherSig):
         otherSig = ISignature(otherSig)
@@ -323,20 +408,17 @@ class Signature(object):
 
 
 
-
-
-
 class PositionalSignature(Signature):
 
     protocols.advise(
-        instancesProvide=[IPositionalSignature],
+        instancesProvide=[ISignature],
         asAdapterForProtocols=[protocols.sequenceOf(ITerm)]
     )
 
     __slots__ = ()
 
     def __init__(self,terms,proto=None):
-        Signature.__init__(self, zip(range(len(terms)), terms))
+        Signature.__init__(self, zip(map(Argument,range(len(terms))), terms))
 
     def __repr__(self):
         return 'PositionalSignature%r' % (tuple(
@@ -438,7 +520,7 @@ def next_method(*__args,**__kw):
     for method in __active_methods__:
         return method(*__args, **__kw)
     else:
-        raise MessageNotUnderstood
+        raise NoApplicableMethods
 
 
 
@@ -480,40 +562,82 @@ def chained_methods(cases):
                     yield methods.keys()[0]
                 else:
                     raise AmbiguousMethod
-        raise MessageNotUnderstood
+        raise NoApplicableMethods
 
     def method(*__args,**__kw):
         __active_methods__ = iterMethods()  # here to be found by next_method()
         for method in __active_methods__:
             return method(*__args, **__kw)
         else:
-            raise MessageNotUnderstood
+            raise NoApplicableMethods
     return method
 
-class PositionalGenericFunction:
+class Argument(object):
 
-    """Generic function w/class discrimination using positional signatures
+    """The most basic kind of dispatch expression: an argument specifier"""
+
+    protocols.advise(instancesProvide=[IDispatchableExpression])
+
+    def __init__(self,pos=None,name=None):
+        if pos is None and name is None:
+            raise ValueError("Argument name or position must be specified")
+
+        self.pos = pos
+        self.name = name
+        self.hash = hash((type(self),self.pos,self.name))
+
+
+    def __eq__(self,other):
+        return isinstance(other,Argument) and \
+            (other.pos==self.pos) and \
+            (other.name==self.name)
+
+    def __ne__(self,other):
+        return not self.__eq__(other)
+
+
+    def __hash__(self):
+        return self.hash
+
+    def asFuncAndIds(self,generic):
+        byName = byPos = None
+        if self.name:
+            byName = generic.argByName(self.name)
+            if self.pos:
+                byPos = generic.argByPos(self.pos)
+                # check name/pos equal
+            else:
+                return byName
+        else:
+            return generic.argByPos(self.pos)
+
+
+
+class GenericFunction:
+
+    """Extensible multi-dispatch generic function
 
     Note: this class is *not* threadsafe!  It probably needs to be, though.  :(
     """
 
-    predicateProtocol = protocols.sequenceOf(IPositionalSignature)
-
-
-    def __init__(self, method_combiner=single_best_method):
+    def __init__(self, args=(), method_combiner=single_best_method):
         self.method_combiner = method_combiner
+        self.args_by_name = abn = {}; self.args = args
+        for n,p in zip(args,range(len(args))):
+            abn[n] = self.__argByNameAndPos(n,p)
         self.clear()
-
 
     def clear(self):
         self.dirty = False
         self.cases = []
-        self.expr_indexes = {}
+        self.disp_indexes = {}
+        self.expr_map = {}
+        self.expr_defs = [None,None]    # args+kw
         self._dispatcher = None
 
 
     def addMethod(self,predicate,function):
-        for signature in self._toSignatures(predicate):
+        for signature in IDispatchPredicate(predicate):
             self[signature] = function
 
 
@@ -522,7 +646,7 @@ class PositionalGenericFunction:
         self._dispatcher = None
 
 
-    def rebuild_indexes(self):
+    def _rebuild_indexes(self):
         if self.dirty:
             cases = self.cases
             self.clear()
@@ -530,39 +654,38 @@ class PositionalGenericFunction:
 
 
 
-
-    def build_dispatcher(self, cases=None, expr_ids=None, memo=None):
+    def _build_dispatcher(self, cases=None, disp_ids=None, memo=None):
 
         if memo is None:
             memo = {}
 
         if cases is None:
-            self.rebuild_indexes()
+            self._rebuild_indexes()
             cases = self.cases
 
-        if expr_ids is None:
-            expr_ids = tuple(self.expr_indexes)
+        if disp_ids is None:
+            disp_ids = tuple(self.disp_indexes)
 
-        key = (tuple(cases), expr_ids)
+        key = (tuple(cases), disp_ids)
 
         if key in memo:
             return memo[key]
         elif not cases:
             node = None
-        elif not expr_ids:
+        elif not disp_ids:
             # No more tests possible, so make a leaf node
             node = self.method_combiner(cases)
         else:
-            best_id, case_map, remaining_ids = self._best_split(cases,expr_ids)
+            best_id, case_map, remaining_ids = self._best_split(cases,disp_ids)
 
             if best_id is None:
                 # None of our current cases had any meaningful tests on the
                 # "best" expression, so don't bother building a dispatch node.
                 # Instead, try again with the current expression removed.
-                node = self.build_dispatcher(cases, remaining_ids, memo)
+                node = self._build_dispatcher(cases, remaining_ids, memo)
             else:
                 def dispatch_table():
-                    build = self.build_dispatcher
+                    build = self._build_dispatcher
                     for key,subcases in case_map.items():
                         yield key,build(subcases,remaining_ids,memo)
 
@@ -575,9 +698,16 @@ class PositionalGenericFunction:
     def __call__(self,*__args,**__kw):
 
         node = self._dispatcher
+        cache = {0:__args, 1:__kw}
+
+        def get(expr_id):
+            if expr_id in cache:
+                return cache[expr_id]
+            f,args = self.expr_defs[expr_id]
+            return f(*map(get,args))
 
         if node is None:
-            node = self._dispatcher = self.build_dispatcher()
+            node = self._dispatcher = self._build_dispatcher()
 
         while node is not None:
 
@@ -587,53 +717,56 @@ class PositionalGenericFunction:
                 if not table:
                     table.update(dict(contents))
 
-                node = dispatch_function(__args[expr], table)         # XXX
+                node = dispatch_function(get(expr), table)         # XXX
 
             else:
                 return node(*__args,**__kw)
 
-        raise MessageNotUnderstood
+        raise NoApplicableMethods
 
 
+    def __argByNameAndPos(self,name,pos):
+
+        def getArg(args,kw):
+            if len(args)<=pos:
+                return kw[name]
+            else:
+                return args[pos]
+
+        return getArg, (0,1)
 
 
+    def argByName(self,name):
+        return self.args_by_name[name]
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+    def argByPos(self,pos):
+        return self.args_by_name[self.args[pos]]
 
 
     def __setitem__(self,signature,method):
-
         """Update indexes to include 'signature'->'method'"""
-
-        self._addCase((self._toSignature(signature), method))
+        signature = Signature(
+            [(self._dispatch_id(expr,term),term)
+                for expr,term in ISignature(signature).items()
+                    if term is not NullTerm
+            ]
+        )
+        self._addCase((signature, method))
 
 
     def _addCase(self,case):
-
         (signature,method) = case
 
-        for expr_id, caselists in self.expr_indexes.items():
+        for disp_id, caselists in self.disp_indexes.items():
 
-            term = signature.get(expr_id)
+            term = signature.get(disp_id)
 
             for key in term.seeds():
                 if key not in caselists:
                     # Add in cases that didn't test this key  :(
                     caselists[key] = [
                         (s2,m2) for s2,m2 in self.cases
-                            if key in s2.get(expr_id)
+                            if key in s2.get(disp_id)
                     ]
 
             for key,lst in caselists.items():
@@ -644,35 +777,25 @@ class PositionalGenericFunction:
         self._dispatcher = None
 
 
+    def _best_split(self, cases, disp_ids):
 
-
-
-
-
-
-
-
-
-
-    def _best_split(self, cases, expr_ids):
-
-        """Return best (expr_id,method_map,remaining_ids) for current subtree"""
+        """Return best (disp_id,method_map,remaining_ids) for current subtree"""
 
         best_id = None
         best_map = None
         best_spread = None
-        remaining_ids = list(expr_ids)
+        remaining_ids = list(disp_ids)
         cases = dict([(case,1) for case in cases])
         is_active = cases.has_key
         active_cases = len(cases)
 
-        for expr_id in expr_ids:
+        for disp_id in disp_ids:
             # XXX may need filtering for required ordering between exprs
             # XXX analyze cost to compute expression?
 
             casemap = {}
             total_cases = 0
-            for key,caselist in self.expr_indexes[expr_id].items():
+            for key,caselist in self.disp_indexes[disp_id].items():
                 caselist = filter(is_active,caselist)
                 casemap[key] = caselist
                 total_cases += len(caselist)
@@ -680,13 +803,13 @@ class PositionalGenericFunction:
             if total_cases == active_cases * len(casemap):
                 # None of the index keys for this expression eliminate any
                 # cases, so this expression isn't needed for dispatching
-                remaining_ids.remove(expr_id)
+                remaining_ids.remove(disp_id)
                 continue
 
             spread = float(total_cases) / len(casemap)
             if spread < best_spread or best_spread is None:
                 best_spread = spread
-                best_id = expr_id
+                best_id = disp_id
                 best_map = casemap
 
         if best_id is not None:
@@ -695,32 +818,32 @@ class PositionalGenericFunction:
         return best_id, best_map, tuple(remaining_ids)
 
 
-    # Methods that should be changed in non-positional or non-class subclasses
-
-    def _toSignatures(self,predicate):
-        """Convert 'predicate' to a list of signatures, updating expr info"""
-        return self.predicateProtocol(predicate)
-
-
-    def _toSignature(self,signature):
-        return Signature(
-            [(self._canonical_expr_id(expr,term),term)
-                for expr,term in ISignature(signature).items()
-                    if term is not NullTerm
-            ]
-        )
-
-
-    def _canonical_expr_id(self,expr,term):
-        """Replace expr with a local key"""
+    def _dispatch_id(self,expr,term):
+        """Replace expr/term with a local key"""
 
         term.subscribe(self)
-        expr = expr, term.dispatch_function
-        self.expr_indexes.setdefault(expr,{})
-        return expr
+        dispid = self.getExpressionId(expr), term.dispatch_function
+        self.disp_indexes.setdefault(dispid,{})
+        return dispid
 
 
+    def getExpressionId(self,expr):
+        """Replace 'expr' with a local expression ID number"""
 
+        try:
+            return self.expr_map[expr]
+
+        except KeyError:
+
+            expr_def = IDispatchableExpression(expr).asFuncAndIds(self)
+
+            try:
+                return self.expr_map[expr_def]
+            except KeyError:
+                expr_id = len(self.expr_defs)
+                self.expr_map[expr] = self.expr_map[expr_def] = expr_id
+                self.expr_defs.append(expr_def)
+                return expr_id
 
 
 
