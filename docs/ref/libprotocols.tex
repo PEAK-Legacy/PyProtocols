@@ -737,7 +737,7 @@ details are useful for.
 
 
 \item[IOpenProtocol] \hfill \\
-This interface formalizes the idea of an ``open protocol'', that was introduced
+This interface formalizes the ``open protocol'' concept that was introduced
 in section \ref{protocol-concepts}.  An \class{IOpenProtocol} is an
 \class{IAdaptingProtocol} that can also accept declarations made by the
 \module{protocols} declaration API.
@@ -752,8 +752,8 @@ create an instance of an \class{Interface}, that object does not provide
 class (or its instances) can be different.}
 
 In addition to its built-in implementations, the \module{protocols} package
-also supplies and declares an adapter factory that adapts Zope's
-\class{Interface} objects to the \class{IOpenProtocol} interface, thus allowing
+also supplies and declares an adapter factory that adapts Zope X3's
+interface objects to the \class{IOpenProtocol} interface, thus allowing
 you to use Zope interfaces in calls to the declaration API.  Similar adapters
 for other frameworks' interfaces may be added, if there is sufficient demand
 and/or contributed code, and the frameworks' authors will not add the adapters
@@ -764,7 +764,8 @@ to their frameworks.
 An \class{IOpenImplementor} is a class or type that can be told (via the
 declaration API) what protocols its instances provide (or support via an
 \class{IAdapterFactory}).  (Note that this implies that the instances have
-a \class{__conform__} method).
+a \class{__conform__} method, otherwise they would not be able to tell
+\function{adapt()} about the declared support.)
 
 Support for this interface is optional, since types that don't support it
 can still have their instances be adapted by \class{IOpenProtocol} objects.
@@ -772,7 +773,6 @@ The \module{protocols} package does not supply any implementations or adapters
 for this interface, either.  It is intended primarily as a hook for metaclasses
 to receive notification about protocol declarations for their instances (i.e.
 classes), as we will discuss later.
-
 
 
 
@@ -823,8 +823,8 @@ argument.
 There are three types of relationships that a protocol can participate in:
 
 \begin{itemize}
-\item A relationship from a class or type, to a protocol it supports or adapts
-to,
+\item A relationship from a class or type, to a protocol its instances provide
+or adapt to,
 
 \item A relationship from an instance, to a protocol it provides or adapts to,
 and
@@ -836,12 +836,12 @@ to it.
 All of these relationships may be declared by reference to the source type,
 instance or protocol, the desired destination protocol, and the adapter to be
 used. (In the event that no adapter is needed, the special adapter
-\function{protocols.NO_ADAPTER_NEEDED} is specified.)
+\function{NO_ADAPTER_NEEDED} is specified.)
 
 To declare relationships like these, the \module{protocols} declaration API
 provides three ``primitive'' declaration functions.  Each takes a \var{protocol}
-argument that must be adaptable to the \class{IOpenProtocol} interface, an
-adapter function (or \function{protocols.NO_ADAPTER_NEEDED}), and the source
+argument that must support the \class{IOpenProtocol} interface, an
+adapter function (or \function{NO_ADAPTER_NEEDED}), and the source
 type, instance, or protocol.  The functions are
 \function{declareAdapterForType()}, \function{declareAdapterForObject()}, and
 \function{declareAdapterForProtocol()}, respectively.
@@ -859,7 +859,7 @@ functions, \function{declareImplementation}, \function{declareAdapter}, and
 \function{adviseObject}.  These functions are structured to support the most
 common declaration use cases.
 
-For declaring protocol information about a type or class:
+For declaring protocols related to a type or class:
 
 \begin{funcdesc}{declareImplementation}{typ
 \optional{, instancesProvide=[ ]} \optional{, instancesDoNotProvide=[ ]}}
@@ -880,7 +880,7 @@ details.
 \end{funcdesc}
 
 
-For declaring protocol information about a specific instance:
+For declaring protocols related to a specific, individual instance:
 
 \begin{funcdesc}{adviseObject}{ob
 \optional{, provides=[ ]} \optional{, doesNotProvide=[ ]}}
@@ -916,18 +916,194 @@ functions for each of the protocols listed in \var{provides} and each of the
 sources listed in the respective keyword arguments.
 \end{funcdesc}
 
-%Notice that because \function{declareAdapter()} can call all three primitive
-%declaration functions, it is capable of doing
+Although these forms are easier to use than raw \code{declareAdapterForX}
+calls, they still require explicit reference to the types or objects involved.
+For the most common use cases, such as declaring protocol relationships to a
+class, or declaring an adapter class, it is easiest to use the ``magic''
+\function{protocols.advise()} function, which we will discuss next.
 
-%The \module{protocols} package supplies
-%several higher-level APIs that are easier to use,
 
-%Specifying all three items can be tedious, however, when multiple protocols,
-%types
 
-\subsubsection{Convenience Declarations in Class, Protocol and Module Bodies}
 
-advise
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\subsubsection{Convenience Declarations in Class, Interface and Module Bodies}
+
+Adapters, interfaces, and protocol implementations are usually defined in
+Python \code{class} statements.  To make it more convenient to make protocol
+declarations for these classes, the \module{protocols} package supplies the
+\function{advise()} function.  This function  can make declarations about a
+class, simply by being called from the body of that class.  It can also be
+called from the body of a module, to make a declaration about the module.
+
+\begin{funcdesc}{advise}{**kw}
+Declare protocol relationships for the containing class or module.  All
+parameters must be supplied as keyword arguments.  This function must be
+called directly from a class or module body, or a \exception{SyntaxError}
+results at runtime.  Different arguments are accepted, according to whether
+the function is called within a class or module.
+
+When invoked in the top-level code of a module, this function only accepts
+the \code{moduleProvides} keyword argument.  When invoked in the body of a
+class definition, this function accepts any keyword arguments \emph{except}
+\code{moduleProvides}.  The complete list of keyword arguments follows.
+Unless otherwise specified, protocols must support the \class{IOpenProtocol}
+interface.
+
+\note{When used in a class body, this function works by temporarily replacing
+the \code{__metaclass__} of the class.  If your class sets an explicit
+\code{__metaclass__}, it must do so \emph{before} \function{advise()} is
+called, or the protocol declarations will not occur.}
+\end{funcdesc}
+
+
+
+
+
+
+
+
+
+
+
+
+
+Keyword arguments accepted by \function{advise()}:
+
+\begin{description}
+
+\item[instancesProvide]= \var{protocols} \hfill \\
+A sequence of protocols that instances of the containing class provide, without
+needing an adapter.  Supplying this argument is equivalent to calling
+\code{declareImplementation(\var{containing class},\var{protocols})}.
+
+\item[instancesDoNotProvide]= \var{protocols} \hfill \\
+A sequence of protocols that instances of the containing class do not provide.
+This is primarily intended for "rejecting" protocols provided or supported
+by base classes of the containing class.  Supplying this argument is equivalent
+to calling \code{declareImplementation(\var{containing
+class},instancesDoNotProvide=\var{protocols})}.
+
+\item[asAdapterForTypes]= \var{types} \hfill \\
+Declare the containing class as an adapter for \var{types}, to the protocols
+listed by the \code{instancesProvide} argument (which must also be supplied).
+Supplying this argument is equivalent to calling
+\code{declareAdapter(\var{containing class}, \var{instancesProvide},
+forTypes=\var{types})}.  (Note that this means the containing class must be an
+object that provides \class{IAdapterFactory}; i.e., its constructor should
+accept being called with two arguments: the object to be adapted, and the
+target protocol.)
+
+\item[asAdapterForProtocols]= \var{protocols} \hfill \\
+Declare the containing class as an adapter for \var{protocols}, to the
+protocols listed by the \code{instancesProvide} argument (which must also be
+supplied).  Supplying this argument is equivalent to calling
+\code{declareAdapter(\var{containing class}, \var{instancesProvide},
+forProtocols=\var{types})}.  (Note that this means the containing class must be
+an object that provides \class{IAdapterFactory}; i.e., its constructor should
+accept being called with two arguments: the object to be adapted, and the
+target protocol.)
+
+
+
+
+
+
+\item[protocolExtends]= \var{protocols} \hfill \\
+Declare that the containing class is a protocol that extends (i.e., implies)
+the listed protocols.  This keyword argument is intended for use inside class
+statements that themselves define protocols, such as \class{Interface}
+subclasses, and that need to ``inherit'' from incompatible protocols.  For
+example, an \class{Interface} cannot directly subclass a Zope interface,
+because their metaclasses are incompatible.  But using \code{protocolExtends}
+works around this:
+
+\begin{verbatim%
+}import protocols
+from mypackage import ISomeInterface
+from zope.something.interfaces import ISomeZopeInterface
+
+class IAnotherInterface(ISomeInterface):
+    protocols.advise(
+        protocolExtends = [ISomeZopeInterface]
+    )
+    #... etc.
+\end{verbatim}
+
+In the above example, \code{IAnotherInterface} wants to extend both
+\code{ISomeInterface} and \code{ISomeZopeInterface}, but cannot do so directly
+because the interfaces are of incompatible types.  \code{protocolExtends}
+informs the newly created interface that it implies \code{ISomeZopeInterface},
+even though it isn't derived from it.
+
+Using this keyword argument is equivalent to calling
+\code{declareAdapter(NO_ADAPTER_NEEDED, \var{protocols},
+forProtocols=[\var{containing class}])}.  Note that this means that the
+containing class must be an object that supports \class{IOpenProtocol}, such
+as an \class{Interface} subclass.
+
+
+
+
+
+
+
+
+
+\item[protocolIsSubsetOf]= \var{protocols} \hfill \\
+Declare that the containing class is a protocol that is implied (extended) by
+the listed protocols.  This is just like \code{protocolExtends}, but in the
+``opposite direction''.  It allows you to declare (in effect) that some other
+interface is actually a subclass of this one.  See the examples in section
+\ref{protocols-defining} for illustration.
+
+Using this keyword argument is equivalent to calling
+\code{declareAdapter(NO_ADAPTER_NEEDED, [\var{containing class}],
+forProtocols=\var{protocols})}.
+
+\item[classProvides]= \var{protocols} \hfill \\
+Declare that the containing class \emph{itself} provides the specified
+protocols.  Supplying this argument is equivalent to calling
+\code{adviseObject(\var{containing class}, \var{protocols})}.  Note that this
+means that the containing class \emph{must} support the \class{IOpenProvider}
+interface (i.e., it has a metaclass or adapter that provide the necessary
+behavior).  XXX Could we loosen this by double-dispatch via the protocol? That,
+and perhaps adapters for 'type' and 'class'?
+
+\item[classDoesNotProvide]= \var{protocols} \hfill \\
+Declare that the containing class \emph{itself} does not provide the specified
+protocols.  This is for classes that need to reject inherited class-level
+\code{classProvides} declarations.  Supplying this argument is equivalent to
+calling \code{adviseObject(\var{containing class},
+doesNotProvide=\var{protocols})}.  Note that this means that the containing
+class \emph{must} support the \class{IOpenProvider} interface (i.e., it has a
+metaclass or adapter that provide the necessary behavior).
+
+\item[moduleProvides]= \var{protocols} (module context only) \hfill \\
+A sequence of protocols that the enclosing module provides.  Equivalent to
+\code{adviseObject(\var{containing module}, \var{protocols})}.
+
+\end{description}
+
+
+
+
+
+
 
 \subsection{Creating and Using Adapters}
 
@@ -937,6 +1113,35 @@ IAdapterFactory
 \label{proto-implication}}
 
 subsetting, extending...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
