@@ -121,6 +121,252 @@ adaptation protocol used by this package.}
 
 
 
+\subsection{Big Example 1 --- A Python Documentation Framework\label{protocols-example1}}
+
+To provide the reader with a ``feel'' for the use and usefulness of the
+\module{protocols} package, we will begin with a motivating example: a simple
+Python documentation framework.  To avoid getting bogged down in details, we
+will only sketch a skeleton of the framework, highlighting areas where the
+\module{protocols} package would play a part.
+
+First, let's consider the background and requirements.  Python has many
+documentation tools available, ranging from the built-in \program{pydoc} to
+third-party tools such as \program{HappyDoc}, \program{epydoc}, and
+\program{Synopsis}.  Many of these tools generate documentation from ``live''
+Python objects, some using the Python \module{inspect} module to do so.
+
+However, such tools often encounter difficulties in the Python 2.2 world.
+Tools that use \function{type()} checks break with custom metaclasses, and even
+tools that use \function{isinstance()} break when dealing with custom
+descriptor types.  These tools often handle other custom object types poorly as
+well: for example, Zope \class{Interface} objects can cause some versions of
+\function{help()} and \program{pydoc} to crash!
+
+The state of Python documentation tools is an example of the problem that both
+\pep{246} and the \module{protocols} package were intended to solve:
+introspection makes frameworks brittle and unextensible.  We can't easily plug
+new kinds of ``documentables'' into our documentation tools, or control how
+existing objects are documented.  These are exactly the kind of problems that
+component adaptation and open protocols were created to address.
+
+So let's review our requirements for the documentation framework.  First, it
+should work with existing built-in types, without requiring a new version of
+Python.  Second, it should allow users to control how objects are recognized
+and documented.  Third, we want the framework to be flexible enough to create
+different kinds of documentation, like JavaDoc-style HTML, PDF reference
+manuals, plaintext online help or manpages, and so on -- with whatever kinds of
+documentable objects exist.  If user A creates a new ``documentable object,''
+and user B creates a new documentation format, user C should be able to combine
+the two.
+
+
+
+
+To design a framework with the \module{protocols} package, the best place to
+start is often with an ``ideal'' interface.  We pretend that every object is
+already the kind of object that would do everything we need it to do.  In the
+case of documentation, we want objects to be able to tell us their name, what
+kind of object they should be listed as, their base classes (if applicable),
+their call signature (if callable), and their contents (if a namespace).
+
+So let's define our ideal interface, using \class{protocols.Interface}.
+(\note{This is not the only way to define an interface; we could also use an
+abstract base class, or other techniques.  Interface definition is
+discussed further in section \ref{protocols-defining}.})
+
+\begin{verbatim%
+}from protocols import Interface
+
+class IDocumentable(Interface):
+    """A documentable object"""
+
+    def getKind():
+        """Return "kind" string, e.g. "class", "interface", "package", etc."""
+
+    def getName():
+        """Return an unqualified (undotted) name of the object"""
+
+    def getBases():
+        """Return a sequence of objects this object is derived from
+        (or an empty sequence if object is not class/type-like)"""
+
+    def getSignature():
+        """Return a description of the object's call signature, or None"""
+
+    def getSummary():
+        """Return a one-line summary description of the object"""
+
+    def getDoc():
+        """Return documentation for the object (not including its contents)"""
+
+    def getContents(includeInherited):
+        """"Return list of (key,value) pairs for namespace contents, if any"""
+\end{verbatim}
+
+Now, in the ``real world,'' no existing Python objects provide this interface.
+But, if every Python object did, we'd be in great shape for writing
+documentation tools.  The tools could focus purely on issues of formatting and
+organization, not ``digging up dirt'' on what to say about the
+objects.
+
+Notice that we don't need to care whether an object is a type or a module or a
+staticmethod or something else.  If a future version of Python made modules
+callable or functions able to somehow inherit from other functions, we'd be
+covered, as long as those new objects supported the methods we described.  Even
+if a tool needs to care about the ``package'' kind vs. the ``module'' kind for
+formatting or organizational reasons, it can easily be written to assume that
+new ``kinds'' might still appear.  For example, an index generator might just
+generate separate alphabetical indexes for each ``kind'' it encounters during
+processing.
+
+Okay, so we've envisioned our ideal scenario, and documented it as an
+interface.  Now what?  Well, we could start writing documentation tools that
+expect to be given objects that support the \class{IDocumentable} interface,
+but that wouldn't be very useful, since we don't have any \class{IDocumentable}
+objects yet.  So let's define some \strong{adapters} for built-in types, so
+that we have something for our tools to document.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\begin{verbatim%
+}from protocols import advise
+from types import FunctionType
+
+class FunctionAsDocumentable(object):
+
+    advise(
+        # Declare that this class provides IDocumentable for FunctionType
+        # (we'll explain this further in later sections)
+
+        provides = [IDocumentable],
+        asAdapterForTypes = [FunctionType],
+    )
+
+    def __init__(self, ob, protocol):
+        self.func = ob
+
+    def getKind(self):
+        return "function"
+
+    def getName(self):
+        return self.func.func_name
+
+    def getBases(self):
+        return ()
+
+    # ... etc.
+
+
+\end{verbatim}
+
+The \class{FunctionAsDocumentable} class wraps a function object with the
+methods of an \class{IDocumentable}, giving us the behavior we need to document
+it.  Now all we need to do is define similar wrappers for all the other
+built-in types, and for any user-defined types, and then pick the right kind of
+wrapper to use when given an object to document.
+
+But wait! Isn't this just as complicated as writing a documentation tool the
+``old fashioned'' way?  We still have to write code to get the data we need,
+\emph{and} we still need to figure out what code to use.  Where's the benefit?
+
+Enter the \pep{246} \function{adapt()} function.  \function{adapt()} has two
+required arguments: an object to adapt, and a \strong{protocol} that you want
+it adapted to.  Our documentation tool, when given an object to document, will
+simply call \code{adapt(object,IDocumentable)} and receive an instance of the
+appropriate adapter.  (Or, if the object has already declared that it supports
+\class{IDocumentable}, we'll simply get the same object back from
+\function{adapt()} that we passed in.)
+
+But that's only the beginning.  If we create and distribute a documentation
+tool based on \class{IDocumentable}, then anyone who creates a new kind of
+documentable object can write their own adapters, and register them via the
+\module{protocols} package, \emph{without} changing the documentation tool, or
+needing to give special configuration options to the tool or call tool-specific
+registration functions.  (Which means we don't have to design or code those
+options or registration functions into our tool.)
+
+Also, lets say I use some kind of ``finite state machine'' library written by
+vendor A, and I'd like to use it with this new documentation tool from vendor
+B.  I can write and register adapters from such types as ``finite state
+machine,'' ``state,'' and ``transition'' to \class{IDocumentable}.  I can then
+use vendor B's tool to document vendor A's object types.
+
+And it goes further.  Suppose vendor C comes out with a new super-duper
+documentation framework with advanced features.  To use the new features,
+however, a more sophisticated interface than \class{IDocumentable} is needed.
+So vendor C's tool requires objects to support his new
+\class{ISuperDocumentable} interface.  What happens then?  Is the new package
+doomed to sit idle because everybody else only has \class{IDocumentable}
+objects?
+
+Heck no.  At least, not if vendor C starts by defining an adapter from
+\class{IDocumentable} to \class{ISuperDocumentable} that supplies reasonable
+default behavior for ``older'' objects.  Then he or she writes adapters from
+built-in types to \class{ISuperDocumentable} that provide more
+useful-than-default behaviors where applicable.  Now, the super-framework is
+instantly usable with existing adapters for other object types.  And, if vendor
+C defined \class{ISuperDocumentable} as \emph{extending} \class{IDocumentable},
+there's another benefit, too.
+
+
+
+Suppose vendor A upgrades their finite state machine library to include direct
+or adapted support for the new \class{ISuperDocumentable} interface.  Do I need
+to switch to vendor C's documentation tool now?  Must I continue to maintain my
+FSM-to-\class{IDocumentable} adapters?  No, to both questions.  If
+\class{ISuperDocumentable} is a strict extension of \class{IDocumentable}, then
+I may use an \class{ISuperDocumentable} anywhere an \class{IDocumentable} is
+accepted.  Thus, I can use vendor A's new library with my existing
+(non-``super'') documentation tool from vendor B, without needing my old
+adapters any more.
+
+As you can see, replacing introspection with adaptation makes frameworks more
+flexible and extensible.  It also simplifies the design process, by letting you
+focus on what you \emph{want} to do, instead of on the details of which objects
+are doing it.
+
+As we mentioned at the beginning of this section, this example is only a sketch
+of a skeleton of a real documentation framework.  For example, a real
+documentation framework would also need to define an \class{ISignature}
+interface for objects returned from \method{getSignature()}.  We've also
+glossed over many other issues that the designers of a real documentation
+framework would face, in order to focus on the problems that can be readily
+solved with adaptable components.
+
+And that's our point, actually.  Every kind of framework has two kinds of
+design issues: issues specific to the framework's subject area, and issues that
+apply to frameworks in general.  The \module{protocols} package can save you a
+lot of work dealing with the latter, letting you spend more time on the former.
+In the sections that follow, we'll show you how.
+
+
+
+
+
+
+
+
+
+
+
+
+
 \subsection{Protocols and Interfaces \label{protocol-concepts}}
 
 Many languages and systems provide ways of defining \strong{interfaces} that
@@ -495,7 +741,6 @@ the availability of a standard mechanism for adaptation means that the
 extension mechanism need only be documented once: right here in this
 document.
 
-
 In section \ref{introspect-elim}, we will present examples of how to
 refactor all three kinds of introspection code to purely adaptation-driven
 code, showing how the flexibility and readability of the code improves in the
@@ -510,6 +755,7 @@ Considered Harmful}{A brief critique of common justifications for using
 introspection}
 
 \end{seealso}
+
 
 
 
@@ -809,14 +1055,16 @@ are classes supplied by \module{protocols}, or built-in types that are
 automatically adapted to the interface.
 
 We will not, however, go into details here about the methods and behavior
-required by each interface.  We will leave such detailed discussions to
-section \ref{customizing-adaptation}, ``Customizing and Extending the
-Declaration API'', since customization and extension are all that the
-details are useful for.
+required by each interface, as those details can be found in section
+\ref{protocols-interfaces-module}.
+
+
+
+
+
+
 
 \begin{description}
-
-
 
 \item[IOpenProtocol] \hfill \\
 This interface formalizes the ``open protocol'' concept that was introduced
@@ -855,8 +1103,6 @@ The \module{protocols} package does not supply any implementations or adapters
 for this interface, either.  It is intended primarily as a hook for classes
 to be able to receive notification about protocol declarations for their
 instances.
-
-
 
 
 \item[IOpenProvider] \hfill \\
@@ -934,7 +1180,7 @@ of the higher level functions in the declaration API.  These higher-level
 functions may make several calls to the primitive functions on your behalf, or
 supply useful defaults for certain parameters.  They are, however, based
 entirely on the primitive functions, which is important for customizations and
-extensions.  This will be covered more in section \ref{customizing-adaptation}.
+extensions.
 
 The next higher layer of declaration APIs are the explicit declaration
 functions: \function{declareImplementation}, \function{declareAdapter}, and
@@ -1436,8 +1682,8 @@ for more details on these and other functions that relate to adapter paths.
 \subsection{Package Contents and Contained Modules\label{protocols-contents}}
 
 The following functions, classes, and interfaces are available from the
-top-level \module{protocols} package.  (The list is arranged in order of
-their expected frequency of use, with most frequently used items listed first.)
+top-level \module{protocols} package.  They are arranged in order of
+their expected frequency of use, with most frequently used items listed first.
 
 \begin{funcdesc}{adapt}{component, protocol,
 \optional{, default \optional{, factory}}}
@@ -1574,6 +1820,7 @@ items listed in the respective keyword arguments.
 \end{funcdesc}
 
 
+XXX Attribute
 
 
 
@@ -1596,6 +1843,12 @@ items listed in the respective keyword arguments.
 
 
 
+\subsubsection{Classes and Functions typically used for Customization/Extension}
+
+These classes and functions are also available from the top-level
+\module{protocols} package.  In contrast to the items already covered, these
+classes and functions are generally needed only when extending the protocols
+framework, as opposed to merely using it.
 
 \begin{classdesc*}{Protocol}
 \class{Protocol} is a base class that implements the \class{IOpenProtocol}
@@ -1624,13 +1877,6 @@ statements.  You may set a class' \code{__metaclass__} to
 will only use \class{InterfaceClass} if you need to combine it with another
 metaclass, in a subclass of \class{Interface}.
 \end{classdesc}
-
-
-
-
-
-
-
 
 
 
@@ -1720,6 +1966,13 @@ calling its \function{addImpliedProtocol} method.
 
 
 
+\subsubsection{\module{protocols.interfaces} --- Package Interfaces\label{protocol-interfaces-module}}
+\declaremodule{protocols-interfaces}{protocols.interfaces}
+
+\note{All of the interfaces listed here can also be imported directly from the
+top-level \module{protocols} package.  However, you will probably only need
+them if you are extending the framework, as opposed to merely using it.}
+
 \begin{classdesc*}{IOpenProtocol}
 This interface documents the behavior required of protocol objects in order to
 be used with the \module{protocols} declaration API (the functions whose names
@@ -1727,7 +1980,6 @@ begin with \code{declare} or \code{advise}.)  The declaration API functions
 will attempt to \function{adapt()} supplied protocols to this interface.
 
 The methods an \class{IOpenProtocol} implementation must supply are:
-
 
 \begin{methoddesc}{addImpliedProtocol}{proto, adapter, depth}
 Declare that this protocol can be adapted to protocol \var{proto} via the
@@ -1742,7 +1994,6 @@ notifications unless the new \var{adapter} and \var{depth} represent a
 ``shorter path'' as described in section \ref{proto-implication}.
 \end{methoddesc}
 
-
 \begin{methoddesc}{registerImplementation}{klass, adapter, depth}
 Declare that instances of type or class \var{klass} can be adapted to this
 protocol via the \class{IAdapterFactory} supplied in \var{adapter}, at the
@@ -1755,11 +2006,6 @@ protocol already knew a way to adapt instances of \var{klass}, this method
 should be a no-op unless the new \var{adapter} and \var{depth} represent a
 ``shorter path'' as described in section \ref{proto-implication}.
 \end{methoddesc}
-
-
-
-
-
 
 \begin{methoddesc}{registerObject}{ob, adapter, depth}
 Ensure that the specific object \var{ob} will be adapted to this protocol via
@@ -2050,6 +2296,13 @@ and \method{get()} methods.  Values stored in the mapping will be
 
 \subsubsection{\module{protocols.advice} --- Metaclasses and other ``Magic''}
 \declaremodule{protocols-advice}{protocols.advice}
+
+This module provides a variety of utility functions and classes used by the
+\module{protocols} package.  None of them are really specific to the package,
+and so may be useful to other libraries or applications.
+
+XXX
+
 addClassAdvisor
 
 isClassAdvisor
@@ -2068,9 +2321,6 @@ mkRef
 
 StrongRef
 
-\subsubsection{\module{protocols.classic} --- Adapters to support built-in types
-and Zope Interfaces}
-\declaremodule{protocols-classic}{protocols.classic}
 
 
 
@@ -2085,60 +2335,8 @@ and Zope Interfaces}
 
 
 
+\subsection{Big Example 2 --- Extending the Framework for Context\label{protocols-context}}
 
-
-
-
-\subsection{Customizing and Extending the Declaration API\label{customizing-adaptation}}
-
-
-\subsubsection{The \class{IOpenProtocol} Interface \label{open-protocols}}
-
-\begin{classdesc*}{IOpenProtocol}
-\class{IOpenProtocol} is an interface object representing the behavior a
-protocol object must provide, to be usable with the \module{protocols}
-declaration API.  (That is, functions whose names begin with \code{declare}
-or \code{advise}.)
-
-Although the \module{protocols} package supplies a default implementation of
-this interface (\class{protocols.Protocol}), you may use any object that
-supports this interface as a protocol for the declaration APIs.
-
-\class{IOpenProtocol} is a subclass of \class{IAdaptingProtocol}.  A complete
-description of the methods this interface requires is in section
-\ref{protocols-implementing}.
-\end{classdesc*}
-
-IOpenProtocol
-
-metaclass issues, fwd ref to metamethod and supermeta
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-\subsubsection{Customizing Class/Type Declaration Management}
-
-IOpenImplementor
-
-\subsubsection{Customizing Single-Object Declaration Management}
-
-IOpenProvider
-
-\subsubsection{Using Protocol Objects}
 Although most common uses for protocols can be served by using \class{Interface}
 objects, there are sometimes situations that call for a dynamically created
 protocol, or a new kind of protocol with added or changed behaviors.
@@ -2146,13 +2344,20 @@ protocol, or a new kind of protocol with added or changed behaviors.
 For these situations, one may wish to use the \class{Protocol} or
 \class{InterfaceClass} classes directly.
 
-Protocol
 
-InterfaceClass
 
-IAdaptingProtocol
 
-IOpenProtocol
+
+
+
+
+
+
+
+
+
+
+
 
 
 
