@@ -1,7 +1,7 @@
 from protocols import Interface, Attribute
 
 __all__ = [
-    'IDispatchFunction', 'ITest', 'ISignature', 'IDispatchPredicate',
+    'IDispatchFunction', 'ICriterion', 'ISignature', 'IDispatchPredicate',
     'IDispatcher', 'AmbiguousMethod', 'NoApplicableMethods',
     'IDispatchableExpression', 'IGenericFunction', 'IDispatchTable',
     'EXPR_GETTER_ID','IExtensibleFunction',
@@ -39,18 +39,18 @@ EXPR_GETTER_ID = -1
 
 
 
-class ITest(Interface):
+class ICriterion(Interface):
+    """A criterion to be applied to an expression
 
-    """A test to be applied to an expression
-
-    A test comprises a "dispatch function" (the kind of test to be applied,
-    such as an 'isinstance()' test or range comparison) and a value or values
-    that the expression must match.  Note that a test describes only the
-    test(s) to be performed, not the expression to be tested.
+    A criterion comprises a "dispatch function" (that determines how the
+    criterion will be checked, such as an 'isinstance()' check or range
+    comparison) and a value or values that the expression must match.  Note
+    that a criterion describes only the check(s) to be performed, not the
+    expression to be checked.
     """
 
     dispatch_function = Attribute(
-        """'IDispatchFunction' that should be used for dispatching this test"""
+        """'IDispatchFunction' that should be used for checking"""
     )
 
     def seeds(table):
@@ -61,11 +61,11 @@ class ITest(Interface):
         'dispatch_function' for interpretation."""
 
     def __contains__(key):
-        """Return true if test is true for 'key'
+        """Return true if criterion is true for 'key'
 
         This method will be passed each seed provided by this or any other
-        tests with the same 'dispatch_function' that are being applied to the
-        same expression."""
+        criteria with the same 'dispatch_function' that are being applied to
+        the same expression."""
 
     def __eq__(other):
         """Return true if equal"""
@@ -74,37 +74,37 @@ class ITest(Interface):
         """Return false if equal"""
 
     def __invert__():
-        """Return an inverse version of this test (i.e. 'not test')"""
+        """Return an inverse version of this criterion (i.e. '~criterion')"""
 
-    def implies(otherTest):
-        """Return true if truth of this test implies truth of 'otherTest'"""
+    def implies(other):
+        """Return true if truth of this criterion implies truth of 'other'"""
 
 
     def matches(table):
-        """Return iterable of keys from 'table' that this test is true for"""
+        """Return iterable of keys from 'table' that this criterion matches"""
 
 
     def subscribe(listener):
-        """Call 'listener.testChanged()' if test's applicability changes
+        """Call 'listener.criterionChanged()' if applicability changes
 
         Multiple calls with the same listener should be treated as a no-op."""
 
     def unsubscribe(listener):
-        """Stop calling 'listener.testChanged()'
+        """Stop calling 'listener.criterionChanged()'
 
         Unsubscribing a listener that was not subscribed should be a no-op."""
 
 
 
 class IDispatchFunction(Interface):
-    """Test to be applied to an expression to navigate a dispatch node"""
+    """Determine what path to take at a dispatch node, given an expression"""
 
     def __call__(ob,table):
         """Return entry from 'table' that matches 'ob' ('None' if not found)
 
-        'table' is an 'IDispatchTable' mapping test seeds to dispatch nodes.
-        The dispatch function should return the appropriate entry from the
-        dictionary."""
+        'table' is an 'IDispatchTable' mapping criterion seeds to dispatch
+        nodes.  The dispatch function should return the appropriate entry from
+        the dictionary."""
 
     def __eq__(other):
         """Return true if equal"""
@@ -137,17 +137,17 @@ class IDispatchTable(Interface):
 
 class ISignature(Interface):
 
-    """Mapping from expression id -> applicable class/dispatch test
+    """Ordered mapping from expression id -> criterion that should be applied
 
     Note that signatures do not/should not interpret expression IDs; the IDs
     may be any object that can be used as a dictionary key.
     """
 
     def items():
-        """Iterable of all '((id,disp_func),test)' pairs for this signature"""
+        """Sequence of '((id,disp_func),criterion)' pairs for this signature"""
 
     def get(expr_id):
-        """Return this signature's 'ITest' for 'expr_id'"""
+        """Return this signature's 'ICriterion' for 'expr_id'"""
 
     def implies(otherSig):
         """Return true if this signature implies 'otherSig'"""
@@ -225,11 +225,11 @@ class IDispatcher(Interface):
         This method, if you want the ID corresponding to a function that will
         return the value of any other expression whose ID is passed to it."""
 
-    def testChanged():
-        """Notify that a test has changed meaning, invalidating any indexes"""
+    def criterionChanged():
+        """Notify that a criterion has changed meaning, invalidating indexes"""
 
     def clear():
-        """Empty all signatures, methods, tests, expressions, etc."""
+        """Empty all signatures, methods, criteria, expressions, etc."""
 
 
 

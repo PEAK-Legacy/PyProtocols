@@ -703,7 +703,7 @@ class PredicateTests(TestCase):
         pe = lambda e: parse(e,locals(),globals())
 
         x_cmp_y = lambda n: Signature([
-            (Call(getattr(operator,n),x,y),TruthTest())
+            (Call(getattr(operator,n),x,y),TruthCriterion())
         ])
 
         x,y = Argument(name='x'),Argument(name='y')
@@ -739,30 +739,30 @@ class PredicateTests(TestCase):
     def testParseMembership(self):
         parse = GenericFunction(lambda x,y,z:None).parse
         pe = lambda e: parse(e,locals(),globals())
-        in_test = lambda seq: OrTest(*[Inequality('==',v) for v in seq])
+        in_test = lambda seq: OrCriterion(*[Inequality('==',v) for v in seq])
 
         self.assertEqual(pe('x in int'), Signature(x=int))
-        self.assertEqual(pe('x not in int'), Signature(x=NotTest(int)))
+        self.assertEqual(pe('x not in int'), Signature(x=NotCriterion(int)))
         self.assertEqual(pe('x in (1,2,3)'), Signature(x=in_test([1,2,3])))
         self.assertEqual(pe('x not in (1,2,3)'),
             Signature(x=~in_test([1,2,3])))
 
         self.assertEqual(pe('x is 1'),
             Signature([(Call(predicates.is_,Argument(name='x'),Const(1)),
-                TruthTest())]))
+                TruthCriterion())]))
 
         self.assertEqual(pe('x is not 1'),
             Signature([(Call(predicates.is_,Argument(name='x'),Const(1)),
-                TruthTest(False))]))
+                TruthCriterion(False))]))
 
         # optimization when 'is None' and type tests occur on an expression
         self.assertEqual(pe('x is None'),Signature(x=types.NoneType))
         self.assertEqual(pe('x is not None'),
-            Signature(x=NotTest(types.NoneType)))
+            Signature(x=NotCriterion(types.NoneType)))
 
         self.assertEqual(pe('not (x is not None)'),Signature(x=types.NoneType))
         self.assertEqual(pe('not (x is None)'),
-            Signature(x=NotTest(types.NoneType)))
+            Signature(x=NotCriterion(types.NoneType)))
 
 
 
@@ -783,23 +783,23 @@ class PredicateTests(TestCase):
 
         self.assertEqual(pe('isinstance(x,int)'), Signature(x=int))
         self.assertEqual(pe('isinstance(x,(str,unicode))'),
-            Signature(x=OrTest(str,unicode)))
+            Signature(x=OrCriterion(str,unicode)))
         self.assertEqual(pe('isinstance(x,(int,(str,unicode)))'),
-            Signature(x=OrTest(int,str,unicode)))
+            Signature(x=OrCriterion(int,str,unicode)))
         self.assertEqual(pe('not isinstance(x,(int,(str,unicode)))'),
-            Signature(x=~OrTest(int,str,unicode)))
+            Signature(x=~OrCriterion(int,str,unicode)))
 
         self.assertEqual(
-            pe('issubclass(x,int)'), Signature(x=SubclassTest(int)))
+            pe('issubclass(x,int)'), Signature(x=SubclassCriterion(int)))
         self.assertEqual(pe('issubclass(x,(str,unicode))'),
-            Signature(x=OrTest(SubclassTest(str),SubclassTest(unicode))))
+            Signature(x=OrCriterion(
+                SubclassCriterion(str),SubclassCriterion(unicode))))
         self.assertEqual(pe('issubclass(x,(int,(str,unicode)))'),
-            Signature(x=OrTest(*map(SubclassTest,(int,str,unicode)))))
+            Signature(
+                x=OrCriterion(*map(SubclassCriterion,(int,str,unicode)))))
         self.assertEqual(pe('not issubclass(x,(int,(str,unicode)))'),
-            Signature(x=~OrTest(*map(SubclassTest,(int,str,unicode)))))
-
-
-
+            Signature(
+                x=~OrCriterion(*map(SubclassCriterion,(int,str,unicode)))))
 
 
 
@@ -834,11 +834,11 @@ class PredicateTests(TestCase):
         # Verify 'not' pushes down to the operators
         self.assertEqual(
             pe('not(x in int or y in str)'),
-            Signature(x=NotTest(int),y=NotTest(str))
+            Signature(x=NotCriterion(int),y=NotCriterion(str))
         )
 
         self.assertEqual(pe('not( x in int and y in str)'),Predicate([
-            Signature(x=NotTest(int)), Signature(y=NotTest(str))
+            Signature(x=NotCriterion(int)), Signature(y=NotCriterion(str))
         ]))
 
         # ...and cancels out nested not's

@@ -1,7 +1,7 @@
 from __future__ import generators
 from dispatch import *
 from dispatch.strategy import Inequality, Signature, ExprBase, default
-from dispatch.strategy import SubclassTest, NullTest
+from dispatch.strategy import SubclassCriterion, NullCriterion
 from dispatch.ast_builder import build
 
 import protocols, operator, dispatch
@@ -9,9 +9,9 @@ from types import NoneType
 
 __all__ = [
     'Call',
-    'AndTest', 'OrTest', 'NotTest', 'TruthTest', 'ExprBuilder',
-    'Const', 'Getattr', 'Tuple', 'dispatch_by_truth',
-    'OrExpr', 'AndExpr', 'TestBuilder', 'expressionSignature',
+    'AndCriterion', 'OrCriterion', 'NotCriterion', 'TruthCriterion',
+    'ExprBuilder', 'Const', 'Getattr', 'Tuple', 'dispatch_by_truth',
+    'OrExpr', 'AndExpr', 'CriteriaBuilder', 'expressionSignature',
 ]
 
 # Helper functions for operations not supplied by the 'operator' module
@@ -408,68 +408,69 @@ class Call(ExprBase):
 
 
 
-class MultiTest(object):
-    """Abstract base for boolean combinations of tests"""
+class MultiCriterion(object):
+    """Abstract base for boolean combinations of criteria"""
 
-    protocols.advise(instancesProvide=[ITest])
+    protocols.advise(instancesProvide=[ICriterion])
     elim_single = True
 
-    def __new__(klass,*tests):
-        tests, alltests = map(ITest,tests), []
-        df = tests[0].dispatch_function
-        for t in tests:
-            if t.dispatch_function is not df:
-                raise ValueError("Mismatched dispatch types", tests)
-            if t.__class__ is klass and klass.elim_single:
-                # flatten nested tests
-                alltests.extend([t for t in t.tests if t not in alltests])
-            elif t not in alltests:
-                alltests.append(t)
-        if klass.elim_single and len(alltests)==1:
-            return alltests[0]
+    def __new__(klass,*criteria):
+        criteria, all = map(ICriterion,criteria), []
+        df = criteria[0].dispatch_function
+        for c in criteria:
+            if c.dispatch_function is not df:
+                raise ValueError("Mismatched dispatch types", criteria)
+            if c.__class__ is klass and klass.elim_single:
+                # flatten nested criteria
+                all.extend([c for c in c.criteria if c not in all])
+            elif c not in all:
+                all.append(c)
+        if klass.elim_single and len(all)==1:
+            return all[0]
         self = object.__new__(klass)
         self.dispatch_function = df
-        self.tests = tuple(alltests)
+        self.criteria = tuple(all)
         return self
 
     def seeds(self,table):
         seeds, mytable = {}, table.copy()
-        for test in self.tests:
-            new_seeds = test.seeds(mytable)
+        for criterion in self.criteria:
+            new_seeds = criterion.seeds(mytable)
             for seed in new_seeds:
                 mytable[seed]=[]
                 seeds[seed]=True
         return seeds.keys()
 
     def subscribe(self,listener):
-        for test in self.tests:
-            test.subscribe(listener)
+        for criterion in self.criteria:
+            criterion.subscribe(listener)
 
     def unsubscribe(listener):
-        for test in self.tests:
-            test.unsubscribe(listener)
+        for criterion in self.criteria:
+            criterion.unsubscribe(listener)
 
     def __contains__(self,key):
         raise NotImplementedError
 
     def __eq__(self,other):
-        return other.__class__ is self.__class__ and self.tests==other.tests
+        return other.__class__ is self.__class__ and \
+            self.criteria==other.criteria
 
     def __ne__(self,other):
         return not self.__eq__(other)
 
-    def implies(self,otherTest):
-        otherTest = ITest(otherTest)
+    def implies(self,other):
+        other = ICriterion(other)
         for seed in self.seeds({}):
-            if seed in self and seed not in otherTest:
+            if seed in self and seed not in other:
                 return False
-        for seed in otherTest.seeds({}):
-            if seed in self and seed not in otherTest:
+        for seed in other.seeds({}):
+            if seed in self and seed not in other:
                 return False
         return True
 
     def __repr__(self):
-        return '%s%r' % (self.__class__.__name__,tuple(self.tests))
+        return '%s%r' % (self.__class__.__name__,tuple(self.criteria))
 
     def matches(self,table):
         for key in table:
@@ -489,29 +490,28 @@ class MultiTest(object):
 
 
 
-
-class AndTest(MultiTest):
-    """All tests must return true for expression"""
+class AndCriterion(MultiCriterion):
+    """All criteria must return true for expression"""
 
     def __invert__(self):
-        return OrTest(*[~test for test in self.tests])
+        return OrCriterion(*[~cri for cri in self.criteria])
 
     def __contains__(self,key):
-        for test in self.tests:
-            if key not in test:
+        for criterion in self.criteria:
+            if key not in criterion:
                 return False
         return True
 
 
-class OrTest(MultiTest):
-    """At least one test must return true for expression"""
+class OrCriterion(MultiCriterion):
+    """At least one criterion must return true for expression"""
 
     def __invert__(self):
-        return AndTest(*[~test for test in self.tests])
+        return AndCriterion(*[~cri for cri in self.criteria])
 
     def __contains__(self,key):
-        for test in self.tests:
-            if key in test:
+        for criterion in self.criteria:
+            if key in criterion:
                 return True
         return False
 
@@ -531,20 +531,20 @@ class OrTest(MultiTest):
 
 
 
-class NotTest(MultiTest):
+class NotCriterion(MultiCriterion):
 
     elim_single = False
 
-    def __init__(self, test):
-        test = self.test = ITest(test)
-        self.tests = test,
-        self.dispatch_function = test.dispatch_function
+    def __init__(self, criterion):
+        criterion = self.criterion = ICriterion(criterion)
+        self.criteria = criterion,
+        self.dispatch_function = criterion.dispatch_function
 
     def __invert__(self):
-        return self.test
+        return self.criterion
 
     def __contains__(self,key):
-        return key not in self.test
+        return key not in self.criterion
 
 
 
@@ -572,11 +572,11 @@ def dispatch_by_truth(ob,table):
 
 
 
-class TruthTest(object):
+class TruthCriterion(object):
 
-    """Test representing truth or falsity of an expression"""
+    """Criterion representing truth or falsity of an expression"""
 
-    protocols.advise(instancesProvide=[ITest])
+    protocols.advise(instancesProvide=[ICriterion])
 
     dispatch_function = staticmethod(dispatch_by_truth)
 
@@ -589,37 +589,37 @@ class TruthTest(object):
     def __contains__(self,key):
         return key==self.truth
 
-    def implies(self,otherTest):
-        return self.truth in ITest(otherTest)
+    def implies(self,other):
+        return self.truth in ICriterion(other)
 
     def subscribe(self,listener): pass
     def unsubscribe(listener):    pass
 
-    def __eq__(self,otherTest):
-        return isinstance(otherTest,TruthTest) and self.truth==otherTest.truth
+    def __eq__(self,other):
+        return isinstance(other,TruthCriterion) and self.truth==other.truth
 
-    def __ne__(self,otherTest):
-        return not self.__eq__(otherTest)
+    def __ne__(self,other):
+        return not self.__eq__(other)
 
     def __invert__(self):
-        return TruthTest(not self.truth)
+        return TruthCriterion(not self.truth)
 
     def matches(self,table):
         return self.truth,
 
-
-
+    def __repr__(self):
+        return "TruthCriterion(%r)" % self.truth
 
 
 
 
 [dispatch.generic()]
-def expressionSignature(expr,test):
-    """Return an ISignature that applies 'test' to 'expr'"""
+def expressionSignature(expr,criterion):
+    """Return an ISignature that applies 'criterion' to 'expr'"""
 
 [expressionSignature.when(default)]
-def expressionSignature(expr,test):
-    return Signature([(expr,test)])
+def expressionSignature(expr,criterion):
+    return Signature([(expr,criterion)])
 
 
 
@@ -654,11 +654,11 @@ def expressionSignature(expr,test):
 
 
 
-class TestBuilder:
+class CriteriaBuilder:
 
     bind_globals = True
     simplify_comparisons = True
-    mode = TruthTest(True)
+    mode = TruthCriterion(True)
 
     def __init__(self,arguments,*namespaces):
         self.expr_builder = ExprBuilder(arguments,*namespaces)
@@ -678,7 +678,7 @@ class TestBuilder:
             self.__class__ = NotBuilder
             return build(self,expr)
         finally:
-            self.__class__ = TestBuilder
+            self.__class__ = CriteriaBuilder
 
 
     _mirror_ops = {
@@ -710,17 +710,18 @@ class TestBuilder:
             else:
                 if op=='is' or op=='is not':
                     if right.value is None:
-                        right = ITest(NoneType)
+                        right = ICriterion(NoneType)
                         if op=='is not':
                             right = ~right
                     else:
-                        left, right = Call(is_,left,right), TruthTest(op=='is')
+                        left = Call(is_,left,right)
+                        right = TruthCriterion(op=='is')
                 else:
                     right = Inequality(op,right.value)
                 return Signature([(left, right)])
 
         # Both sides involve variables or an un-optimizable constant,
-        #  so it's a generic boolean test  :(
+        #  so it's a generic boolean criterion  :(
         return expressionSignature(
             self.expr_builder.Compare(initExpr,((op,other),)), self.mode
         )
@@ -735,36 +736,35 @@ class TestBuilder:
 
 
 
-
-def compileIn(expr,test,truth):
-    """Return a signature or predicate (or None) for 'expr in test'"""
+def compileIn(expr,criterion,truth):
+    """Return a signature or predicate (or None) for 'expr in criterion'"""
     try:
-        iter(test)
+        iter(criterion)
     except TypeError:
-        return applyTest(expr,test,truth)
+        return applyCriterion(expr,criterion,truth)
 
     if truth:
-        test = OrTest(*[Inequality('==',v) for v in test])
+        criterion = OrCriterion(*[Inequality('==',v) for v in criterion])
     else:
-        test = AndTest(*[Inequality('<>',v) for v in test])
+        criterion = AndCriterion(*[Inequality('<>',v) for v in criterion])
 
-    return Signature([(expr,test)])
-
-
-[dispatch.on('test')]
-def applyTest(expr,test,truth):
-    """Apply 'test' to 'expr' (ala 'expr in test') -> signature or predicate"""
+    return Signature([(expr,criterion)])
 
 
-[applyTest.when(ITest)]
-def applyITest(expr,test,truth):
+[dispatch.on('criterion')]
+def applyCriterion(expr,criterion,truth):
+    """Apply 'criterion' to 'expr' (ala 'expr in criterion') -> sig or pred"""
+
+
+[applyCriterion.when(ICriterion)]
+def applyICriterion(expr,criterion,truth):
     if not truth:
-        test = ~test
-    return Signature([(expr,test)])
+        criterion = ~criterion
+    return Signature([(expr,criterion)])
 
 
-[applyTest.when(object)]
-def applyDefault(expr,test,truth):
+[applyCriterion.when(object)]
+def applyDefault(expr,criterion,truth):
     return None     # no special application possible
 
 
@@ -777,20 +777,20 @@ def applyDefault(expr,test,truth):
 
 
 
-class NotBuilder(TestBuilder):
+class NotBuilder(CriteriaBuilder):
 
-    mode = TruthTest(False)
+    mode = TruthCriterion(False)
 
     def Not(self,expr):
         try:
-            self.__class__ = TestBuilder
+            self.__class__ = CriteriaBuilder
             return build(self,expr)
         finally:
             self.__class__ = NotBuilder
 
     # Negative logic for and/or
-    And = TestBuilder.Or
-    Or  = TestBuilder.And
+    And = CriteriaBuilder.Or
+    Or  = CriteriaBuilder.And
 
     _rev_ops = {
         '>': '<=', '>=': '<', '=>': '<',
@@ -803,8 +803,8 @@ class NotBuilder(TestBuilder):
     def Compare(self,initExpr,((op,other),)):
         op = self._rev_ops[op]
         try:
-            self.__class__ = TestBuilder
-            return TestBuilder.Compare(self,initExpr,((op,other),))
+            self.__class__ = CriteriaBuilder
+            return CriteriaBuilder.Compare(self,initExpr,((op,other),))
         finally:
             self.__class__ = NotBuilder
 
@@ -818,9 +818,9 @@ class NotBuilder(TestBuilder):
 
 
 
-def _tupleToOrTest(ob):
+def _tupleToOrCriterion(ob):
     if isinstance(ob,tuple):
-        return OrTest(*map(_tupleToOrTest,ob))
+        return OrCriterion(*map(_tupleToOrCriterion,ob))
     return ob
 
 [expressionSignature.when(
@@ -828,29 +828,29 @@ def _tupleToOrTest(ob):
     "expr in Call and expr.function==isinstance"
     " and len(expr.argexprs)==2 and expr.argexprs[1] in Const"
 )]
-def convertIsInstanceToClassTest(expr,test):
-    typecheck = _tupleToOrTest(expr.argexprs[1].value)
+def convertIsInstanceToClassCriterion(expr,criterion):
+    typecheck = _tupleToOrCriterion(expr.argexprs[1].value)
 
-    if not test.truth:
+    if not criterion.truth:
         typecheck = ~typecheck
 
     return Signature([(expr.argexprs[0],typecheck)])
 
 
-def _tupleToSubclassTest(ob):
+def _tupleToSubclassCriterion(ob):
     if isinstance(ob,tuple):
-        return OrTest(*map(_tupleToSubclassTest,ob))
-    return SubclassTest(ob)
+        return OrCriterion(*map(_tupleToSubclassCriterion,ob))
+    return SubclassCriterion(ob)
 
 [expressionSignature.when(
     # matches 'issubclass(expr,Const)'
     "expr in Call and expr.function==issubclass"
     " and len(expr.argexprs)==2 and expr.argexprs[1] in Const"
 )]
-def convertIsSubclassToSubClassTest(expr,test):
-    typecheck = _tupleToSubclassTest(expr.argexprs[1].value)
+def convertIsSubclassToSubClassCriterion(expr,criterion):
+    typecheck = _tupleToSubclassCriterion(expr.argexprs[1].value)
 
-    if not test.truth:
+    if not criterion.truth:
         typecheck = ~typecheck
 
     return Signature([(expr.argexprs[0],typecheck)])

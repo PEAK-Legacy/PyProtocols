@@ -11,7 +11,7 @@ from types import FunctionType, ClassType, InstanceType
 ClassTypes = (ClassType, type)
 
 __all__ = [
-    'GenericFunction', 'NullTest', 'Dispatcher', 'DispatchNode',
+    'GenericFunction', 'NullCriterion', 'Dispatcher', 'DispatchNode',
     'AbstractGeneric',
 ]
 
@@ -121,11 +121,11 @@ class CriterionIndex:
 
 
 
-class NullTest:
+class NullCriterion:
 
-    """Test that is always true"""
+    """A "wildcard" Criterion that is always true"""
 
-    protocols.advise(instancesProvide=[ITest])
+    protocols.advise(instancesProvide=[ICriterion])
 
     dispatch_function = staticmethod(lambda ob,table: None)
 
@@ -133,22 +133,22 @@ class NullTest:
         return ()
 
     def __contains__(self,ob):   return True
-    def implies(self,otherTest): return False
+    def implies(self,other): return False
 
-    def __repr__(self): return "NullTest"
+    def __repr__(self): return "NullCriterion"
 
     def subscribe(self,listener): pass
     def unsubscribe(self,listener): pass
 
     def matches(self,table):
-        # NullTest is true for any key
+        # NullCriterion is true for any key
         return list(table)
 
     def __invert__(self):
-        from predicates import NotTest
-        return NotTest(self)
+        from predicates import NotCriterion
+        return NotCriterion(self)
 
-NullTest = NullTest()
+NullCriterion = NullCriterion()
 
 
 
@@ -318,9 +318,9 @@ class Dispatcher:
 
 
     def parse(self,expr_string,local_dict,global_dict):
-        from dispatch.predicates import TestBuilder
+        from dispatch.predicates import CriteriaBuilder
         from dispatch.ast_builder import parse_expr
-        builder=TestBuilder(self.argMap,local_dict,global_dict,__builtins__)
+        builder=CriteriaBuilder(self.argMap,local_dict,global_dict,__builtins__)
         return parse_expr(expr_string,builder)
 
 
@@ -416,7 +416,7 @@ class Dispatcher:
             map(self._addCase, cases)
 
 
-    def testChanged(self):
+    def criterionChanged(self):
         self.dirty = True
         self._dispatcher = None
 
@@ -461,9 +461,9 @@ class Dispatcher:
         self.__lock.acquire()
         try:
             signature = Signature(
-                [(self._dispatch_id(expr,test),test)
-                    for expr,test in ISignature(signature).items()
-                        if test is not NullTest
+                [(self._dispatch_id(expr,criterion),criterion)
+                    for expr,criterion in ISignature(signature).items()
+                        if criterion is not NullCriterion
                 ]
             )
             self._addCase((signature, method))
@@ -545,7 +545,7 @@ class Dispatcher:
 
         for disp_id in disp_ids:
             if disp_id in disabled:
-                continue    # Skip tests that have unchecked prerequisites
+                continue    # Skip criteria that have unchecked prerequisites
 
             index = self.disp_indexes[disp_id]
             total_cases = index.count_for(cases)
@@ -572,14 +572,14 @@ class Dispatcher:
 
 
 
-    def _dispatch_id(self,(expr,disp_func),test):
-        """Replace expr/test with a local key"""
+    def _dispatch_id(self,(expr,disp_func),criterion):
+        """Replace expr/criterion with a local key"""
 
-        test.subscribe(self)
+        criterion.subscribe(self)
         expr = self.getExpressionId(expr)
-        disp = expr, test.dispatch_function
+        disp = expr, criterion.dispatch_function
         if disp not in self.disp_indexes:
-            self.disp_indexes[disp] = index = CriterionIndex()
+            self.disp_indexes[disp] = CriterionIndex()
         return expr
 
 
@@ -605,7 +605,7 @@ class Dispatcher:
 
     def _addConstraints(self, signature):
         pre = []
-        for key,test in signature.items():
+        for key,criterion in signature.items():
             if key[0] >= self.argct:    # constrain non-argument exprs
                 for item in pre: self.constraints.add(item,key)
             pre.append(key)
@@ -670,7 +670,7 @@ class AbstractGeneric(Dispatcher):
                 def registerClassSpecificMethod(cls):
                     import strategy
                     req = strategy.Signature(
-                        [(strategy.Argument(0),ITest(cls))]
+                        [(strategy.Argument(0),ICriterion(cls))]
                     )
                     self.addMethod(req & cond, func)
                     return cls

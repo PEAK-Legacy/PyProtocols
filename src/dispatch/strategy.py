@@ -1,15 +1,15 @@
 """Indexing and Method Combination Strategies
 
-    ProtocolTest -- Index handler for testing that an expression adapts to
-        a protocol
+    ProtocolCriterion -- Index handler for checking that an expression adapts
+        to a protocol
 
-    ClassTest -- Index handler for testing that an expression is of a type
-        or class
+    ClassCriterion -- Index handler for checking that an expression is of a
+        type or class
 
-    SubclassTest -- Index handler for testing that an expression is a subclass
-        of a given class
+    SubclassCriterion -- Index handler for checking that an expression is a
+        subclass of a given class
 
-    Inequality -- Index handler for testing that an expression has a range
+    Inequality -- Index handler for checking that an expression has a range
         relation (i.e. <,>,<=,>=,==,!=) to a constant value
 
     Min, Max -- Extreme values for use with 'Inequality'
@@ -48,12 +48,12 @@ ClassTypes = (ClassType, type)
 from sys import _getframe
 from weakref import WeakKeyDictionary
 from dispatch.interfaces import *
-from dispatch.functions import NullTest
+from dispatch.functions import NullCriterion
 from new import instancemethod
 
 __all__ = [
-    'ProtocolTest', 'ClassTest', 'SubclassTest', 'Inequality', 'Min', 'Max',
-    'Predicate', 'Signature', 'PositionalSignature', 'Argument',
+    'ProtocolCriterion', 'ClassCriterion', 'SubclassCriterion', 'Inequality',
+    'Min', 'Max', 'Predicate', 'Signature', 'PositionalSignature', 'Argument',
     'most_specific_signatures', 'ordered_signatures', 'separate_qualifiers',
     'method_chain', 'method_list', 'all_methods', 'safe_methods',
     'default',
@@ -162,10 +162,13 @@ def dispatch_by_subclass(ob,table):
                 break
     return table[None]
 
-class ClassTest(Adapter):
-    """Test that indicates expr is of a particular class"""
+class ClassCriterion(Adapter):
+    """Criterion that indicates expr is of a particular class"""
 
-    protocols.advise(instancesProvide=[ITest], asAdapterForTypes=ClassTypes)
+    protocols.advise(
+        instancesProvide=[ICriterion], asAdapterForTypes=ClassTypes
+    )
+
     dispatch_function = staticmethod(dispatch_by_mro)
 
     def seeds(self,table):
@@ -180,8 +183,8 @@ class ClassTest(Adapter):
             )
         return False
 
-    def implies(self,otherTest):
-        return self.subject in ITest(otherTest) or otherTest is NullTest
+    def implies(self,other):
+        return self.subject in ICriterion(other) or other is NullCriterion
 
     def __repr__(self):
         return self.subject.__name__
@@ -200,13 +203,51 @@ class ClassTest(Adapter):
             if key in self:
                 yield key
 
-    def __invert__(self): from predicates import NotTest; return NotTest(self)
+    def __invert__(self):
+        from predicates import NotCriterion
+        return NotCriterion(self)
 
 
-class SubclassTest(object):
-    """Test that indicates expr is a subclass of a particular class"""
 
-    protocols.advise(instancesProvide=[ITest])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class SubclassCriterion(object):
+    """Criterion that indicates expr is a subclass of a particular class"""
+
+    protocols.advise(instancesProvide=[ICriterion])
     dispatch_function = staticmethod(dispatch_by_subclass)
 
     def __init__(self,klass):
@@ -219,11 +260,11 @@ class SubclassTest(object):
         if isinstance(ob,ClassTypes) and issubclass(ob,self.klass):
             return True
 
-    def implies(self,otherTest):
-        return self.klass in ITest(otherTest)
+    def implies(self,other):
+        return self.klass in ICriterion(other)
 
     def __repr__(self):
-        return "SubclassTest(%s)" % (self.klass.__name__,)
+        return "SubclassCriterion(%s)" % (self.klass.__name__,)
 
     def subscribe(self,listener): pass
     def unsubscribe(self,listener): pass
@@ -234,14 +275,14 @@ class SubclassTest(object):
     def __ne__(self,other):
         return not self.__eq__(other)
 
-    def __invert__(self): from predicates import NotTest; return NotTest(self)
+    def __invert__(self):
+        from predicates import NotCriterion
+        return NotCriterion(self)
 
     def matches(self,table):
         for key in table:
             if key in self:
                 yield key
-
-
 
 
 class _ExtremeType(object):     # Courtesy of PEP 326
@@ -327,9 +368,9 @@ except ImportError:
 
 
 class Inequality(object):
-    """Test that indicates target matches specified constant inequalities"""
+    """Criterion that indicates target matches specified const. inequalities"""
 
-    protocols.advise(instancesProvide=[ITest])
+    protocols.advise(instancesProvide=[ICriterion])
     dispatch_function = staticmethod(dispatch_by_inequalities)
 
     def __init__(self,op,val):
@@ -367,9 +408,9 @@ class Inequality(object):
     def __invert__(self):
         return Inequality(rev_ops[self.op], self.val)
 
-    def implies(self,otherTest):
+    def implies(self,other):
         for r in self.ranges:
-            if not r in ITest(otherTest):
+            if not r in ICriterion(other):
                 return False
         return True
 
@@ -442,23 +483,23 @@ class _Notifier(Protocol):
         try:
             if self.__subscribers:
                 for subscriber in self.__subscribers.keys():
-                    subscriber.testChanged()
+                    subscriber.criterionChanged()
         finally:
             self._Protocol__lock.release()
 
         return result
 
 
-class ProtocolTest(StickyAdapter):
+class ProtocolCriterion(StickyAdapter):
 
-    """Test that indicates instances of expr's class provide a protocol"""
+    """Criterion that indicates instances of expr's class provide a protocol"""
 
     protocols.advise(
-        instancesProvide=[ITest],
+        instancesProvide=[ICriterion],
         asAdapterForTypes=[Protocol]
     )
 
-    attachForProtocols = (ITest,)
+    attachForProtocols = (ICriterion,)
     dispatch_function  = staticmethod(dispatch_by_mro)
 
     def __init__(self,ob):
@@ -487,18 +528,20 @@ class ProtocolTest(StickyAdapter):
             if key in self:
                 yield key
 
-    def __invert__(self): from predicates import NotTest; return NotTest(self)
+    def __invert__(self):
+        from predicates import NotCriterion
+        return NotCriterion(self)
 
 
-    def implies(self,otherTest):
+    def implies(self,other):
 
-        otherTest = ITest(otherTest)
+        other = ICriterion(other)
 
-        if otherTest is NullTest:
+        if other is NullCriterion:
             return True
 
         for base in self.notifier._Protocol__adapters.keys():
-            if base not in otherTest:
+            if base not in other:
                 return False
 
         return True
@@ -823,7 +866,7 @@ protocols.declareAdapter(
 )
 
 class Signature(object):
-    """A set of tests (in conjunctive normal form) applied to expressions"""
+    """A set of criteria (in conjunctive normal form) applied to expressions"""
 
     protocols.advise(instancesProvide=[ISignature])
 
@@ -833,18 +876,18 @@ class Signature(object):
         items = list(__id_to_test)+[(Argument(name=k),v) for k,v in kw.items()]
         self.data = data = {}; self.keys = keys = []
         for k,v in items:
-            v = ITest(v)
+            v = ICriterion(v)
             k = k,v.dispatch_function
             if k in data:
-                from predicates import AndTest
-                data[k] = AndTest(data[k],v)
+                from predicates import AndCriterion
+                data[k] = AndCriterion(data[k],v)
             else:
                 data[k] = v; keys.append(k)
 
     def implies(self,otherSig):
         otherSig = ISignature(otherSig)
-        for expr_id,otherTest in otherSig.items():
-            if not self.get(expr_id).implies(otherTest):
+        for expr_id,otherCriterion in otherSig.items():
+            if not self.get(expr_id).implies(otherCriterion):
                 return False
         return True
 
@@ -852,7 +895,7 @@ class Signature(object):
         return [(k,self.data[k]) for k in self.keys]
 
     def get(self,expr_id):
-        return self.data.get(expr_id,NullTest)
+        return self.data.get(expr_id,NullCriterion)
 
     def __repr__(self):
         return 'Signature(%s)' % (','.join(
@@ -891,23 +934,22 @@ class Signature(object):
             return other  # Always true
 
         if len(me)==1 and len(they)==1 and me[0][0]==they[0][0]:
-            from predicates import OrTest
+            from predicates import OrCriterion
             return Signature([
                 (me[0][0][0],
-                    OrTest(me[0][1],they[0][1])
+                    OrCriterion(me[0][1],they[0][1])
                 )
             ])
         return Predicate([self,other])
 
 
     def __eq__(self,other):
-
         if other is self:
             return True
 
         other = ISignature(other,None)
 
-        if other is None or other is NullTest:
+        if other is None or other is NullCriterion:
             return False
 
         for k,v in self.items():
@@ -929,14 +971,15 @@ class PositionalSignature(Signature):
 
     protocols.advise(
         instancesProvide=[ISignature],
-        asAdapterForProtocols=[protocols.sequenceOf(ITest)]
+        asAdapterForProtocols=[protocols.sequenceOf(ICriterion)]
     )
 
     __slots__ = ()
 
-    def __init__(self,tests,proto=None):
-        Signature.__init__(self, zip(map(Argument,range(len(tests))), tests))
-
+    def __init__(self,criteria,proto=None):
+        Signature.__init__(self,
+            zip(map(Argument,range(len(criteria))), criteria)
+        )
 
 default = Signature()
 

@@ -80,11 +80,11 @@ class TestGraph(TestCase):
             [(1,1),(1,2),(1,3),(2,1),(2,2),(2,3),(3,1),(3,2),(3,3)])
 
 
-class TestTests(TestCase):
+class CriteriaTests(TestCase):
 
-    def testClassTestMembership(self):
+    def testClassCriteriaMembership(self):
 
-        hp = ITest(HumanPowered)
+        hp = ICriterion(HumanPowered)
 
         self.failUnless(PaddleBoat in hp)
         self.failUnless(Bicycle in hp)
@@ -94,8 +94,8 @@ class TestTests(TestCase):
         self.failIf(Hummer in hp)
         self.failIf(object in hp)
 
-        it = ITest(InstanceType)
-        ob = ITest(object)
+        it = ICriterion(InstanceType)
+        ob = ICriterion(object)
 
         for klass in (GasPowered,HumanPowered):
             self.failUnless(klass in it)
@@ -109,65 +109,65 @@ class TestTests(TestCase):
 
 
     def testTestImplication(self):
-        self.failUnless(ITest(Bicycle).implies(Wheeled))
-        self.failUnless(ITest(PaddleBoat).implies(HumanPowered))
-        self.failUnless(ITest(Hummer).implies(FourWheeled))
-        self.failUnless(ITest(Hummer).implies(LandVehicle))
-        self.failUnless(ITest(Speedboat).implies(Vehicle))
-        self.failUnless(ITest(Wheeled).implies(object))
-        self.failUnless(ITest(GasPowered).implies(InstanceType))
-        self.failUnless(ITest(Wheeled).implies(Vehicle))
-        self.failIf(ITest(object).implies(Speedboat))
+        self.failUnless(ICriterion(Bicycle).implies(Wheeled))
+        self.failUnless(ICriterion(PaddleBoat).implies(HumanPowered))
+        self.failUnless(ICriterion(Hummer).implies(FourWheeled))
+        self.failUnless(ICriterion(Hummer).implies(LandVehicle))
+        self.failUnless(ICriterion(Speedboat).implies(Vehicle))
+        self.failUnless(ICriterion(Wheeled).implies(object))
+        self.failUnless(ICriterion(GasPowered).implies(InstanceType))
+        self.failUnless(ICriterion(Wheeled).implies(Vehicle))
+        self.failIf(ICriterion(object).implies(Speedboat))
 
 
 
-    def testNullTest(self):
+    def testNullCriterion(self):
         # Null test has no seeds
-        self.failIf(list(NullTest.seeds({})))
+        self.failIf(list(NullCriterion.seeds({})))
 
         # and it matches anything
-        self.failUnless(object in NullTest)
-        self.failUnless(Speedboat in NullTest)
+        self.failUnless(object in NullCriterion)
+        self.failUnless(Speedboat in NullCriterion)
 
         # is implied by everything
-        self.failUnless(ITest(Vehicle).implies(NullTest))
+        self.failUnless(ICriterion(Vehicle).implies(NullCriterion))
 
         # and implies nothing
-        self.failIf(NullTest.implies(object))
+        self.failIf(NullCriterion.implies(object))
 
 
-    def testClassTestSeedsAndDispatchFunctions(self):
+    def testClassCriteriaSeedsAndDispatchFunctions(self):
         for klass in (Vehicle,LandVehicle,WaterVehicle,HumanPowered,GasPowered):
-            seeds = list(ITest(klass).seeds({}))
+            seeds = list(ICriterion(klass).seeds({}))
             self.failUnless(klass in seeds)
             self.failUnless(object in seeds)
             self.failIf(len(seeds)<>2)
             self.failUnless(
-                ITest(klass).dispatch_function is strategy.dispatch_by_mro
+                ICriterion(klass).dispatch_function is strategy.dispatch_by_mro
             )
 
-    def testTestAdaptation(self):
-        self.failUnless(Hummer in ITest(Wheeled))
-        self.failIf(ITest(Hummer).implies(Speedboat))
-        self.failUnless(ITest(Speedboat).implies(WaterVehicle))
-        self.failUnless(object in list(ITest(InstanceType).seeds({})))
+    def testCriterionAdaptation(self):
+        self.failUnless(Hummer in ICriterion(Wheeled))
+        self.failIf(ICriterion(Hummer).implies(Speedboat))
+        self.failUnless(ICriterion(Speedboat).implies(WaterVehicle))
+        self.failUnless(object in list(ICriterion(InstanceType).seeds({})))
 
-    def testProtocolTest(self):
-        self.failUnless(Bicycle in ITest(Wheeled))
-        seeds = list(ITest(Wheeled).seeds({}))
+    def testProtocolCriterion(self):
+        self.failUnless(Bicycle in ICriterion(Wheeled))
+        seeds = list(ICriterion(Wheeled).seeds({}))
         self.failUnless(Hummer in seeds)
         self.failUnless(Bicycle in seeds)
         self.failUnless(object in seeds)
         self.failUnless(len(seeds)==4)
         class BrokenBike(Bicycle): advise(instancesDoNotProvide=[Wheeled])
-        self.failIf(BrokenBike in ITest(Wheeled))
+        self.failIf(BrokenBike in ICriterion(Wheeled))
 
     def testSignatures(self):
         a0 = Argument(0); a1 = Argument(1)
-        d1 = {a0:ITest(LandVehicle), a1:ITest(WaterVehicle)}
-        d2 = {a0:ITest(Hummer), a1:ITest(Speedboat)}
-        d3 = {a0:ITest(WaterVehicle), a1:ITest(LandVehicle)}
-        d4 = {a0:ITest(LandVehicle), a1:ITest(LandVehicle)}
+        d1 = {a0:ICriterion(LandVehicle), a1:ICriterion(WaterVehicle)}
+        d2 = {a0:ICriterion(Hummer), a1:ICriterion(Speedboat)}
+        d3 = {a0:ICriterion(WaterVehicle), a1:ICriterion(LandVehicle)}
+        d4 = {a0:ICriterion(LandVehicle), a1:ICriterion(LandVehicle)}
 
         for d in d1,d2,d3,d4:
             self.assertEqual( dict(Signature(d.items()).items()),
@@ -178,12 +178,12 @@ class TestTests(TestCase):
         s3 = Signature(d3.items())
         s4 = Signature(d4.items())
         s5 = PositionalSignature(
-            (ITest(LandVehicle),ITest(WaterVehicle),ITest(object))
+            (ICriterion(LandVehicle),ICriterion(WaterVehicle),
+                ICriterion(object))
         )
 
         self.failUnless(s2.implies(s1)); self.failIf(s1.implies(s2))
         self.failUnless(s5.implies(s1)); self.failIf(s1.implies(s3))
-
         self.failIf(s1.implies(s4)); self.failIf(s2.implies(s3))
         self.failIf(s2.implies(s4)); self.failIf(s1.implies(s5))
 
@@ -244,10 +244,10 @@ class TestTests(TestCase):
 
 
 
-    def testSubclassTest(self):
-        s = SubclassTest(Vehicle)
+    def testSubclassCriterion(self):
+        s = SubclassCriterion(Vehicle)
         self.failUnless(
-            ITest(s).dispatch_function is strategy.dispatch_by_subclass )
+            ICriterion(s).dispatch_function is strategy.dispatch_by_subclass )
 
         # seeds()
         self.assertEqual( s.seeds({}), [Vehicle,None])
@@ -259,17 +259,17 @@ class TestTests(TestCase):
             self.failUnless(klass not in s)
 
         # implies()
-        self.failUnless( s.implies(SubclassTest(object)) )
-        self.failUnless( SubclassTest(LandVehicle).implies(s) )
-        self.failUnless( s.implies(NullTest) )
-        self.failIf( s.implies(SubclassTest(LandVehicle)) )
-        self.failIf( SubclassTest(object).implies(s) )
+        self.failUnless( s.implies(SubclassCriterion(object)) )
+        self.failUnless( SubclassCriterion(LandVehicle).implies(s) )
+        self.failUnless( s.implies(NullCriterion) )
+        self.failIf( s.implies(SubclassCriterion(LandVehicle)) )
+        self.failIf( SubclassCriterion(object).implies(s) )
 
         # eq/ne/invert
-        self.assertEqual( s, SubclassTest(Vehicle))
-        self.assertNotEqual( s, SubclassTest(LandVehicle))
-        self.assertNotEqual( s, NullTest)
-        self.assertEqual( ~s, NotTest(s) )
+        self.assertEqual( s, SubclassCriterion(Vehicle))
+        self.assertNotEqual( s, SubclassCriterion(LandVehicle))
+        self.assertNotEqual( s, NullCriterion)
+        self.assertEqual( ~s, NotCriterion(s) )
 
         # matches()
         table = {LandVehicle:1,object:2,None:3}
@@ -394,40 +394,39 @@ class TestTests(TestCase):
 
 
     def testTruth(self):
-        self.assertEqual(TruthTest(27), TruthTest("abc"))
-        self.assertNotEqual(TruthTest(1), TruthTest(False))
-        self.failUnless(True in TruthTest(1))
-        self.failUnless(False not in TruthTest(1))
-        self.failUnless(True not in TruthTest(0))
-        self.failUnless(False in TruthTest(0))
-        self.failIf(TruthTest(1).implies(TruthTest(0)))
-        self.failIf(TruthTest(0).implies(TruthTest(1)))
-        self.failUnless(TruthTest(0).implies(TruthTest(0)))
-        self.failUnless(TruthTest(1).implies(TruthTest(1)))
-        self.assertEqual(TruthTest(42).seeds({}), (True,False))
-        self.assertEqual(TruthTest(None).seeds({}), (True,False))
+        self.assertEqual(TruthCriterion(27), TruthCriterion("abc"))
+        self.assertNotEqual(TruthCriterion(1), TruthCriterion(False))
+        self.failUnless(True in TruthCriterion(1))
+        self.failUnless(False not in TruthCriterion(1))
+        self.failUnless(True not in TruthCriterion(0))
+        self.failUnless(False in TruthCriterion(0))
+        self.failIf(TruthCriterion(1).implies(TruthCriterion(0)))
+        self.failIf(TruthCriterion(0).implies(TruthCriterion(1)))
+        self.failUnless(TruthCriterion(0).implies(TruthCriterion(0)))
+        self.failUnless(TruthCriterion(1).implies(TruthCriterion(1)))
+        self.assertEqual(TruthCriterion(42).seeds({}), (True,False))
+        self.assertEqual(TruthCriterion(None).seeds({}), (True,False))
 
 
     def testAndOr(self):
         def is_in(items):
-            return OrTest(*[Inequality('==',x) for x in items])
-
+            return OrCriterion(*[Inequality('==',x) for x in items])
         equals_two = Inequality('==',2)
         odd_primes = is_in([3,5,7,11,13,19])
-        lo_primes = OrTest(equals_two, odd_primes)
-        self.assertEqual(lo_primes.tests[1:], odd_primes.tests) # flattening
+        lo_primes = OrCriterion(equals_two, odd_primes)
+        self.assertEqual(lo_primes.criteria[1:], odd_primes.criteria) # flatten
         self.failIf((4,4) in lo_primes)
         self.failUnless((11,11) in lo_primes)
 
         # Rephrase as And(Not(), Or(...)), so we can confirm other implications
         lo_primes = is_in([2,3,5,7,11,13,19])
-        odd_primes = AndTest(NotTest(equals_two), lo_primes)
+        odd_primes = AndCriterion(NotCriterion(equals_two), lo_primes)
         self.failIf((4,4) in lo_primes)
         self.failUnless((11,11) in lo_primes)
 
         odd_nums  = is_in([1,3,5,7,9,11,13,15,19])
         even_nums = is_in([2,4,6,8,10,12,14])
-        even_primes = AndTest(lo_primes,even_nums)
+        even_primes = AndCriterion(lo_primes,even_nums)
 
         self.failIf((3,3) in even_nums)
         self.failUnless((4,4) in even_nums)
@@ -442,16 +441,18 @@ class TestTests(TestCase):
         self.failIf(lo_primes.implies(even_nums))
         self.failIf(odd_primes.implies(even_nums))
 
-        self.failUnless(odd_primes.implies(NullTest))
-        self.failUnless(even_primes.implies(NullTest))
-        self.failUnless(lo_primes.implies(NullTest))
-        self.assertRaises(ValueError, AndTest, Inequality('==',1), TruthTest(1))
-        self.assertRaises(ValueError, OrTest, Inequality('==',1), HumanPowered)
-
+        self.failUnless(odd_primes.implies(NullCriterion))
+        self.failUnless(even_primes.implies(NullCriterion))
+        self.failUnless(lo_primes.implies(NullCriterion))
+        self.assertRaises(ValueError, AndCriterion,
+            Inequality('==',1), TruthCriterion(1))
+        self.assertRaises(ValueError, OrCriterion,
+            Inequality('==',1), HumanPowered)
 
     def testRangeIntersection(self):
-        ten_to_twenty = AndTest(Inequality('>=',10), Inequality('<=',20))
-        fifteen_to_nineteen = AndTest(Inequality('>=',15), Inequality('<=',19))
+        ten_to_twenty = AndCriterion(Inequality('>=',10), Inequality('<=',20))
+        fifteen_to_nineteen = AndCriterion(
+            Inequality('>=',15), Inequality('<=',19))
 
         self.failUnless( (5,5) not in ten_to_twenty )
         self.failUnless( (5,5) not in fifteen_to_nineteen )
@@ -464,72 +465,71 @@ class TestTests(TestCase):
         self.failIf(ten_to_twenty.implies(fifteen_to_nineteen))
 
         self.failUnless(
-            NotTest(ten_to_twenty).implies(NotTest(fifteen_to_nineteen))
+            NotCriterion(ten_to_twenty).implies(
+                NotCriterion(fifteen_to_nineteen))
         )
         self.failIf(
-            NotTest(fifteen_to_nineteen).implies(NotTest(ten_to_twenty))
+            NotCriterion(fifteen_to_nineteen).implies(
+                NotCriterion(ten_to_twenty))
         )
 
-        either = OrTest(fifteen_to_nineteen,ten_to_twenty)
+        either = OrCriterion(fifteen_to_nineteen,ten_to_twenty)
         for item in fifteen_to_nineteen, ten_to_twenty:
             self.failUnless( item.implies(either) )
-            self.failUnless( item.implies(NullTest) )
-            self.failUnless( NotTest(item).implies(NullTest) )
-
+            self.failUnless( item.implies(NullCriterion) )
+            self.failUnless( NotCriterion(item).implies(NullCriterion) )
 
     def testClassIntersections(self):
-        self.failUnless( Hummer in AndTest(LandVehicle,GasPowered) )
-        self.failUnless( Speedboat in NotTest(LandVehicle) )
-        self.failUnless( Bicycle in OrTest(NotTest(HumanPowered),LandVehicle) )
-        self.failUnless( AndTest(LandVehicle,GasPowered).implies(GasPowered) )
-
+        self.failUnless( Hummer in AndCriterion(LandVehicle,GasPowered) )
+        self.failUnless( Speedboat in NotCriterion(LandVehicle) )
+        self.failUnless( Bicycle in
+            OrCriterion(NotCriterion(HumanPowered),LandVehicle) )
+        self.failUnless( AndCriterion(LandVehicle,GasPowered).implies(
+            GasPowered) )
         # This implication doesn't hold true because RiverBoat is a Wheeled
         # non-LandVehicle; if Riverboat didn't exist the implication would hold
-        self.failIf( NotTest(LandVehicle).implies(NotTest(Wheeled)) )
-
-
-
+        self.failIf( NotCriterion(LandVehicle).implies(NotCriterion(Wheeled)) )
 
     def testSimplifications(self):
-        self.assertEqual((~TruthTest(1)), TruthTest(0))
-        self.assertEqual((~(~TruthTest(1))), TruthTest(27))
+        self.assertEqual((~TruthCriterion(1)), TruthCriterion(0))
+        self.assertEqual((~(~TruthCriterion(1))), TruthCriterion(27))
 
         self.assertEqual(
-            (~AndTest(Inequality('>=',10),Inequality('<=',20))),
-            OrTest((~Inequality('>=',10)),(~Inequality('<=',20)))
+            (~AndCriterion(Inequality('>=',10),Inequality('<=',20))),
+            OrCriterion((~Inequality('>=',10)),(~Inequality('<=',20)))
         )
 
         self.assertEqual(
-            (~OrTest(Inequality('>=',10),Inequality('<=',20))),
-            AndTest((~Inequality('>=',10)),(~Inequality('<=',20)))
+            (~OrCriterion(Inequality('>=',10),Inequality('<=',20))),
+            AndCriterion((~Inequality('>=',10)),(~Inequality('<=',20)))
         )
 
         self.assertEqual(
-            AndTest(AndTest(Inequality('>=',10),Inequality('<=',20)),
+            AndCriterion(AndCriterion(Inequality('>=',10),Inequality('<=',20)),
                 Inequality('==',15)
             ),
-            AndTest(Inequality('>=',10),Inequality('<=',20),Inequality('==',15))
+            AndCriterion(
+                Inequality('>=',10),Inequality('<=',20),Inequality('==',15))
         )
 
         self.assertEqual(
-            OrTest(OrTest(Inequality('>=',10),Inequality('<=',20)),
+            OrCriterion(OrCriterion(Inequality('>=',10),Inequality('<=',20)),
                 Inequality('==',15)
             ),
-            OrTest(Inequality('>=',10),Inequality('<=',20),Inequality('==',15))
+            OrCriterion(
+                Inequality('>=',10),Inequality('<=',20),Inequality('==',15))
         )
 
 
     def testTruthDispatch(self):
         x_gt_y = Call(operator.gt, Argument(name='x'), Argument(name='y'))
         greater = GenericFunction(lambda x,y:None)
-        greater[Signature([(x_gt_y, TruthTest(False))])] = lambda x,y: False
-        greater[Signature([(x_gt_y, TruthTest(True))])]  = lambda x,y: True
+        greater[Signature([(x_gt_y, TruthCriterion(False))])]= lambda x,y:False
+        greater[Signature([(x_gt_y, TruthCriterion(True))])] = lambda x,y:True
 
         self.failIf(greater(1,10))
         self.failIf(greater(1,1))
         self.failUnless(greater(2,1))
-
-
 
     def testSignatureArithmetic(self):
         x_gt_10 = Signature(x=Inequality('>',10))
@@ -538,7 +538,7 @@ class TestTests(TestCase):
         empty = Signature()
 
         self.assertEqual((x_gt_10 & x_lt_20),
-            Signature(x=AndTest(Inequality('>',10),Inequality('<',20)))
+            Signature(x=AndCriterion(Inequality('>',10),Inequality('<',20)))
         )
 
         self.assertEqual((x_gt_10 & y_in_LandVehicle),
@@ -552,7 +552,7 @@ class TestTests(TestCase):
         self.assertEqual((x_gt_10 | empty), empty)
         self.assertEqual((empty | x_gt_10), empty)
         self.assertEqual((x_gt_10 | x_lt_20),
-            Signature(x=OrTest(Inequality('>',10),Inequality('<',20)))
+            Signature(x=OrCriterion(Inequality('>',10),Inequality('<',20)))
         )
         self.assertEqual((x_gt_10 | y_in_LandVehicle),
             Predicate([x_gt_10,y_in_LandVehicle])
@@ -739,7 +739,7 @@ class ExpressionTests(TestCase):
     def testTuple(self):
         xy = Tuple(tuple,Argument(name='x'),Argument(name='y'))
         xy_is_one_two = GenericFunction(lambda x,y:None)
-        xy_is_one_two[Signature([(xy,Inequality('==',(1,2)))])] = lambda x,y:True
+        xy_is_one_two[Signature([(xy,Inequality('==',(1,2)))])]=lambda x,y:True
         xy_is_one_two[Signature([])] = lambda x,y: False
 
         self.failUnless(xy_is_one_two(1,2))
@@ -783,7 +783,7 @@ class ExpressionTests(TestCase):
 
         xyz = OrExpr(x,y,z)
         or_ = GenericFunction(lambda x,y,z:None)
-        or_[Signature([(xyz,TruthTest())])] = lambda x,y,z:True
+        or_[Signature([(xyz,TruthCriterion())])] = lambda x,y,z:True
         or_[Signature([])] = lambda x,y,z: False
 
         self.failUnless(or_(1,0,1))
@@ -824,7 +824,7 @@ class ExpressionTests(TestCase):
 
         xyz = AndExpr(x,y,z)
         and_ = GenericFunction(lambda x,y,z:None)
-        and_[Signature([(xyz,TruthTest())])] = lambda x,y,z:True
+        and_[Signature([(xyz,TruthCriterion())])] = lambda x,y,z:True
         and_[Signature([])] = lambda x,y,z: False
 
         self.failUnless(and_(True,True,True))
@@ -1168,9 +1168,9 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
 
         # f1, f1.x, f2, f1.x@!B, f1.y=f2.y
 
-        g.addMethod([(A,A,NullTest,T,T)], m1)
+        g.addMethod([(A,A,NullCriterion,T,T)], m1)
         g.addMethod([(B,B),(C,B,A)], m2)
-        g.addMethod([(C,NullTest,C)], m3)
+        g.addMethod([(C,NullCriterion,C)], m3)
         g.addMethod([(C,)], m4)
         g.addMethod([(T,)], m5)
 
@@ -1184,7 +1184,7 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
             self.assertEqual( w(C(),C(),C()),     "m3")
             self.assertEqual( w(C(),A(),A()),     "m4")
             self.assertEqual( g(T(),None,None,None,None), "m5")
-            g.testChanged()
+            g.criterionChanged()
 
 
     def testInstanceMethods(self):
@@ -1311,7 +1311,7 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
 
 
 TestClasses = (
-    TestGraph, TestTests, ExpressionTests, SimpleGenerics, GenericTests,
+    TestGraph, CriteriaTests, ExpressionTests, SimpleGenerics, GenericTests,
 )
 
 def test_combiners():
