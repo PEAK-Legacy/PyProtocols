@@ -234,12 +234,12 @@ def validateCriterion(criterion, node_type, seeded=True):
         criterion = ISeededCriterion(criterion)
         for seed in criterion.seeds(d):
             d[seed] = seed in criterion
-    
+
         matches = list(criterion.matches(d))
         for seed in matches:
             assert d[seed], (criterion,"should have contained",seed)
             del d[seed]
-    
+
         for value in d.values():
             assert not value,(criterion,"should've included",seed,"in matches")
 
@@ -403,7 +403,9 @@ class AbstractCriterion(object):
     def __ne__(self,other):
         return not self.__eq__(other)
 
-
+    def __and__(self,other):
+        from predicates import AndCriterion
+        return AndCriterion(self,other)
 
 
 
@@ -687,7 +689,7 @@ class InequalityIndex(SeededIndex):
 
 class InequalityNode(DispatchNode):
     make_index = InequalityIndex
-    
+
 
 
 
@@ -1205,8 +1207,7 @@ class Signature(object):
             v = ICriterion(v)
             k = k,v.node_type
             if k in data:
-                from predicates import AndCriterion
-                data[k] = AndCriterion(data[k],v)
+                data[k] &= v
             else:
                 data[k] = v; keys.append(k)
 
@@ -1227,6 +1228,7 @@ class Signature(object):
         return 'Signature(%s)' % (','.join(
             [('%r=%r' % (k,v)) for k,v in self.data.items()]
         ),)
+
 
     def __and__(self,other):
         me = self.data.items()

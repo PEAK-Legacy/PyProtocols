@@ -790,9 +790,7 @@ class PredicateTests(TestCase):
             Signature(x=int)|Signature(x=str)|Signature(x=unicode))
 
         self.assertEqual(pe('not isinstance(x,(int,(str,unicode)))'),
-            Signature(x=AndCriterion(
-                ~ICriterion(int), ~ICriterion(str), ~ICriterion(unicode))
-            )
+            Signature(x=~ICriterion(int)&~ICriterion(str)&~ICriterion(unicode))
         )
 
         self.assertEqual(
@@ -815,6 +813,8 @@ class PredicateTests(TestCase):
                     *[~SubclassCriterion(x) for x in (int,str,unicode)])
                 )
         )
+
+
 
 
 

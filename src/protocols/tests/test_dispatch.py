@@ -326,7 +326,6 @@ class CriteriaTests(TestCase):
 
 
 
-
     def testInequalities(self):
         self.assertRaises(ValueError, Inequality, '', 1)
         self.assertRaises(ValueError, Inequality, 'xyz', 2)
@@ -453,12 +452,12 @@ class CriteriaTests(TestCase):
     def testAndOr(self):
         equals_two = Inequality('==',2)
         less_than_four = Inequality('<',4)
-        lo_primes = AndCriterion(Inequality('>',1),less_than_four)  #2, 3
-        odd_primes = AndCriterion(NotCriterion(equals_two), lo_primes)
+        lo_primes = Inequality('>',1) & less_than_four  #2, 3
+        odd_primes = (~equals_two) & lo_primes
         self.failIf((4,4) in lo_primes)
         self.failUnless((3,3) in lo_primes)
 
-        even_primes = AndCriterion(equals_two,less_than_four)
+        even_primes = equals_two & less_than_four
 
         self.failUnless((3,3) in less_than_four)
         self.failIf((4,4) in less_than_four)
@@ -471,8 +470,8 @@ class CriteriaTests(TestCase):
 
         self.failUnless(even_primes.implies(NullCriterion))
 
-        self.assertRaises(ValueError, AndCriterion,
-            Inequality('==',1), TruthCriterion(1))
+        self.assertRaises(ValueError,
+            lambda: Inequality('==',1) & TruthCriterion(1))
 
 
 
@@ -492,9 +491,9 @@ class CriteriaTests(TestCase):
 
 
     def testRangeIntersection(self):
-        ten_to_twenty = AndCriterion(Inequality('>=',10), Inequality('<=',20))
-        fifteen_to_nineteen = AndCriterion(
-            Inequality('>=',15), Inequality('<=',19))
+        ten_to_twenty = Inequality('>=',10)&Inequality('<=',20)
+        fifteen_to_nineteen = (
+            Inequality('>=',15) & Inequality('<=',19))
 
         self.failUnless( (5,5) not in ten_to_twenty )
         self.failUnless( (5,5) not in fifteen_to_nineteen )
@@ -537,9 +536,7 @@ class CriteriaTests(TestCase):
         self.assertEqual((~(~TruthCriterion(1))), TruthCriterion(27))
 
         self.assertEqual(
-            AndCriterion(AndCriterion(Inequality('>=',10),Inequality('<=',20)),
-                Inequality('==',15)
-            ),
+            Inequality('>=',10) & Inequality('<=',20) & Inequality('==',15),
             AndCriterion(
                 Inequality('>=',10),Inequality('<=',20),Inequality('==',15))
         )
@@ -573,6 +570,8 @@ class CriteriaTests(TestCase):
 
 
 
+
+
     def testSignatureArithmetic(self):
         x_gt_10 = Signature(x=Inequality('>',10))
         x_lt_20 = Signature(x=Inequality('<',20))
@@ -580,7 +579,7 @@ class CriteriaTests(TestCase):
         empty = Signature()
 
         self.assertEqual((x_gt_10 & x_lt_20),
-            Signature(x=AndCriterion(Inequality('>',10),Inequality('<',20)))
+            Signature(x=Inequality('>',10) & Inequality('<',20))
         )
 
         self.assertEqual((x_gt_10 & y_in_LandVehicle),

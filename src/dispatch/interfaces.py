@@ -53,8 +53,8 @@ class ICriterion(Interface):
         """The type of object that will actually do the dispatching"""
     )
 
-    def make_index():
-        """Return an 'ICriterionIndex' for indexing criteria of this kind"""
+    def __and__(other):
+        """Apply multiple criteria of the same node type to the same expr"""
 
     def __eq__(other):
         """Return true if equal"""

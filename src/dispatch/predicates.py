@@ -648,11 +648,11 @@ def or_criteria(expr,seq):
     return Predicate(seq)
 
 def and_criteria(expr,seq):
-    return Signature([(expr,AndCriterion(*seq))])
-
-
-
-
+    it = iter(seq)
+    for val in it: break
+    else: raise ValueError("No criteria supplied!")
+    for next in it: val &= next
+    return Signature([(expr,val)])
 
 class NotBuilder(CriteriaBuilder):
 
