@@ -1,7 +1,7 @@
 """Basic Adapters and Adapter Operations"""
 
 __all__ = [
-    'IMPLEMENTATION_ERROR','NO_ADAPTER_NEEDED','DOES_NOT_SUPPORT',
+    'IMPLEMENTATION_ERROR','NO_ADAPTER_NEEDED','DOES_NOT_SUPPORT', 'Adapter',
     'minimumAdapter', 'composeAdapters', 'updateWithSimplestAdapter',
 ]
 
@@ -28,13 +28,13 @@ except ImportError:
     pass
 
 
+class Adapter(object):
 
+    """Convenient base class for adapters"""
 
-
-
-
-
-
+    def __init__(self, ob, proto):
+        self.subject = ob
+        self.protocol = proto
 
 
 
