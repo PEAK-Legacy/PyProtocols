@@ -49,16 +49,16 @@ class TestBase(TestCase):
     def assertObProvidesOnlyA(self):
         assert adapt(self.ob, self.IA, None) is self.ob
         assert adapt(self.ob, self.IB, None) is None
-        assert adapt(self.IA, self.ob, None) is None
-        assert adapt(self.IB, self.ob, None) is None
-        assert adapt(self.ob, self.ob, None) is None
+        assert adapt(self.IA, None, None) is None
+        assert adapt(self.IB, None, None) is None
+        assert adapt(self.ob, None, None) is None
 
     def assertObProvidesAandB(self):
         assert adapt(self.ob, self.IA, None) is self.ob
         assert adapt(self.ob, self.IB, None) is self.ob
-        assert adapt(self.IA, self.ob, None) is None
-        assert adapt(self.IB, self.ob, None) is None
-        assert adapt(self.ob, self.ob, None) is None
+        assert adapt(self.IA, None, None) is None
+        assert adapt(self.IB, None, None) is None
+        assert adapt(self.ob, None, None) is None
 
     def assertAmbiguous(self, a1, a2, d1, d2, ifaces):
         try:
@@ -75,9 +75,9 @@ class TestBase(TestCase):
         # (Caller must ensure that self.ob provides self.IA)
         class IC(self.Interface):
             advise(protocolIsSubsetOf=[self.IA])
-
+            if 'self' in locals():
+                del locals()['self']  # how the heck???
         assert adapt(self.ob, IC, None) is self.ob
-
 
 
     def setupBases(self,base):
@@ -207,7 +207,7 @@ class AdaptiveChecks(SimpleAdaptiveChecks):
 
     """General adapter/protocol implication checks
 
-    Twisted and Zope can't handle these."""
+    Twisted can't handle these."""
 
     def checkAmbiguity(self):
         self.declareObAdapts(self.a1,[self.IA])

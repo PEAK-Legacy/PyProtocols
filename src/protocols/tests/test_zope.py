@@ -25,15 +25,15 @@ class NewStyle(object):
 
 from checks import ImplementationChecks, makeClassTests, makeInstanceTests
 from checks import ProviderChecks, BasicClassProvidesChecks
-from checks import makeMetaClassProvidesTests
+from checks import makeMetaClassProvidesTests, AdaptiveChecks
 
-class BasicChecks(ImplementationChecks):
+class BasicChecks(AdaptiveChecks, ImplementationChecks):
     IA = IA
     IB = IB
     Interface = Interface
     IPure = IPure
 
-class InstanceChecks(ProviderChecks):
+class InstanceChecks(AdaptiveChecks, ProviderChecks):
     IA = IA
     IB = IB
     Interface = Interface
@@ -52,19 +52,19 @@ TestClasses += makeInstanceTests(InstanceChecks,Picklable,NewStyle)
 class IB(protocols.Interface):
     advise(protocolExtends = [IA])
 
-class BasicChecks(ImplementationChecks):
+class BasicChecks(AdaptiveChecks, ImplementationChecks):
     IA = IA
     IB = IB
     Interface = Interface
     IPure = IPure
 
-class InstanceChecks(ProviderChecks):
+class InstanceChecks(AdaptiveChecks, ProviderChecks):
     IA = IA
     IB = IB
     Interface = Interface
     IPure = IPure
 
-class ClassChecks(BasicClassProvidesChecks, ProviderChecks):
+class ClassChecks(AdaptiveChecks, BasicClassProvidesChecks, ProviderChecks):
     IA = IA
     IB = IB
     Interface = Interface
