@@ -136,27 +136,27 @@ class APITests(TestCase):
                 assert ob.value==j
 
 
+    def checkStickyAdapter(self):
+        class T: pass
+        t = T()
+        class I(Interface): pass
+        from protocols.adapters import StickyAdapter
+        class A(StickyAdapter):
+            attachForProtocols = I,
+            advise(instancesProvide=[I], asAdapterForTypes=[T])
 
+        a = adapt(t, I)
+        assert adapt(t, I) is a
+        assert a.subject is t
+        assert a.protocol is I
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        n = T()
+        a2 = adapt(n, I)
+        assert a2 is not a
+        assert a2.subject is n
+        assert a2.protocol is I
+        assert adapt(n, I) is a2
+        
 
 
 
