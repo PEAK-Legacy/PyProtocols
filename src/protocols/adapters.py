@@ -21,11 +21,11 @@ def DOES_NOT_SUPPORT(obj, protocol):
     return None
 
 
-
-
-
-
-
+try:
+    from _speedups import IMPLEMENTATION_ERROR, NO_ADAPTER_NEEDED, \
+        DOES_NOT_SUPPORT
+except ImportError:
+    pass
 
 
 

@@ -182,6 +182,10 @@ class Protocol:
             if factory is not None:
                 return factory[0](obj,self)
 
+    try:
+        from _speedups import Protocol__adapt__ as __adapt__
+    except ImportError:
+        pass
     __adapt__ = metamethod(__adapt__)
 
 
@@ -198,10 +202,6 @@ class Protocol:
 
         finally:
             self.__lock.release()
-
-
-
-
 
 class InterfaceClass(Protocol, type):
 

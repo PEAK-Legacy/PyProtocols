@@ -80,6 +80,11 @@ def adapt(obj, protocol, default=_marker, factory=IMPLEMENTATION_ERROR):
         return factory(obj, protocol)
     return default
 
+try:
+    from _speedups import adapt
+except ImportError:
+    pass
+
 # Fundamental, explicit interface/adapter declaration API:
 #   All declarations should end up passing through these three routines.
 
@@ -106,7 +111,6 @@ def declareAdapterForObject(protocol, adapter, ob, depth=1):
     """Declare that 'adapter' adapts 'ob' to 'protocol'"""
     adapt(protocol,IOpenProtocol).registerObject(ob,adapter,depth)
 
-
 # Bootstrap APIs to work with Protocol and InterfaceClass, without needing to
 # give Protocol a '__conform__' method that's hardwired to IOpenProtocol.
 # Note that InterfaceClass has to be registered first, so that when the
@@ -115,12 +119,7 @@ def declareAdapterForObject(protocol, adapter, ob, depth=1):
 
 IOpenProtocol.registerImplementation(InterfaceClass)    # VERY BAD!!
 IOpenProtocol.registerImplementation(Protocol)          # NEVER DO THIS!!
-
 # From this line forward, the declaration APIs can work.  Use them instead!
-
-
-
-
 
 # Interface and adapter declarations - convenience forms, explicit targets
 

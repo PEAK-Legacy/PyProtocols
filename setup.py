@@ -2,36 +2,36 @@
 
 """Distutils setup file"""
 
+include_speedups  = True   # edit this to avoid building C speedups module
+
+
 execfile('src/setup/prologue.py')
 
-# Metadata
 
+# Metadata
 PACKAGE_NAME = "PyProtocols"
 PACKAGE_VERSION = "0.8"
-
-HAPPYDOC_IGNORE = [
-    '-i', 'examples',  '-i', 'old', '-i', 'tests', '-i', 'setup',
-]
+HAPPYDOC_IGNORE = ['-i', 'tests', '-i', 'setup']
 
 
 # Base packages for installation
-scripts = []
-
 packages = [
     'protocols', 'protocols.tests',
 ]
 
-extensions = []
+if include_speedups:
+    extensions = [
+        Extension("protocols._speedups", ["src/protocols/_speedups" + EXT]),
+    ]
+else:
+    extensions = []
 
-# Base data files
 
+# data files & scripts
 data_files = []
+scripts = []
 
 execfile('src/setup/common.py')
-
-
-
-
 
 
 
@@ -58,6 +58,21 @@ setup(
     ext_modules = extensions,
     scripts = scripts,
 )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
