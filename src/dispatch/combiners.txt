@@ -268,7 +268,7 @@ create interesting method combinations:
 
         >>> strategy.single_best([])
         <...NoApplicableMethods instance at ...>
-       
+
         >>> strategy.single_best([(strategy.Signature(x=int),1)])
         1
 
@@ -281,7 +281,7 @@ create interesting method combinations:
         ...    [(strategy.Signature(x=int),1),(strategy.Signature(x=int),2)]
         ... )
         <...AmbiguousMethod instance at ...>
-        
+
     This function implements the default ``Dispatcher`` combination strategy,
     or the generic function strategy in the absence of ``next_method`` and
     before/after/around methods.
@@ -457,7 +457,7 @@ And now we can try them out::
     42
 
 Now, let's look at the function that was used in ``combine()`` to separate and
-preprocess the applicable methods.    
+preprocess the applicable methods.
 
 ``separate_qualifiers(qualified_cases, **postprocess)``
     Turn a list of cases with possibly-qualified methods into a dictionary
@@ -484,22 +484,22 @@ preprocess the applicable methods.
 
     Some examples/tests::
 
-    >>> def f1(x): pass
-    >>> def f2(x): pass
-    >>> def f3(x): pass
+        >>> def f1(x): pass
+        >>> def f2(x): pass
+        >>> def f3(x): pass
 
-    >>> mixed = [(1,("x",f1)),(2,("x",f2)),(3,("y",f3))]
-    >>> strategy.separate_qualifiers(mixed) # doctest: +NORMALIZE_WHITESPACE
-    {'y': [(3, <function f3...>)],
-     'x': [(1, <function f1...>), (2, <function f2...>)]}
+        >>> mixed = [(1,("x",f1)),(2,("x",f2)),(3,("y",f3))]
+        >>> strategy.separate_qualifiers(mixed) # doctest: +NORMALIZE_WHITESPACE
+        {'y': [(3, <function f3...>)],
+         'x': [(1, <function f1...>), (2, <function f2...>)]}
 
-    >>> flat = [(1,f1),(2,f2),(3,("y",f3))]
-    >>> strategy.separate_qualifiers(flat) # doctest: +NORMALIZE_WHITESPACE
-    {'y': [(3, <function f3...>)],
-     'primary': [(1, <function f1...>), (2, <function f2...>)]}
+        >>> flat = [(1,f1),(2,f2),(3,("y",f3))]
+        >>> strategy.separate_qualifiers(flat) # doctest: +NORMALIZE_WHITESPACE
+        {'y': [(3, <function f3...>)],
+         'primary': [(1, <function f1...>), (2, <function f2...>)]}
 
-    >>> strategy.separate_qualifiers(flat,primary=[strategy.method_chain])
-    {'y': [(3, <function f3...>)], 'primary': (1, <function f1...>)}
+        >>> strategy.separate_qualifiers(flat,primary=[strategy.method_chain])
+        {'y': [(3, <function f3...>)], 'primary': (1, <function f1...>)}
 
 
 So, now that you know how ``separate_qualifiers()`` works, you can go back and
@@ -510,13 +510,14 @@ when you might want to create custom combinations of your own.
 Map Dispatchers
 ===============
 
-Map dispatchers are typically used for class and attribute metadata, such as
-command line options associated with a class' attributes.  Map dispatchers
-merge the metadata that was defined for a class and its ancestors, detecting
-any ambiguities between specific metadata items defined in different base
-classes, or defined by multiple rules for the same class.  (Actually, they use
-normal implication precedence, but for simple metadata registries, this usually
-maps directly to the inheritance structure of the target classes.)
+Map dispatchers are ``Dispatcher`` subclasses, typically used for class and
+attribute metadata such as what command line options are associated with a
+class' attributes.  Map dispatchers merge the metadata that was defined for a
+class and its ancestors, detecting any ambiguities between specific metadata
+items defined in different base classes, or defined by multiple rules for the
+same class.  (Actually, they use normal implication precedence, but for simple
+metadata registries, this usually maps directly to the inheritance structure of
+the target classes.)
 
 In essence, one defines the metadata as a set of keys and values.  The map
 combiner builds a map of the "most specific" applicable values.  The keys and
