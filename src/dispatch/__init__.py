@@ -30,5 +30,5 @@
 """
 
 from dispatch.interfaces import *
-from dispatch.strategy import *     # XXX?
-
+from dispatch.strategy import *
+from dispatch.functions import GenericFunction, defmethod, when

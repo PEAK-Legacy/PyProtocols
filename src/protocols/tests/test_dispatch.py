@@ -9,6 +9,7 @@ from dispatch import *
 from dispatch.predicates import *
 from protocols import Interface,advise,declareImplementation
 from dispatch import strategy
+from dispatch.strategy import most_specific_signatures, ordered_signatures
 
 class Vehicle(object):  pass
 class LandVehicle(Vehicle): pass
@@ -102,7 +103,7 @@ class TestTests(TestCase):
             self.failUnless(object in seeds)
             self.failIf(len(seeds)<>2)
             self.failUnless(
-                ITest(klass).dispatch_function is dispatch_by_mro
+                ITest(klass).dispatch_function is strategy.dispatch_by_mro
             )
 
     def testTestAdaptation(self):
