@@ -2,7 +2,7 @@
 
 __all__ = [
     'TestBase', 'ImplementationChecks', 'ProviderChecks',
-    'InstanceImplementationChecks',
+    'InstanceImplementationChecks', 'makeClassTests', 'ClassProvidesChecks',
 ]
 
 from unittest import TestCase, makeSuite, TestSuite
@@ -365,5 +365,169 @@ class ImplementationChecks(InstanceImplementationChecks):
 
 
 
+
+
+class ClassProvidesChecks:
+
+    """Object-provides checks for classes and types"""
+
+    def checkNoInstancePassThru(self):
+        inst = self.ob()
+        adviseObject(self.ob, provides=[self.IA])
+        assert adapt(inst, self.IA, None) is None
+
+
+    def checkInheritedDeclaration(self):
+        class Sub(self.ob): pass
+        adviseObject(self.ob, provides=[self.IB])
+        assert adapt(Sub, self.IB, None) is Sub
+        assert adapt(Sub, self.IA, None) is Sub
+
+
+    def checkRejectInheritanceAndReplace(self):
+        adviseObject(self.ob, provides=[self.IB])
+
+        class Sub(self.ob): advise(classDoesNotProvide=[self.IB])
+
+        assert adapt(Sub,self.IA,None) is Sub
+        assert adapt(Sub,self.IB,None) is None
+
+        adviseObject(Sub,provides=[self.IB])
+        assert adapt(Sub,self.IB,None) is Sub
+
+
+    def checkChangingBases(self):
+
+        # Zope and Twisted fail this because they rely on the first-found
+        # __implements__ attribute and ignore a class' MRO/__bases__
+
+        M1, M2 = self.setupBases(self.ob)
+        adviseObject(M1, provides=[self.IA])
+        adviseObject(M2, provides=[self.IB])
+        self.assertM1ProvidesOnlyAandM2ProvidesB(M1,M2)
+        self.assertChangingBasesChangesInterface(M1,M2,M1,M2)
+
+
+def makeInstanceTests(base):
+
+    """Generate a set of instance-oriented test classes using 'base'"""
+
+    class AdviseFunction(base):
+        def setUp(self):
+            def aFunc(foo,bar):
+                pass
+            self.ob = aFunc
+
+    class AdviseModule(base):
+        def setUp(self):
+            from types import ModuleType
+            self.ob = ModuleType()
+
+    class AdviseInstance(base):
+        def setUp(self):
+            self.ob = self.Picklable()
+
+        def checkPickling(self):
+            from cPickle import loads,dumps     # pickle has a bug!
+            adviseObject(self.ob, provides=[self.IPure])
+            newOb = loads(dumps(self.ob))
+            assert adapt(newOb,self.IPure,None) is newOb, newOb.__conform__.subject()
+
+    class AdviseNewInstance(AdviseInstance):
+        def setUp(self):
+            self.ob = self.NewStyle()
+
+    return AdviseFunction, AdviseModule, AdviseInstance, AdviseNewInstance
+
+
+
+
+
+
+
+
+
+
+
+def makeClassProvidesTests(base):
+
+    """Generate a set of class-provides-oriented test classes using 'base'"""
+
+    class AdviseClass(base):
+        def setUp(self):
+            class Classic:
+                pass
+            self.ob = Classic
+
+    class AdviseType(AdviseClass):
+        def setUp(self):
+            class Class(object):
+                pass
+            self.ob = Class
+
+    return AdviseClass, AdviseType
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def makeClassTests(base):
+
+    """Generate a set of class-oriented test classes using 'base'"""
+
+    class TestClassic(base):
+
+        def setUp(self):
+            class Classic: pass
+            self.klass = Classic
+            self.ob = Classic()
+
+    class TestBuiltin(base):
+
+        def setUp(self):
+            # Note: We need a type with a no-arguments constructor
+            class Newstyle(list): __slots__ = ()
+            self.klass = Newstyle
+            self.ob = Newstyle()
+
+    class TestMetaclass(base):
+
+        def setUp(self):
+            class Meta(type): pass
+            self.klass = Meta
+            class Base(object): __metaclass__ = Meta
+            self.ob = Base
+
+        def make(self,klass):
+            return klass('Dummy',(object,),{})
+
+    class TestMetaInstance(base):
+
+        def setUp(self):
+            class Meta(type): pass
+            class Base(object): __metaclass__ = Meta
+            self.klass = Base
+            self.ob = Base()
+
+    return TestClassic, TestBuiltin, TestMetaclass, TestMetaInstance
 
 

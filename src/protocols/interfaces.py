@@ -258,25 +258,25 @@ class Attribute(object):
     def __get__(self,ob,typ=None):
         if ob is None:
             return self
+        if not self.name:
+            raise NotImplementedError("Abstract attribute")
         try:
             return ob.__dict__[self.name]
         except KeyError:
             return self.value
 
     def __set__(self,ob,val):
+        if not self.name:
+            raise NotImplementedError("Abstract attribute")
         ob.__dict__[self.name] = val
 
     def __delete__(self,ob):
+        if not self.name:
+            raise NotImplementedError("Abstract attribute")
         del ob.__dict__[self.name]
 
     def __repr__(self):
         return "Attribute: %s" % self.__doc__
-
-
-
-
-
-
 
 
 

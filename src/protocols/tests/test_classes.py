@@ -8,40 +8,12 @@
 
 from unittest import TestCase, makeSuite, TestSuite
 from protocols import *
-from checks import TestBase, ImplementationChecks, AdaptiveChecks
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+from checks import ImplementationChecks, AdaptiveChecks,  makeClassTests
 
 
 class BasicChecks(AdaptiveChecks, ImplementationChecks):
 
-    """Checks to be done on every object"""
+    """PyProtocols-only class-instances-provide checks"""
 
     def checkChangingBases(self):
 
@@ -57,108 +29,8 @@ class BasicChecks(AdaptiveChecks, ImplementationChecks):
         self.assertChangingBasesChangesInterface(M1,M2,m1,m2)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-class TestClassic(BasicChecks):
-
-    def setUp(self):
-        class Classic: pass
-        self.klass = Classic
-        self.ob = Classic()
-
-
-class TestBuiltin(BasicChecks):
-
-    def setUp(self):
-        # Note: We need a type with a no-arguments constructor
-        class Newstyle(list): __slots__ = ()
-        self.klass = Newstyle
-        self.ob = Newstyle()
-
-
-class TestMetaclass(BasicChecks):
-
-    def setUp(self):
-        class Meta(type): pass
-        self.klass = Meta
-        class Base(object): __metaclass__ = Meta
-        self.ob = Base
-
-    def make(self,klass):
-        return klass('Dummy',(object,),{})
-
-
-class TestMetaInstance(BasicChecks):
-
-    def setUp(self):
-        class Meta(type): pass
-        class Base(object): __metaclass__ = Meta
-        self.klass = Base
-        self.ob = Base()
-
-
-
-
-
-TestClasses = (
-    TestClassic, TestBuiltin, TestMetaclass, TestMetaInstance,
-)
-
+TestClasses = makeClassTests(BasicChecks)
 
 def test_suite():
     return TestSuite([makeSuite(t,'check') for t in TestClasses])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

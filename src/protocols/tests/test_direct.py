@@ -8,35 +8,8 @@
 
 from unittest import TestCase, makeSuite, TestSuite
 from protocols import *
-from checks import TestBase, ProviderChecks, AdaptiveChecks
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+from checks import ProviderChecks, AdaptiveChecks, ClassProvidesChecks
+from checks import makeClassProvidesTests, makeInstanceTests
 
 
 class BasicChecks(AdaptiveChecks, ProviderChecks):
@@ -44,64 +17,9 @@ class BasicChecks(AdaptiveChecks, ProviderChecks):
     """Checks to be done on every object"""
 
 
-class ClassChecks(BasicChecks):
+class ClassChecks(ClassProvidesChecks, BasicChecks):
 
     """Checks to be done on classes and types"""
-
-    def checkNoInstancePassThru(self):
-        inst = self.ob()
-        adviseObject(self.ob, provides=[self.IA])
-        assert adapt(inst, self.IA, None) is None
-
-
-    def checkInheritedDeclaration(self):
-
-        class Sub(self.ob): pass
-
-        adviseObject(self.ob, provides=[self.IB])
-        assert adapt(Sub, self.IB, None) is Sub
-        assert adapt(Sub, self.IA, None) is Sub
-
-
-    def checkRejectInheritanceAndReplace(self):
-        adviseObject(self.ob, provides=[self.IB])
-
-        class Sub(self.ob): advise(classDoesNotProvide=[self.IB])
-
-        assert adapt(Sub,self.IA,None) is Sub
-        assert adapt(Sub,self.IB,None) is None
-
-        adviseObject(Sub,provides=[self.IB])
-        assert adapt(Sub,self.IB,None) is Sub
-
-
-
-
-
-
-
-    def checkChangingBases(self):
-
-        # Zope and Twisted fail this because they rely on the first-found
-        # __implements__ attribute and ignore a class' MRO/__bases__
-
-        M1, M2 = self.setupBases(self.ob)
-        adviseObject(M1, provides=[self.IA])
-        adviseObject(M2, provides=[self.IB])
-        self.assertM1ProvidesOnlyAandM2ProvidesB(M1,M2)
-        self.assertChangingBasesChangesInterface(M1,M2,M1,M2)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -162,88 +80,6 @@ class ClassConformChecks(InstanceConformChecks):
         self.assertBadConform(b, [self.IA], b.__conform__)
 
 
-class AdviseFunction(BasicChecks, InstanceConformChecks):
-
-    def setUp(self):
-        def aFunc(foo,bar):
-            pass
-        self.ob = aFunc
-
-class AdviseModule(AdviseFunction):
-
-    def setUp(self):
-        from types import ModuleType
-        self.ob = ModuleType()
-
-
-class AdviseClass(ClassChecks, ClassConformChecks):
-
-    def setUp(self):
-        class Classic:
-            pass
-        self.ob = Classic
-
-
-class AdviseType(AdviseClass):
-
-    def setUp(self):
-        class Class(object):
-            pass
-        self.ob = Class
-
-
-
-
-
-
-
-
-
-
-
-
-
-class AdviseInstance(AdviseFunction):
-
-    def setUp(self):
-        self.ob = self.Picklable()
-
-    def checkPickling(self):
-        from pickle import loads,dumps
-        adviseObject(self.ob, provides=[self.IPure])
-        newOb = loads(dumps(self.ob))
-        assert adapt(newOb,self.IPure,None) is newOb
-
-
-
-class AdviseNewInstance(AdviseInstance):
-
-    def setUp(self):
-        self.ob = self.NewStyle()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class AdviseMixinInstance(BasicChecks):
 
     def setUp(self):
@@ -285,11 +121,16 @@ class AdviseMixinMultiMeta2(ClassChecks):
 
 
 
+class InstanceTestsBase(BasicChecks, InstanceConformChecks): pass
+class ClassTestsBase(ClassChecks, ClassConformChecks): pass
+
 TestClasses = (
-    AdviseFunction, AdviseModule, AdviseClass, AdviseType,
     AdviseMixinInstance, AdviseMixinClass, AdviseMixinMultiMeta1,
-    AdviseMixinMultiMeta2, AdviseInstance
+    AdviseMixinMultiMeta2
 )
+
+TestClasses += makeClassProvidesTests(ClassTestsBase)
+TestClasses += makeInstanceTests(InstanceTestsBase)
 
 def test_suite():
     return TestSuite([makeSuite(t,'check') for t in TestClasses])

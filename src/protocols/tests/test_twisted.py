@@ -15,107 +15,16 @@ class IA(Interface):
 class IB(IA):
     pass
 
-from checks import InstanceImplementationChecks
+from checks import InstanceImplementationChecks, makeClassTests
 
 class BasicChecks(InstanceImplementationChecks):
     IA = IA
     IB = IB
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-class TestClassic(BasicChecks):
-
-    def setUp(self):
-        class Classic: pass
-        self.klass = Classic
-        self.ob = Classic()
-
-
-class TestBuiltin(BasicChecks):
-
-    def setUp(self):
-        # Note: We need a type with a no-arguments constructor
-        class Newstyle(list): __slots__ = ()
-        self.klass = Newstyle
-        self.ob = Newstyle()
-
-
-class TestMetaclass(BasicChecks):
-
-    def setUp(self):
-        class Meta(type): pass
-        self.klass = Meta
-        class Base(object): __metaclass__ = Meta
-        self.ob = Base
-
-    def make(self,klass):
-        return klass('Dummy',(object,),{})
-
-
-class TestMetaInstance(BasicChecks):
-
-    def setUp(self):
-        class Meta(type): pass
-        class Base(object): __metaclass__ = Meta
-        self.klass = Base
-        self.ob = Base()
-
-
-
-
-
-TestClasses = (
-    TestClassic, TestBuiltin, TestMetaclass, TestMetaInstance,
-)
-
+TestClasses = makeClassTests(BasicChecks)
 
 def test_suite():
     return TestSuite([makeSuite(t,'check') for t in TestClasses])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

@@ -63,7 +63,7 @@ class TwistedAdaptMethod(object):
             return obj
 
         # Get Twisted to try and adapt
-        return self.iface(ob, None)
+        return self.iface(obj, None)
 
 
     def im_func(self, ob, default):

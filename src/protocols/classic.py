@@ -154,13 +154,13 @@ class conformsRegistry(dict):
         return self.subject(), self.items()
 
     def __setstate__(self,(subject,items)):
-        from weakref import ref
-        try:
-            self.subject = ref(subject)
-        except TypeError:
-            self.subject = lambda: subject
         self.clear()
         self.update(dict(items))
+        self.subject = mkRef(subject)
+
+
+
+
 
 class MiscObjectsAsOpenProvider(object):
 
