@@ -39,6 +39,88 @@ class DispatchNode(dict):
 
 
 
+class CriterionIndex:
+
+    """Index connecting seeds and results"""
+
+    def __init__(self):
+        self.clear()
+
+    def clear(self):
+        """Reset index to empty"""
+        self.allSeeds = {}          # set of all seeds
+        self.matchingSeeds = {}     # applicable seeds for each case
+        self.criteria = {}          # criterion each value was saved under
+
+
+    def __setitem__(self,criterion,case):
+        """Register 'value' under each of the criterion's seeds"""
+
+        seeds = self.allSeeds
+        caseItems = self.matchingSeeds.setdefault(case,[])
+
+        for key in criterion.seeds(seeds):
+            if key not in seeds:
+                self.addSeed(key)
+
+        caseItems.extend(criterion.matches(seeds))
+        self.criteria[case] = criterion
+
+
+    def __iter__(self):
+        return iter(self.allSeeds)
+
+    def __len__(self):
+        return len(self.allSeeds)
+
+
+    def count_for(self,cases):
+        """Get the total count of outgoing branches, given incoming cases"""
+        get = self.matchingSeeds.get
+        dflt = self.allSeeds
+        return sum([len(get(case,dflt)) for case in cases])
+
+    def casemap_for(self,cases):
+        """Return a mapping from seeds->caselists for the given cases"""
+        casemap = {}
+        get = self.matchingSeeds.get
+        set = casemap.setdefault
+        dflt = self.allSeeds
+
+        for case in cases:
+            for key in get(case,dflt):
+                set(key,[]).append(case)
+
+        return casemap
+
+
+    def addSeed(self,seed):
+        """Add a previously-missing seed"""
+        criteria = self.criteria
+
+        for case,itsSeeds in self.matchingSeeds.items():
+            if case in criteria and seed in criteria[case]:
+                itsSeeds.append(seed)
+
+        self.allSeeds[seed] = None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class NullTest:
 
     """Test that is always true"""
@@ -271,9 +353,7 @@ class Dispatcher:
                     for key,subcases in case_map.items():
                         yield key,build((subcases,remaining_ids,memo))
                 def reseed(key):
-                    self.disp_indexes[best_id][key] = [
-                        sm for sm in self.cases if key in sm[0].get(best_id)
-                    ]
+                    self.disp_indexes[best_id].addSeed(key)
                     case_map[key] = [
                         sm for sm in cases if key in sm[0].get(best_id)
                     ]
@@ -284,6 +364,8 @@ class Dispatcher:
                 node = DispatchNode(best_id, dispatch_table, reseed)
         memo[key] = node
         return node
+
+
 
     def __getitem__(self,argtuple):
         self.__lock.acquire()
@@ -315,7 +397,7 @@ class Dispatcher:
                     node = dispatch_function(argtuple[expr], node)
                 else:
                     if cache is None:
-                        cache = {EXPR_GETTER_ID: get}                       
+                        cache = {EXPR_GETTER_ID: get}
                     node = dispatch_function(get(expr), node)
         finally:
             cache = get = None    # allow GC of values computed during dispatch
@@ -420,24 +502,24 @@ class Dispatcher:
 
 
     def _addCase(self,case):
-        (signature,method) = case
-        for disp_id, caselists in self.disp_indexes.items():
-
-            test = signature.get(disp_id)
-
-            for key in test.seeds(caselists):
-                if key not in caselists:
-                    # Add in cases that didn't test this key  :(
-                    caselists[key] = [
-                        sm for sm in self.cases
-                            if key in sm[0].get(disp_id)
-                    ]
-
-            for key in test.matches(caselists):
-                caselists[key].append(case)
+        for disp_id, criterion in case[0].items():
+            self.disp_indexes[disp_id][criterion] = case
 
         self.cases.append(case)
         self._dispatcher = None
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -465,29 +547,29 @@ class Dispatcher:
             if disp_id in disabled:
                 continue    # Skip tests that have unchecked prerequisites
 
-            casemap = {}
-            total_cases = 0
-            for key,caselist in self.disp_indexes[disp_id].items():
-                caselist = filter(is_active,caselist)
-                casemap[key] = caselist
-                total_cases += len(caselist)
+            index = self.disp_indexes[disp_id]
+            total_cases = index.count_for(cases)
+            lindex = len(index)
 
-            if total_cases == active_cases * len(casemap):
+            if total_cases == active_cases * lindex:
                 # None of the index keys for this expression eliminate any
                 # cases, so this expression isn't needed for dispatching
                 remaining_ids.remove(disp_id)
                 continue
 
-            spread = float(total_cases) / len(casemap)
+            spread = float(total_cases) / lindex
             if spread < best_spread or best_spread is None:
                 best_spread = spread
                 best_id = disp_id
-                best_map = casemap
 
         if best_id is not None:
             remaining_ids.remove(best_id)
+            best_map = self.disp_indexes[best_id].casemap_for(cases)
 
         return best_id, best_map, tuple(remaining_ids)
+
+
+
 
 
     def _dispatch_id(self,(expr,disp_func),test):
@@ -496,7 +578,8 @@ class Dispatcher:
         test.subscribe(self)
         expr = self.getExpressionId(expr)
         disp = expr, test.dispatch_function
-        self.disp_indexes.setdefault(disp,{})
+        if disp not in self.disp_indexes:
+            self.disp_indexes[disp] = index = CriterionIndex()
         return expr
 
 
@@ -526,7 +609,6 @@ class Dispatcher:
             if key[0] >= self.argct:    # constrain non-argument exprs
                 for item in pre: self.constraints.add(item,key)
             pre.append(key)
-
 
 
 
