@@ -375,8 +375,8 @@ class Dispatcher(BaseDispatcher):
     def __init__(self,args):
         self.args = args
         self.argct = len(args)
-        from dispatch.strategy import Argument
-        self.argMap = dict([(name,Argument(name=name)) for name in args])
+        global strategy; import strategy
+        self.argMap = dict([(name,strategy.Argument(name=name)) for name in args])
         lock = allocate_lock()
         self._acquire = lock.acquire
         self._release = lock.release
@@ -397,7 +397,7 @@ class Dispatcher(BaseDispatcher):
         self.disp_indexes = {}
         self.expr_map = {}
         self._dispatcher = None
-        from dispatch.strategy import TGraph; self.constraints=TGraph()
+        self.constraints=strategy.TGraph()
         self._setupArgs()
 
 
@@ -468,11 +468,10 @@ class Dispatcher(BaseDispatcher):
 
     def _setupArgs(self):
         self.expr_defs = [None]*self.argct  # skip defs for arguments
-        from dispatch.strategy import Argument
         for p,n in enumerate(self.args):
-            self.expr_map[Argument(name=n)] = p
-            self.expr_map[Argument(pos=p)] = p
-            self.expr_map[Argument(name=n,pos=p)] = p
+            self.expr_map[strategy.Argument(name=n)] = p
+            self.expr_map[strategy.Argument(pos=p)] = p
+            self.expr_map[strategy.Argument(name=n,pos=p)] = p
 
 
     def _startNode(self):
@@ -490,6 +489,7 @@ class Dispatcher(BaseDispatcher):
 
 
 
+
     def __setitem__(self,signature,method):
         """Update indexes to include 'signature'->'method'"""
         cond = self.parseRule(signature)
@@ -498,13 +498,12 @@ class Dispatcher(BaseDispatcher):
                 self[signature] = method
             return
 
-        from dispatch.strategy import Signature, NullCriterion
         self._acquire()
         try:
-            signature = Signature(
+            signature = strategy.Signature(
                 [(self._dispatch_id(expr,criterion),criterion)
                     for expr,criterion in ISignature(signature).items()
-                        if criterion is not NullCriterion
+                        if criterion is not strategy.NullCriterion
                 ]
             )
             self._addCase((signature, method))
@@ -531,16 +530,9 @@ class Dispatcher(BaseDispatcher):
 
 
 
-    def combine(self,cases):
-        import strategy
-        for group in strategy.ordered_signatures(cases):
-            if len(group)>1:
-                return AmbiguousMethod(group)
-            elif group:
-                return group[0][1]
-            else:
-                return NoApplicableMethods()
 
+    def combine(self,cases):
+        return strategy.single_best(cases)
 
     def _addCase(self,case):
         for disp_id, criterion in case[0].items():
@@ -548,6 +540,14 @@ class Dispatcher(BaseDispatcher):
 
         self.cases.append(case)
         self._dispatcher = None
+
+
+
+
+
+
+
+
 
 
 
@@ -709,7 +709,6 @@ class AbstractGeneric(Dispatcher):
             if kind=='class':
                 # 'when()' in class body; defer adding the method
                 def registerClassSpecificMethod(cls):
-                    import strategy
                     req = strategy.Signature(
                         [(strategy.Argument(0),ICriterion(cls))]
                     )
@@ -736,13 +735,12 @@ class AbstractGeneric(Dispatcher):
 
 
 
+
 class GenericFunction(AbstractGeneric):
 
     """Extensible predicate dispatch generic function"""
 
     def combine(self,cases):
-        import strategy
-
         strict = [strategy.ordered_signatures,strategy.safe_methods]
         loose  = [strategy.ordered_signatures,strategy.all_methods]
 
@@ -771,6 +769,8 @@ class GenericFunction(AbstractGeneric):
             chain = strategy.method_chain(list(cases['around'])+[chain])
 
         return chain
+
+
 
 
 

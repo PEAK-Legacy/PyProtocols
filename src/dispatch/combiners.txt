@@ -16,20 +16,26 @@ techniques, ranging from using a provided subclass of ``GenericFunction`` or
 >>> from dispatch import strategy, functions, combiners, NoApplicableMethods
 
 
+.. contents:: **Table of Contents**
+
+
 --------------------------
 The "Standard" Combination
 --------------------------
 
-The default ``GenericFunction`` class implements a result combination strategy
+The default ``Dispatcher`` class only supports returning the most-specific
+value, or raising ``NoApplicableMethods`` or ``AmbiguousMethod`` errors.  But,
+the default ``GenericFunction`` class implements a result combination strategy
 similar to the "standard method combination" for generic functions in the
 Common Lisp Object System (CLOS).  Specifically, it supports methods calling
 the "next method", and it supports "before", "after", and "around" methods, in
 an ordering similar to that of CLOS.
 
 Let's go over each of these concepts in turn.  But as we do, please keep in
-mind that before/after/around methods in PyProtocols should be needed less
-often than their CLOS equivalents, so make sure you *really* need a particular
-feature before making your code more complicated than it needs to be.
+mind that because of PyProtocols' "logical implication" approach to method
+ordering, before/after/around methods should be needed less often than they
+would be in CLOS.  So, make sure you actually need a particular feature before
+making your code more complicated than it needs to be.
 
 
 Using ``next_method``
@@ -193,8 +199,9 @@ run.
 
 Sometimes you need to recognize certain special cases, and perhaps not run
 the entire generic function, or need to alter its return value in some way,
-etc.  You can do this with "around" methods, which run "around" the entire
-"before/primary/after" sequence described in the previous section.
+or perhaps trap and handle certain exceptions, etc.  You can do this with
+"around" methods, which run "around" the entire "before/primary/after" sequence
+described in the previous section.
 
 A good way to think of this is that it's as if the "around" methods form a
 separate generic function, whose default (least-specific) method is the
@@ -207,7 +214,7 @@ and so on.  When there are no more "around" methods, calling ``next_method``
 instead invokes the "before", "primary", and "after" methods, according to
 the sequence described in the previous section.  For example::
 
-    >>> if BankAccount.withdraw.around("amount > self.balance"): # Python 2.3
+    >>> if [BankAccount.withdraw.around("amount > self.balance")]: # Python 2.3
     ...     def overdraft_fee(next_method,self,amount):
     ...         print "Adding overdraft fee of $25"
     ...         return next_method(self,amount+25)
@@ -216,23 +223,14 @@ the sequence described in the previous section.  For example::
     Transferring 45 from overdraft protection
 
 (Note: the ``if`` block should be replaced by a decorator in normal code; it
-needs to be as shown for ``doctest`` to properly parse the above test in
-Python versions < 2.4.)
+needs to be as shown for ``doctest`` to properly parse the above test
+in Python versions < 2.4.)
 
 
 
-Default Result Combination
-==========================
-
-XXX need test for default Dispatcher combination strategy (i.e. most-specific
-only)
-
-
-
-
-
+-------------------------
 Custom Result Combination
-=========================
+-------------------------
 
 If none of the supplied ``Dispatcher`` or ``GenericFunction`` subclasses
 directly meet your needs, you'll want to implement a custom subclass that
@@ -255,11 +253,38 @@ filtering, and combining methods from the input sequence.
 
 
 Method Combination Utilities
-----------------------------
+============================
 
 The following method combination utilities are available from the
 ``dispatch.strategy`` module.  They can be assembled in various ways to
 create interesting method combinations:
+
+``single_best(cases)``
+    Return the single "best" method or value from `cases`.  That is, the
+    method or value of the case whose signature is most specific.  If it's
+    ambiguous as to which is most specific, an ``AmbiguousMethod`` instance is
+    returned.  If ``cases`` is empty, then a ``NoApplicableMethods`` instance
+    is returned::
+
+        >>> strategy.single_best([])
+        <...NoApplicableMethods instance at ...>
+       
+        >>> strategy.single_best([(strategy.Signature(x=int),1)])
+        1
+
+        >>> strategy.single_best(
+        ...    [(strategy.Signature(x=object),1),(strategy.Signature(x=int),2)]
+        ... )
+        2
+
+        >>> strategy.single_best(
+        ...    [(strategy.Signature(x=int),1),(strategy.Signature(x=int),2)]
+        ... )
+        <...AmbiguousMethod instance at ...>
+        
+    This function implements the default ``Dispatcher`` combination strategy,
+    or the generic function strategy in the absence of ``next_method`` and
+    before/after/around methods.
 
 ``ordered_signatures(cases)``
     Yields a series of cases grouped by specificity, such that each group
@@ -285,7 +310,6 @@ create interesting method combinations:
     >>> list(strategy.safe_methods([[(1,2)],[(3,4),(5,6)]]))
     [2, <...AmbiguousMethod instance at ...>]
 
-
 ``all_methods(grouped_cases)``
     Yields all methods from the grouped cases, including ones in ambiguous
     groups.
@@ -294,7 +318,6 @@ create interesting method combinations:
     []
     >>> list(strategy.all_methods([[(1,2)],[(3,4),(5,6)]]))
     [2, 4, 6]
-
 
 ``method_chain(methods)``
     Returns a callable that invokes the first method in ``methods``.  If
@@ -346,6 +369,96 @@ create interesting method combinations:
     []
 
 
+Custom Method Qualfiers
+=======================
+
+If the standard before/after/around/when decorators don't work for your
+application, you can create custom ones by subclassing ``AbstractGeneric`` and
+defining your own "method qualifiers".  Here's an example of a "pricing rules"
+generic function that accomodates tax and discounts as well as upcharges.
+(Don't worry if you don't understand it at first glance; we'll go over the
+individual parts in detail later.)::
+
+    >>> class Pricing(functions.AbstractGeneric):
+    ...     """Implement a generic pricing rule with add-ons, tax, etc."""
+    ...
+    ...     def add_when(self,cond): self._decorate(cond,"add")
+    ...     def tax_when(self,cond): self._decorate(cond,"tax")
+    ...     def discount_when(self,cond): self._decorate(cond,"discount")
+    ...
+    ...     def combine(self,cases):
+    ...         cases = strategy.separate_qualifiers(
+    ...             cases, add=[
+    ...                 strategy.ordered_signatures, strategy.all_methods,
+    ...                 strategy.method_list
+    ...             ],
+    ...         )
+    ...         discount = strategy.single_best(cases.get('discount',()))
+    ...         tax = strategy.single_best(cases.get('tax',()))
+    ...
+    ...         def combined(*args,**kw):
+    ...             price = sum(cases['add'](*args,**kw))
+    ...             if not isinstance(discount,NoApplicableMethods):
+    ...                 price -= discount(*args,**kw) * price
+    ...             if not isinstance(tax,NoApplicableMethods):
+    ...                 price += tax(*args,**kw) * price
+    ...             return price
+    ...
+    ...         return combined
+
+The ``_decorate`` method of ``AbstractGeneric`` implements a simple function
+decorator similar to ``when()`` et al., so ``Pricing`` generic functions will
+have ``add_when()``, ``tax_when()``, and ``discount_when()`` decorator methods.
+The functions decorated by these methods are then tracked with "qualifiers"
+indicating what kind of method they are, so that ``combine()`` can then
+separate them out of the list of applicable methods for a given situation.
+``combine()`` then creates a closure (``combined``) that combines the effects
+of the applicable methods.
+
+We can now use this pricing class to implement a generic function::
+
+    >>> class Product:
+    ...     [dispatch.generic(Pricing)]
+    ...     def getPrice(product,customer=None,options=()):
+    ...         """Get this product's price"""
+    ...
+    ...     [getPrice.add_when(strategy.default)]
+    ...     def __addBasePrice(product,customer,options):
+    ...         """Always include the product's base price"""
+    ...         return product.base_price
+
+    >>> shoes = Product()
+    >>> shoes.base_price = 42
+
+And then we can create some pricing rules (again, these "if" blocks should be
+decorators; they have to be this way to support running the doctests in Python
+2.3)::
+
+    >>> if [Product.getPrice.add_when("'blue suede' in options")]:
+    ...     def blueSuedeUpcharge(product,customer,options):
+    ...         return 24
+    ...
+
+    >>> if [Product.getPrice.discount_when(
+    ...    "customer=='Elvis' and 'blue suede' in options and product is shoes"
+    ... )]:
+    ...     def ElvisGetsTenPercentOff(product,customer,options):
+    ...         return .1
+
+And now we can try them out::
+
+    >>> shoes.getPrice()
+    42
+    >>> shoes.getPrice(options=['blue suede'])
+    66
+    >>> print shoes.getPrice('Elvis',options=['blue suede'])
+    59.4
+    >>> shoes.getPrice('Elvis')     # no suede, no discount!
+    42
+
+Now, let's look at the function that was used in ``combine()`` to separate and
+preprocess the applicable methods.    
+
 ``separate_qualifiers(qualified_cases, **postprocess)``
     Turn a list of cases with possibly-qualified methods into a dictionary
     mapping qualifiers to (possibly post-processed) case lists.  If a given
@@ -387,6 +500,11 @@ create interesting method combinations:
 
     >>> strategy.separate_qualifiers(flat,primary=[strategy.method_chain])
     {'y': [(3, <function f3...>)], 'primary': (1, <function f1...>)}
+
+
+So, now that you know how ``separate_qualifiers()`` works, you can go back and
+see what the ``Pricing.combine()`` method is doing, and begin thinking about
+when you might want to create custom combinations of your own.
 
 
 Map Dispatchers
@@ -562,8 +680,4 @@ results in an error at dispatch time::
 As you can see, ``r1`` and ``r3`` have conflicting definitions for the value
 of ``'key_a'``, so making them both applicable to ``D`` instances creates an
 ambiguity.
-
-
-
-
 

@@ -21,9 +21,9 @@
 """
 
 from dispatch.interfaces import *
+from types import ClassType as _ClassType
 
-
-
+_cls  = _ClassType,type
 
 
 
@@ -74,8 +74,8 @@ def generic(combiner=None):
     '[dispatch.generic()]' instead of '@dispatch.generic()'.
     """
 
-
-
+    from dispatch.functions import GenericFunction, AbstractGeneric
+    from protocols.advice import add_assignment_advisor
 
 
 
@@ -83,14 +83,15 @@ def generic(combiner=None):
     if combiner is None:
         def callback(frm,name,value,old_locals):
             return GenericFunction(value).delegate
+    elif isinstance(combiner,_cls) and issubclass(combiner,AbstractGeneric):
+        def callback(frm,name,value,old_locals):
+            return combiner(value).delegate
     else:
         def callback(frm,name,value,old_locals):
             gf = GenericFunction(value)
             gf.combine = combiner
             return gf.delegate
 
-    from dispatch.functions import GenericFunction
-    from protocols.advice import add_assignment_advisor
     return add_assignment_advisor(callback)
 
 
@@ -118,9 +119,6 @@ def as(*decorators):
 
     from protocols.advice import add_assignment_advisor
     return add_assignment_advisor(callback)
-
-
-
 
 
 def on(argument_name):

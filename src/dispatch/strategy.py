@@ -85,7 +85,7 @@ def validateCriterion(criterion, dispatch_function):
 
     criterion = ICriterion(criterion)
     assert criterion.dispatch_function is dispatch_function
-    
+
     assert criterion==criterion, (criterion, "should equal itself")
     assert criterion!=NullCriterion,(criterion,"shouldn't equal NullCriterion")
     assert criterion!=~criterion,(criterion,"shouldn't equal its inverse")
@@ -114,7 +114,7 @@ def validateCriterion(criterion, dispatch_function):
     for value in d.values():
         assert not value, (criterion,"should've included",seed,"in matches")
 
-   
+
     criterion.subscribe(d)
     criterion.unsubscribe(d)
 
@@ -289,7 +289,7 @@ class ClassCriterion(AbstractCriterion):
     """Criterion that indicates expr is of a particular class"""
 
     __slots__ = 'subject'
-    
+
     protocols.advise(
         instancesProvide=[ICriterion], asAdapterForTypes=ClassTypes
     )
@@ -402,7 +402,7 @@ class NullCriterion(AbstractCriterion):
     def seeds(self,table):      return ()
     def __contains__(self,ob):  return True
     def implies(self,other):    return False
-    def __repr__(self):         return "NullCriterion"   
+    def __repr__(self):         return "NullCriterion"
     def matches(self,table):    return list(table)
 
 NullCriterion = NullCriterion()
@@ -821,6 +821,8 @@ def safe_methods(grouped_cases):
 def method_list(methods):
     """Return callable that yields results of calling 'methods' w/same args"""
 
+    methods = list(methods)     # ensure it's re-iterable
+
     def combined(*args,**kw):
         for m in methods:
             yield m(*args,**kw)
@@ -831,7 +833,7 @@ def method_list(methods):
 def method_chain(methods):
     """Chain 'methods' such that each may call the next"""
 
-    methods = iter(methods)
+    methods = iter(methods) # ensure that nested calls will see only the tail
 
     for method in methods:
         try:
@@ -849,13 +851,11 @@ def method_chain(methods):
     return NoApplicableMethods()
 
 
-
-
-
-
-
-
-
+def single_best(cases):
+    for method in safe_methods(ordered_signatures(cases)):
+        return method
+    else:
+        return NoApplicableMethods()
 
 
 
