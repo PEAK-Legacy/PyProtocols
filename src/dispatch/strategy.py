@@ -804,12 +804,12 @@ def safe_methods(grouped_cases):
 
     for group in grouped_cases:
         if len(group)>1:
-            def ambiguous(*args,**kw):
-                raise AmbiguousMethod(group)
-            yield ambiguous
+            yield AmbiguousMethod(group)
             break
         for signature,method in group:
             yield method
+
+
 
 
 
@@ -846,10 +846,10 @@ def method_chain(methods):
 
         return method
 
-    def no_applicable(*args,**kw):
-        raise NoApplicableMethods(args,kw)
+    return NoApplicableMethods()
 
-    return no_applicable
+
+
 
 
 

@@ -57,6 +57,13 @@ after it, and so on, down through all the applicable methods.  For example::
     ...
     ...     [foo.when("baz=='blue'")]
     ...     def foo_spam(next_method, self, bar, baz):
+    ...
+    ...         # if next_method is an instance of DispatchError, it means
+    ...         # that calling it will raise that error (NoApplicableMethods
+    ...         # or AmbiguousMethod)
+    ...         assert isinstance(next_method, dispatch.DispatchError)
+    ...
+    ...         # but we'll call it anyway, just to demo the error
     ...         return 22 + next_method(self,bar,baz)
 
     >>> NextMethodExample().foo(2,"spam")   # 2 + 42
@@ -70,23 +77,30 @@ after it, and so on, down through all the applicable methods.  For example::
     NoApplicableMethods: ...
 
 Notice that ``next_method`` comes *before* ``self`` in the arguments if the
-generic function is an instance method.  If used, it must be the very first
-argument of the method.  It is supplied automatically by the generic function
-machinery, so when you call ``next_method`` you do not have to care whether
-the next method needs to know *its* next method; just pass in all of the
-*other* arguments (including ``self`` if applicable) and the ``next_method``
-implementation will do the rest.
+generic function is an instance method.  (If used, it must be the *very first*
+argument of the method.)  Its value is supplied automatically by the generic
+function machinery, so when you call ``next_method`` you do not have to care
+whether the next method needs to know *its* next method; just pass in all of
+the *other* arguments (including ``self`` if applicable) and the
+``next_method`` implementation will do the rest.  (For implementation details,
+see the ``strategy.method_chain()`` function, which is described in the
+`Method Combination Utilities`_ section below.)
 
 Also notice that methods that do not call their next method do not need to have
 a ``next_method`` argument.  If a method calls ``next_method`` when there are
 no further methods available, ``NoApplicableMethods`` is raised.  Similarly,
 if there is more than one "next method" and they are all equally specific
-(i.e. ambiguous), then ``AmbiguousMethod`` is raised.  (XXX add a way to check
-if ``next_method`` is ambiguous or missing *without* calling it first.)
+(i.e. ambiguous), then ``AmbiguousMethod`` is raised.
 
-The ``next_method`` technique is implemented by ``GenericFunction`` using the
-``strategy.method_chain()`` function, which we will cover later in the section
-on `Method Combination Utilities`_.
+Most of the time, you will know when writing a routine whether it's safe to
+call ``next_method``.  But sometimes you need a routine to behave differently
+depending on whether a next method is available.  If calling ``next_method``
+will raise an error, then ``next_method`` will be an instance of the error
+class, so you can detect it with ``isinstance()``.  If there are no remaining
+methods, then ``next_method`` will be an instance of ``NoApplicableMethods``,
+and if the next method is ambiguous, it will be an ``AmbiguousMethod``
+instance.  In either case, calling ``next_method`` will raise that error with
+the supplied arguments.
 
 
 Before/After Methods
@@ -269,7 +283,7 @@ create interesting method combinations:
     >>> list(strategy.safe_methods([[(1,2)],[(3,4)],[(5,6)]]))
     [2, 4, 6]
     >>> list(strategy.safe_methods([[(1,2)],[(3,4),(5,6)]]))
-    [2, <function ambiguous at ...>]
+    [2, <...AmbiguousMethod instance at ...>]
 
 
 ``all_methods(grouped_cases)``
@@ -481,13 +495,11 @@ if there is no higher-precedence value defined for a given key::
     >>> combine([(b,r2),(a,r4)])
     {'key_a': 2, 'key_b': 42}
 
-But rules at the same precedence levels with the same keys should produce
-an error::
+But rules at the same precedence levels with the same keys should return
+an ``AmbiguousMethod`` instance::
 
     >>> combine([(b,r1),(c,r2)])
-    Traceback (most recent call last):
-    ...
-    AmbiguousMethod...
+    <...AmbiguousMethod instance at ...>
 
 Unless of course the keys have the same values::
 
@@ -537,4 +549,21 @@ updated)::
 
     >>> disp[D(),] is disp[D(),]    # same object returned from two calls
     1
+
+Finally, let's verify that adding an ambiguous or conflicting definition
+results in an error at dispatch time::
+
+    >>> disp["x in D"] = r1     # we previously defined it as r3
+    >>> disp[D(),]
+    Traceback (most recent call last):
+    ...
+    AmbiguousMethod: ('key_a', 1, 2, (<...D instance at ...>,), {})
+
+As you can see, ``r1`` and ``r3`` have conflicting definitions for the value
+of ``'key_a'``, so making them both applicable to ``D`` instances creates an
+ambiguity.
+
+
+
+
 

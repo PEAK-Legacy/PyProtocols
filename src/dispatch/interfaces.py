@@ -4,25 +4,25 @@ __all__ = [
     'IDispatchFunction', 'ICriterion', 'ISignature', 'IDispatchPredicate',
     'IDispatcher', 'AmbiguousMethod', 'NoApplicableMethods',
     'IDispatchableExpression', 'IGenericFunction', 'IDispatchTable',
-    'EXPR_GETTER_ID','IExtensibleFunction',
+    'EXPR_GETTER_ID','IExtensibleFunction', 'DispatchError',
 ]
 
-class AmbiguousMethod(Exception):
+class DispatchError(Exception):
+    """A dispatch error has occurred"""
+
+    def __call__(self,*args,**kw):
+        raise self.__class__(*self.args+(args,kw))
+    
+
+class AmbiguousMethod(DispatchError):
     """More than one choice of method is possible"""
 
 
-class NoApplicableMethods(Exception):
+class NoApplicableMethods(DispatchError):
     """No applicable method has been defined for the given arguments"""
 
 
 EXPR_GETTER_ID = -1
-
-
-
-
-
-
-
 
 
 

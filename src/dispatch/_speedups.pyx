@@ -3,8 +3,8 @@
 __all__ = [
 ]
 
-cdef object NoApplicableMethods, _NF
-from dispatch.interfaces import NoApplicableMethods
+cdef object NoApplicableMethods, DispatchError, _NF
+from dispatch.interfaces import NoApplicableMethods, DispatchError
 
 _NF = [0,None, NoApplicableMethods, (None,None)]
 
@@ -82,6 +82,7 @@ cdef extern from "Python.h":
 
     int len "PyObject_Length" (object o) except -1
     object type "PyObject_Type" (object o)
+    int isinstance "PyObject_IsInstance" (object inst, object cls)
 
     # These macros return borrowed references, so we make them void *
     # When Pyrex casts them to objects, it will incref them
@@ -94,7 +95,6 @@ cdef extern from "Python.h":
 
     void Py_DECREF(PyObject *p)
     object __Pyx_GetExcValue()
-
 
 
 
@@ -317,8 +317,8 @@ cdef class BaseDispatcher:
                 finally:
                     cache = None    # GC of values computed during dispatch
 
-        if val is NoApplicableMethods:
-            raise NoApplicableMethods
+        if PyInstance_Check(val) and isinstance(val,DispatchError):
+            val(*argtuple)
 
         return val
 

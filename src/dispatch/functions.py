@@ -322,8 +322,8 @@ class BaseDispatcher:
                     break
                 finally:
                     cache = None    # GC of values computed during dispatch
-        if val is NoApplicableMethods:
-            raise NoApplicableMethods
+        if isinstance(val,DispatchError):
+            val(*argtuple)
         return val
 
 try:
@@ -535,11 +535,11 @@ class Dispatcher(BaseDispatcher):
         import strategy
         for group in strategy.ordered_signatures(cases):
             if len(group)>1:
-                raise AmbiguousMethod(group)
+                return AmbiguousMethod(group)
             elif group:
                 return group[0][1]
             else:
-                raise NoApplicableMethods
+                return NoApplicableMethods()
 
 
     def _addCase(self,case):

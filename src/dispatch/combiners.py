@@ -68,7 +68,7 @@ class MapDispatcher(Dispatcher):
                     if k in d:  # already defined
                         continue
                     if k in current and current[k]<>v:
-                        raise AmbiguousMethod
+                        return AmbiguousMethod(k,v,current[k])
                     current[k] = v
             d.update(current)
             if should_stop:

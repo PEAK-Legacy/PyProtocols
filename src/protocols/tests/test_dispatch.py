@@ -285,9 +285,6 @@ class CriteriaTests(TestCase):
 
 
 
-
-
-
     def testSubclassCriterion(self):
         s = SubclassCriterion(Vehicle)
         validateCriterion(s,strategy.dispatch_by_subclass)
