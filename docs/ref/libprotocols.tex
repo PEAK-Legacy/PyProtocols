@@ -189,7 +189,7 @@ required.  (We will have more to say about direct and adapted implication
 relationships later on, in section \ref{proto-implication}.)
 
 At this point, we still haven't described any mechanisms for making adapters
-available, or declaring what protocols are supported by a class or object
+available, or declaring what protocols are supported by a class or object.
 To do that, we need to define two additional kinds of protocol objects, that
 have more specialized abilities.
 
@@ -210,7 +210,7 @@ protocol declaration API, as long as they implement (or can be adapted to)
 the \class{IOpenProtocol} interface, as will be described in section
 \ref{open-protocols}.
 
-Notice that the concepts of protocol objects, adpating protocols, and open
+Notice that the concepts of protocol objects, adapting protocols, and open
 protocols are themselves ``protocols''.  The \module{protocols} package supplies
 three interface objects that symbolize these concepts: \class{IProtocol},
 \class{IAdaptingProtocol}, and \class{IOpenProtocol}, respectively.  Just as
@@ -277,16 +277,16 @@ in four steps:
 
 \begin{enumerate}
 
-\item If the protocol is a class or type, and the component is an instance
+\item If \var{protocol} is a class or type, and \var{component} is an instance
 of that class or type, the component is returned unchanged.  (This quickly
 disposes of the most trivial cases).
 
-\item If the component has a \method{__conform__} method, it is called,
+\item If \var{component} has a \method{__conform__} method, it is called,
 passing in the protocol.  If the method returns a value other than
 \constant{None}, it is returned as the result of \function{adapt()}.
 
-\item If the protocol has an \method{__adapt__} method, it is called,
-passing in the component.  If the method returns a value other than
+\item If \var{protocol} has an \method{__adapt__} method, it is called,
+passing in \var{component}.  If the method returns a value other than
 \constant{None}, it is returned as the result of \function{adapt()}.
 
 \item Perform default processing as described above, returning \var{default},
@@ -1107,16 +1107,16 @@ A sequence of protocols that the enclosing module provides.  Equivalent to
 
 \subsection{Creating and Using Adapters, Components, and Protocols}
 
-IAdapterFactory
+supporting reflexivity: if you create a wrapper, it should declare itself as
+supporting the protocol (declaration API does this automatically for you).
 
-Defining __conform__ - interactions?
+Wrapper functions should only wrap to object types that support the protocol
 
-Rejecting inherited contracts
+symmetry not automatic; must define "unwrapper"
 
-object identity; adaptation reflexivity or lack thereof
-
-
-
+preferable to keep the "base" object around, separate from each "interface
+pointer", to use for equality or identity comparison and to obtain alternate
+interfaces.
 
 
 
