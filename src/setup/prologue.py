@@ -1,7 +1,7 @@
 """Setup script prologue - set up functions and constants"""
 
 from distutils.core import Extension
-from os.path import join, walk
+from os.path import join, walk, normpath
 from os import sep
 import fnmatch
 
@@ -24,7 +24,7 @@ def findDataFiles(dir, skipDepth, *globs):
             out.append( (instdir, [join(dirname,f) for f in n]) )
 
     out = []
-    walk(dir,visit,out)
+    walk(normpath(dir),visit,out)
     return out
 
 
