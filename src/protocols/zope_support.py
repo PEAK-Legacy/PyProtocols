@@ -61,14 +61,14 @@ if ZopeInterface is not None:
     ZopeInterface.__class__.__adapt__ = __adapt__
     ZopeInterfaceTypes = [ZopeInterface.__class__]
 
-    declareImplementation(
-        ZopeInterface.__class__, instancesProvide=[IAdaptingProtocol]
-    )
-
 else:
     ZopeInterfaceTypes = []
 
 del ZopeInterface, __adapt__
+
+
+
+
 
 
 
