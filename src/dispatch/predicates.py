@@ -1,18 +1,18 @@
+from __future__ import generators
 from dispatch import *
-from dispatch.strategy import Inequality, Signature, ExprBase, Argument
+from dispatch.strategy import Inequality, Signature, ExprBase, Argument,default
 from dispatch.functions import NullTest
 from dispatch.ast_builder import build
 
-import protocols, operator
+import protocols, operator, dispatch
 from types import NoneType
 
 __all__ = [
     'Call',
     'AndTest', 'OrTest', 'NotTest', 'TruthTest', 'ExprBuilder',
     'Const', 'Getattr', 'Tuple', 'Var', 'dispatch_by_truth',
-    'OrExpr', 'AndExpr', 'TestBuilder',
+    'OrExpr', 'AndExpr', 'TestBuilder', 'expressionSignature',
 ]
-
 
 # Helper functions for operations not supplied by the 'operator' module
 
@@ -34,9 +34,9 @@ def add_dict(d1,d2):
     return d1
 
 
-# XXX Order-preserving signatures
-# XXX Need ordering constraints
 # XXX var, let, ???
+
+
 
 
 class ExprBuilder:
@@ -512,6 +512,24 @@ class MultiTest(object):
     def __repr__(self):
         return '%s%r' % (self.__class__.__name__,tuple(self.tests))
 
+    def matches(self,table):
+        for key in table:
+            if key in self:
+                yield key
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 class AndTest(MultiTest):
     """All tests must return true for expression"""
@@ -530,6 +548,29 @@ class OrTest(MultiTest):
             if key in test:
                 return True
         return False
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 class NotTest(MultiTest):
 
@@ -613,6 +654,15 @@ class TruthTest(object):
 
 
 
+[dispatch.generic()]
+def expressionSignature(expr,test):
+    """Return an ISignature that applies 'test' to 'expr'"""
+
+[expressionSignature.when(default)]
+def expressionSignature(expr,test):
+    return Signature([(expr,test)])
+
+
 class TestBuilder:
 
     bind_globals = True
@@ -625,7 +675,7 @@ class TestBuilder:
     def mkOp(name):
         op = getattr(ExprBuilder,name)
         def method(self,*args):
-            return Signature([(op(self.expr_builder,*args), self.mode)])
+            return expressionSignature(op(self.expr_builder,*args), self.mode)
         return method
 
     for opname in dir(ExprBuilder):
@@ -638,15 +688,6 @@ class TestBuilder:
             return build(self,expr)
         finally:
             self.__class__ = TestBuilder
-
-
-
-
-
-
-
-
-
 
 
 
@@ -688,11 +729,11 @@ class TestBuilder:
 
         else:
             # Both sides involve variables, so it's a boolean test  :(
-            return Signature([
-                (self.expr_builder.Compare(initExpr,((op,other),)),
-                    TruthTest(True))
-                ]
+            return expressionSignature(
+                self.expr_builder.Compare(initExpr,((op,other),)),
+                self.mode
             )
+
 
 
     def And(self,items):
@@ -766,6 +807,47 @@ class NotBuilder(TestBuilder):
             return TestBuilder.Compare(self,initExpr,((op,other),))
         finally:
             self.__class__ = NotBuilder
+
+
+
+
+
+
+
+
+
+
+
+def _tupleToOrTest(ob):
+    if isinstance(ob,tuple):
+        return OrTest(*map(_tupleToOrTest,ob))
+    return ob
+
+[expressionSignature.when(
+    # matches 'isinstance(expr,Const)'
+    "expr in Call and expr.function==isinstance"
+    " and len(expr.argexprs)==2 and expr.argexprs[1] in Const"
+)]
+def convertIsInstanceToClassTest(expr,test):
+    typecheck = _tupleToOrTest(expr.argexprs[1].value)
+
+    if not test.truth:
+        typecheck = NotTest(typecheck)
+
+    return Signature([(expr.argexprs[0],typecheck)])
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

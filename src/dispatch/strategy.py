@@ -55,8 +55,8 @@ __all__ = [
     'single_best_method', 'chained_methods', 'next_method',
     'Predicate', 'Signature', 'PositionalSignature', 'Argument',
     'most_specific_signatures', 'ordered_signatures',
+    'default',
 ]
-
 
 
 
@@ -815,6 +815,6 @@ class PositionalSignature(Signature):
         Signature.__init__(self, zip(map(Argument,range(len(tests))), tests))
 
 
-
+default = Signature()
 
 

@@ -737,10 +737,8 @@ class PredicateTests(TestCase):
 
 
     def testParseMembership(self):
-
         parse = GenericFunction(lambda x,y,z:None).parse
         pe = lambda e: parse(e,locals(),globals())
-
         in_test = lambda seq: OrTest(*[Inequality('==',v) for v in seq])
 
         self.assertEqual(pe('x in int'), Signature(x=int))
@@ -767,14 +765,16 @@ class PredicateTests(TestCase):
             Signature(x=NotTest(types.NoneType)))
 
 
-
-
-
-
-
-
-
-
+    def testParseExpressionMatching(self):
+        parse = GenericFunction(lambda x,y,z:None).parse
+        pe = lambda e: parse(e,locals(),globals())
+        self.assertEqual(pe('isinstance(x,int)'), Signature(x=int))
+        self.assertEqual(pe('isinstance(x,(str,unicode))'),
+            Signature(x=OrTest(str,unicode)))
+        self.assertEqual(pe('isinstance(x,(int,(str,unicode)))'),
+            Signature(x=OrTest(int,str,unicode)))
+        self.assertEqual(pe('not isinstance(x,(int,(str,unicode)))'),
+            Signature(x=NotTest(OrTest(int,str,unicode))))
 
 
     def testParseDNF(self):
