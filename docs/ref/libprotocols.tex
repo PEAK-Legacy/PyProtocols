@@ -511,7 +511,7 @@ Return an implementation of \var{protocol} (a protocol object) for
 behalf.  If no implementation is available, return \var{default}.  If no
 \var{default} is provided, call \code{\var{factory}(\var{component},
 \var{protocol})} and return the result.  If no \var{factory} is supplied,
-raise \exception{NotImplementedError}.
+raise \exception{protocols.AdaptationFailure}.
 
 \var{default} may be supplied as a positional or keyword argument.
 \var{factory}, however, must be supplied as a keyword argument in order
@@ -536,7 +536,7 @@ passing in \var{component}.  If the method returns a value other than
 \constant{None}, it is returned as the result of \function{adapt()}.
 
 \item Perform default processing as described above, returning \var{default},
-invoking \var{factory}, or raising \exception{NotImplementedError} as
+invoking \var{factory}, or raising \exception{protocols.AdaptationFailure} as
 appropriate.
 
 \end{enumerate}
@@ -802,9 +802,13 @@ it will be passed through to the caller of \function{adapt}.  Thus, if you
 are writing one of these methods, you should not raise a \exception{TypeError}
 to signal the lack of an adaptation.  Rather, you should return \constant{None}.
 
-Second, \exception{NotImplementedError} is raised when no adaptation is
+Second, \exception{protocols.AdaptationFailure} is raised when no adaptation is
 found, and no default is supplied, rather than the \exception{TypeError}
-specified by \pep{246}.  And third, \function{protocols.adapt()} has an optional
+specified by \pep{246}.  (\note{\exception{protocols.AdaptationFailure} is a
+subclass of \exception{TypeError} and \exception{NotImplementedError}, so code
+written to catch either of these errors will work.})
+
+And third, \function{protocols.adapt()} has an optional
 \var{factory} argument that the \pep{246} \function{adapt()} does not.
 
 These differences are the result of experience using the \module{protocols}
@@ -812,10 +816,6 @@ package with PEAK, and advances in the Python state-of-the-art since
 \pep{246} was written (over two years ago).  We believe that they make the
 adaptation protocol more robust, more predictable, and easier to use for
 its most common applications.
-
-
-
-
 
 
 \subsubsection{Convenience Adaptation API (NEW in 0.9.3)\label{protocols-calling}}
@@ -1980,7 +1980,7 @@ Return an implementation of \var{protocol} (a protocol object) for
 behalf.  If no implementation is available, return \var{default}.  If no
 \var{default} is provided, call \code{\var{factory}(\var{component},
 \var{protocol})} and return the result.  If no \var{factory} is supplied,
-raise \exception{NotImplementedError}.
+raise \exception{protocols.AdaptationFailure}.
 
 \var{default} may be supplied as a positional or keyword argument.
 \var{factory}, however, must be supplied as a keyword argument in order
@@ -1989,6 +1989,13 @@ to be used.
 A detailed description of this function's operations and purpose may be found in
 section \ref{adapt-protocol}.
 \end{funcdesc}
+
+\begin{excdesc}{AdaptationFailure}
+\versionadded{0.9.3}
+A subclass of \exception{TypeError} and \exception{NotImplementedError}, this
+exception type is raised by \function{adapt()} when no implementation can be
+found, and no \var{default} or \var{factory} was supplied.
+\end{excdesc}
 
 \begin{classdesc}{Adapter}{ob, proto}
 \versionadded{0.9.1}
@@ -1999,18 +2006,15 @@ the adapter provides, for what types, and so on.)  Your subclass' methods can
 use the following attributes, which will have been set by the \method{__init__}
 method:
 
+
 \begin{memberdesc}{subject}
-The \member{subject} attribute of an \class{Adapter} instance is
-the \var{ob} supplied to its constructor.  That is, it is the object being
-adapted.
+The \member{subject} attribute of an \class{Adapter} instance is the \var{ob}
+supplied to its constructor.  That is, it is the object being adapted.
 \end{memberdesc}
 
-
-
-\begin{memberdesc}{protocol}
-The \member{subject} attribute of an \class{Adapter} instance is
-the \var{proto} supplied to its constructor.  That is, it is the protocol to
-which the \member{subject} is being adapted.
+\begin{memberdesc}{protocol} The \member{subject} attribute of an
+\class{Adapter} instance is the \var{proto} supplied to its constructor.  That
+is, it is the protocol to which the \member{subject} is being adapted.
 \end{memberdesc}
 \end{classdesc}
 
@@ -2033,8 +2037,7 @@ the \code{__metaclass__} of the class.  If your class sets an explicit
 called, or the protocol declarations will not occur!}
 \end{funcdesc}
 
-\begin{funcdesc}{adviseObject}{ob
-\optional{, provides=[ ]} \optional{, doesNotProvide=[ ]}}
+\begin{funcdesc}{adviseObject}{ob \optional{, provides=[ ]} \optional{, doesNotProvide=[ ]}}
 Declare that \var{ob} provides (or does not provide) the specified protocols.
 This is shorthand for calling \function{declareAdapterForObject()}
 with \function{NO_ADAPTER_NEEDED} and \function{DOES_NOT_SUPPORT} as adapters
@@ -2044,9 +2047,6 @@ must be adaptable to \class{IOpenProtocol}.  See section
 \ref{protocols-instances}, ``Protocol Declarations for Individual Objects'',
 for more information on using \function{adviseObject}.
 \end{funcdesc}
-
-
-
 
 \begin{classdesc}{Attribute}{doc\optional{,name=\constant{None}, value=\constant{None}}}
 This class is used to document attributes required by an interface.  An example

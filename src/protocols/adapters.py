@@ -3,15 +3,17 @@
 __all__ = [
     'IMPLEMENTATION_ERROR','NO_ADAPTER_NEEDED','DOES_NOT_SUPPORT', 'Adapter',
     'minimumAdapter', 'composeAdapters', 'updateWithSimplestAdapter',
-    'StickyAdapter',
+    'StickyAdapter', 'AdaptationFailure',
 ]
 
-
+class AdaptationFailure(NotImplementedError,TypeError):
+    """A suitable implementation/adapter could not be found"""
+    
 # Fundamental Adapters
 
 def IMPLEMENTATION_ERROR(obj, protocol):
-    """Raise 'NotImplementedError' when adapting 'obj' to 'protocol'"""
-    raise NotImplementedError("Can't adapt", obj, protocol)
+    """Raise 'AdaptationFailure' when adapting 'obj' to 'protocol'"""
+    raise AdaptationFailure("Can't adapt", obj, protocol)
 
 def NO_ADAPTER_NEEDED(obj, protocol):
     """Assume 'obj' implements 'protocol' directly"""
@@ -27,8 +29,6 @@ try:
         DOES_NOT_SUPPORT
 except ImportError:
     pass
-
-
 
 
 

@@ -59,7 +59,7 @@ cdef extern from "Python.h":
 
 cdef object _marker, __conform, __adapt, __mro, __ECType
 from sys import exc_info
-
+from protocols.adapters import AdaptationFailure
 
 try:
     from ExtensionClass import ExtensionClass
@@ -83,8 +83,8 @@ __mro      = PyString_InternFromString("__mro__")
 # Fundamental Adapters
 
 def IMPLEMENTATION_ERROR(obj, protocol):
-    """Raise 'NotImplementedError' when adapting 'obj' to 'protocol'"""
-    raise NotImplementedError("Can't adapt", obj, protocol)
+    """Raise 'AdaptationFailure' when adapting 'obj' to 'protocol'"""
+    raise AdaptationFailure("Can't adapt", obj, protocol)
 
 def NO_ADAPTER_NEEDED(obj, protocol):
     """Assume 'obj' implements 'protocol' directly"""
@@ -191,7 +191,7 @@ def adapt(obj, protocol, default=_marker, factory=IMPLEMENTATION_ERROR):
 
     If 'default' is not supplied and no implementation is found,
     the result of 'factory(obj,protocol)' is returned.  If 'factory'
-    is also not supplied, 'NotImplementedError' is then raised."""
+    is also not supplied, 'AdaptationFailure' is then raised."""
 
     return _adapt(obj,protocol,default,factory)
 

@@ -1,5 +1,10 @@
 Fixes and changes since PyProtocols 0.9.2
 
+ - Raise 'AdaptationFailure' instead of 'NotImplementedError' when adaptation
+   is unsuccessful.  'AdaptationFailure' is a subclass of both 'TypeError' and
+   'NotImplementedError', so code written according to either PEP 246 or older
+   versions of PyProtocols will still catch the error.
+
  - There is now an 'AbstractBase' class, similar to 'Interface', that can be
    used for the "ABC" (Abstract Base Class) style of interface usage, where the
    interface may contain implementation code, and can be subclassed to create
