@@ -347,7 +347,7 @@ def Protocol__adapt__(self, obj):
         elif PyObject_TypeCheck(cls,__ECType):
             # Yep, toss out the error and compute a reasonable MRO
             PyErr_Clear()
-            mro = extClassMRO(ob, 1)
+            mro = extClassMRO(cls, 1)
 
         # Okay, we give up...  reraise the error so somebody smarter than us
         # can figure it out.  :(
