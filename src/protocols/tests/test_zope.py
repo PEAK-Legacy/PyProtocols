@@ -15,13 +15,18 @@ class IA(Interface):
 class IB(IA):
     pass
 
-from checks import ImplementationChecks, makeClassTests
+from checks import ImplementationChecks, makeClassTests, makeInstanceTests
+from checks import ProviderChecks, ClassProvidesChecks
 
 class BasicChecks(ImplementationChecks):
     IA = IA
     IB = IB
 
-TestClasses = makeClassTests(BasicChecks)
+class InstanceChecks(ProviderChecks):
+    IA = IA
+    IB = IB
+
+TestClasses = makeClassTests(BasicChecks)+makeInstanceTests(InstanceChecks)
 
 def test_suite():
     return TestSuite([makeSuite(t,'check') for t in TestClasses])

@@ -9,66 +9,25 @@ from api import declareImplementation, advise
 from interfaces import IOpenProtocol
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # Monkeypatch Zope Interfaces
 
-def __adapt__(self, obj):
-    if self.isImplementedBy(obj):
-        return obj
-
-
 try:
-    # Zope X3
-    from zope.interface import Interface as ZopeInterface
-    from zope.interface.implements import implements as ZopeImplements
-    from zope.interface.implements import flattenInterfaces as ZopeFlatten
+    import zope.interface as zi
 
 except ImportError:
-    ZopeInterface = None
-
-
-if ZopeInterface is not None:
-
-    ZopeInterface.__class__.__adapt__ = __adapt__
-    ZopeInterfaceTypes = [ZopeInterface.__class__]
+    ZopeInterfaceTypes = []
+    zi = None
 
 else:
-    ZopeInterfaceTypes = []
 
-del ZopeInterface, __adapt__
+    def __adapt__(self, obj):
+        if self.isImplementedBy(obj):
+            return obj
 
+    zi.Interface.__class__.__adapt__ = __adapt__
+    ZopeInterfaceTypes = [zi.Interface.__class__]
 
-
-
+    del __adapt__
 
 
 
@@ -81,10 +40,6 @@ del ZopeInterface, __adapt__
 
 
 # Adapter for Zope X3 Interfaces
-
-# XXX this would be a lot cleaner if written to the new zope.interface API...
-# XXX this isn't seriously tested yet; it may still have lurking bugs
-
 
 class ZopeInterfaceAsProtocol(object):
 
@@ -107,18 +62,22 @@ class ZopeInterfaceAsProtocol(object):
 
     def registerImplementation(self,klass,adapter=NO_ADAPTER_NEEDED,depth=1):
         if adapter is NO_ADAPTER_NEEDED:
-            ZopeImplements(klass, self.iface)
+            zi.classImplements(klass, self.iface)
         elif adapter is DOES_NOT_SUPPORT:
-            klass.__implements__ = tuple([
-                iface for iface in ZopeFlatten(
-                    getattr(klass,'__implements__',())
-                ) if not self.iface.isEqualOrExtendedBy(iface)
-            ])
+            ifaces = zi.InterfaceSpecification(
+                [i.__iro__ for i in zi.implementedBy(klass)]
+            ) - self.iface
+            zi.classImplementsOnly(klass, ifaces)
         else:
             raise TypeError(
                 "Zope interfaces can only declare support, not adapters",
                 self.iface, klass, adapter
             )
+
+
+
+
+
 
 
     def addImpliedProtocol(self, proto, adapter=NO_ADAPTER_NEEDED,depth=1):
@@ -131,13 +90,17 @@ class ZopeInterfaceAsProtocol(object):
 
     def registerObject(self, ob, adapter=NO_ADAPTER_NEEDED, depth=1):
 
-        if isinstance(ob,(type,ClassType)):
-            ob.__class_implements__ = (
-                self.iface, + getattr(ob,'__class_implements__',())
-            )
+        if adapter is NO_ADAPTER_NEEDED:
+            zi.directlyProvides(ob,self.iface)
+
+        elif adapter is DOES_NOT_SUPPORT:
+            zi.directlyProvides(ob, zi.directlyProvidedBy(ob)-self.iface)
+
         else:
-            # Don't verify implementation, since it's not a class
-            ZopeImplements(ob, self.iface, False)
+            raise TypeError(
+                "Zope interfaces can only declare support, not adapters",
+                self.iface, klass, adapter
+            )
 
         # Zope interfaces handle implied protocols directly, so the above
         # should be all we need to do.
@@ -147,10 +110,6 @@ class ZopeInterfaceAsProtocol(object):
         # Zope interfaces don't add protocols, so we don't need to actually
         # send any implication notices.  Therefore, subscribing is a no-op.
         pass
-
-
-
-
 
 
 
