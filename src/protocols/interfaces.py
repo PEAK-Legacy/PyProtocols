@@ -146,17 +146,17 @@ class Protocol:
 
     def addImplicationListener(self, listener):
 
-        if self.__listeners is None:
-            from weakref import WeakKeyDictionary
-            self.__listeners = WeakKeyDictionary()
+        self.__lock.acquire()
 
-        self.__listeners[listener] = 1
+        try:
+            if self.__listeners is None:
+                from weakref import WeakKeyDictionary
+                self.__listeners = WeakKeyDictionary()
 
+            self.__listeners[listener] = 1
 
-
-
-
-
+        finally:
+            self.__lock.release()
 
 
 
@@ -165,14 +165,14 @@ class Protocol:
 class InterfaceClass(Protocol, type):
 
     def __init__(self, __name__, __bases__, __dict__):
+
         type.__init__(self, __name__, __bases__, __dict__)
         Protocol.__init__(self)
 
-    def getImpliedProtocols(self):
-        return [
-            (b,(NO_ADAPTER_NEEDED,1)) for b in self.__bases__
-                if isinstance(b,Protocol) and b is not Interface
-        ] + super(InterfaceClass,self).getImpliedProtocols()
+        for b in __bases__:
+            if isinstance(b,Protocol) and b is not Interface:
+                self.addImpliedProtocol(b)
+
 
     def getBases(self):
         return [
@@ -181,23 +181,23 @@ class InterfaceClass(Protocol, type):
         ]
 
 
+    def __setattr__(self,attr,val):
+
+        # We could probably support changing __bases__, as long as we checked
+        # that no bases are *removed*.  But it'd be a pain, since we'd
+        # have to do callbacks, remove entries from our __implies registry,
+        # etc.  So just punt for now.
+
+        if attr=='__bases__':
+            raise TypeError(
+                "Can't change interface __bases__", self
+            )
+
+        type.__setattr__(self,attr,val)
+
 
 class Interface(object):
     __metaclass__ = InterfaceClass
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

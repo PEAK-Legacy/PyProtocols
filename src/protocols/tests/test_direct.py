@@ -123,14 +123,14 @@ class BasicChecks(TestCase):
 
     def checkLateDefinition(self):
 
-        declareAdapter(DOES_NOT_SUPPORT,provides=[IA],forObjects=[self.ob])
+        adviseObject(self.ob, doesNotProvide=[IA])
         assert adapt(self.ob,IA,None) is None
 
-        declareAdapter(NO_ADAPTER_NEEDED,provides=[IA],forObjects=[self.ob])
+        adviseObject(self.ob, provides=[IA])
         assert adapt(self.ob,IA,None) is self.ob
 
         # NO_ADAPTER_NEEDED at same depth should override DOES_NOT_SUPPORT
-        declareAdapter(DOES_NOT_SUPPORT,provides=[IA],forObjects=[self.ob])
+        adviseObject(self.ob, doesNotProvide=[IA])
         assert adapt(self.ob,IA,None) is self.ob
 
 

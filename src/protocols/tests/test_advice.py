@@ -3,6 +3,40 @@
 from unittest import TestCase, makeSuite, TestSuite
 from protocols.advice import *
 import sys
+from types import InstanceType
+
+
+def ping(log, value):
+
+    def pong(klass):
+        log.append((value,klass))
+        return [klass]
+
+    addClassAdvisor(pong)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class SuperTest(TestCase):
@@ -37,6 +71,13 @@ class SuperTest(TestCase):
 
         assert ClassOfSubMeta.foo(1)==-1
         assert ClassOfSubMeta().foo(1)==2
+
+
+
+
+
+
+
 
 
     def checkPropSuper(self):
@@ -101,20 +142,61 @@ class FrameInfoTest(TestCase):
 
 
     def checkCallInfo(self):
-        kind,module,f_locals,f_globals = getFrameInfo(sys._getframe())       
+        kind,module,f_locals,f_globals = getFrameInfo(sys._getframe())
         assert kind=="function call"
-        assert f_locals is locals() # ???        
+        assert f_locals is locals() # ???
         for d in module.__dict__, f_globals:
             assert d is globals()
 
 
-def ping(log, value):
 
-    def pong(klass):
-        log.append((value,klass))
-        return [klass]
 
-    addClassAdvisor(pong)
+
+
+
+
+
+
+
+
+
+
+
+class MROTests(TestCase):
+
+    def checkStdMRO(self):
+        class foo(object): pass
+        class bar(foo): pass
+        class baz(foo): pass
+        class spam(bar,baz): pass
+        assert getMRO(spam) is spam.__mro__
+
+    def checkClassicMRO(self):
+        class foo: pass
+        class bar(foo): pass
+        class baz(foo): pass
+        class spam(bar,baz): pass
+        basicMRO = [spam,bar,foo,baz,foo]
+        assert list(getMRO(spam)) == basicMRO
+        assert list(getMRO(spam,True)) == basicMRO+[InstanceType,object]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -214,15 +296,15 @@ class AdviceTests(TestCase):
         assert determineMetaclass((meta,type))==metameta
 
 
+
+
+
 TestClasses = (
-    SuperTest, AdviceTests, FrameInfoTest,
+    SuperTest, AdviceTests, FrameInfoTest, MROTests,
 )
 
 def test_suite():
     return TestSuite([makeSuite(t,'check') for t in TestClasses])
-
-
-
 
 
 

@@ -17,13 +17,14 @@ def metamethod(func):
 
 def classicMRO(ob, extendedClassic=False):
     stack = []
-    push = stack.append
+    push = stack.insert
     pop = stack.pop
-    push(ob)
+    push(0,ob)
     while stack:
-        cls = pop(0)
+        cls = pop()
         yield cls
-        map(push,cls.__bases__)
+        p = len(stack)
+        for b in cls.__bases__: push(p,b)
 
     if extendedClassic:
         yield InstanceType
@@ -35,7 +36,6 @@ def getMRO(ob, extendedClassic=False):
     elif isinstance(ob,type):
         return ob.__mro__
     return ob,
-
 
 
 
