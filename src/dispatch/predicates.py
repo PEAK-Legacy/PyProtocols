@@ -19,6 +19,9 @@ __all__ = [
 def is_(o1,o2):
     return o1 is o2
 
+def in_(o1,o2):
+    return o1 in o2
+
 def is_not(o1,o2):
     return o1 is not o2
 
@@ -31,12 +34,9 @@ def add_dict(d1,d2):
     return d1
 
 
-
 # XXX Order-preserving signatures
 # XXX Need ordering constraints
 # XXX var, let, ???
-
-
 
 
 class ExprBuilder:
@@ -66,7 +66,7 @@ class ExprBuilder:
         '>': operator.gt, '>=': operator.ge,
         '<': operator.lt, '<=': operator.le,
         '<>': operator.ne, '!=': operator.ne, '==':operator.eq,
-        'in': operator.contains, 'not in': not_in,
+        'in': in_, 'not in': not_in,
         'is': is_, 'is not': is_not
     }
 
