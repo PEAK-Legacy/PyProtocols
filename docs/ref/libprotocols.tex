@@ -1967,7 +1967,7 @@ to \var{protocol}, by calling
 
 
 \subsubsection{\module{protocols.interfaces} --- Package Interfaces\label{protocols-interfaces-module}}
-\declaremodule{protocols-interfaces}{protocols.interfaces}
+\declaremodule{}{protocols.interfaces}
 
 \note{All of the interfaces listed here can also be imported directly from the
 top-level \module{protocols} package.  However, you will probably only need
@@ -2213,7 +2213,7 @@ support the requirements defined by \class{IProtocol} as well.
 
 
 \subsubsection{\module{protocols.adapters} --- ``Adapter arithmetic'' support \label{protocol-adapters-module}}
-\declaremodule{protocols-adapters}{protocols.adapters}
+\declaremodule{}{protocols.adapters}
 
 The \module{protocols.adapters} module provides support for doing ``adapter
 arithmetic'' such as determining which of two adapter paths is shorter,
@@ -2295,7 +2295,7 @@ and \method{get()} methods.  Values stored in the mapping will be
 
 
 \subsubsection{\module{protocols.zope_support} --- Support for Zope Interfaces}
-\declaremodule{protocols-zope-support}{protocols.zope_support}
+\declaremodule[protocols.zopesupport]{}{protocols.zope_support}
 
 Importing this module enables experimental support for using Zope X3
 \class{Interface} objects with the \module{protocols} package, by registering
@@ -2377,7 +2377,7 @@ this time, as Zope X3's interface declaration API is currently in flux.
 
 
 \subsubsection{\module{protocols.twisted_support} --- Support for Twisted Interfaces}
-\declaremodule{protocols-twisted-support}{protocols.twisted_support}
+\declaremodule[protocols.twistedsupport]{}{protocols.twisted_support}
 
 Importing this module enables experimental support for using Twisted 1.0.5
 \class{Interface} objects with the \module{protocols} package, by registering
@@ -2459,7 +2459,7 @@ both Zope and Twisted interfaces.
 
 
 \subsubsection{\module{protocols.advice} --- Metaclasses and other ``Magic''}
-\declaremodule{protocols-advice}{protocols.advice}
+\declaremodule{}{protocols.advice}
 
 This module provides a variety of utility functions and classes used by the
 \module{protocols} package.  None of them are really specific to the
