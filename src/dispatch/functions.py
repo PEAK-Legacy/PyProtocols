@@ -14,20 +14,6 @@ __all__ = [
     'GenericFunction', 'Dispatcher', 'DispatchNode', 'AbstractGeneric',
 ]
 
-
-class DispatchNode(dict):
-
-    """A mapping w/lazily population and supporting 'reseed()' operations"""
-
-    protocols.advise(instancesProvide=[IDispatchTable])
-
-    __slots__ = 'reseed'
-
-    def __init__(self, contents, reseed):
-        self.reseed = reseed
-        dict.__init__(self,contents())
-
-
 _NF = (0,None, NoApplicableMethods, (None,None))
 
 
@@ -39,11 +25,66 @@ _NF = (0,None, NoApplicableMethods, (None,None))
 
 
 
-class CriterionIndex:
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+class DispatchNode(dict):
+
+    """A mapping w/lazily population and supporting 'reseed()' operations"""
+
+    protocols.advise(instancesProvide=[IDispatchTable])
+
+    __slots__ = 'index','cases','build','lock'
+
+    def __init__(self, index, cases, build, lock):
+        self.index = index
+        self.cases = cases
+        self.build = build
+        self.lock = lock
+        dict.__init__(
+            self,
+            [(key,build(subcases))
+                for key,subcases in index.casemap_for(cases).items()]
+        )
+
+    def reseed(self,key):
+        self.lock.acquire()
+        try:
+            self.index.addSeed(key)
+            self[key] = retval = self.build(
+                self.index.casemap_for(self.cases)[key]
+            )
+            return retval
+        finally:
+            self.lock.release()
+
+
+
+
+
+
+
+
+
+
+
+
+class CriterionIndex:
     """Index connecting seeds and results"""
 
-    def __init__(self):
+    def __init__(self,dispatch_function):
+        self.dispatch_function = dispatch_function
         self.clear()
 
     def clear(self):
@@ -108,9 +149,9 @@ class CriterionIndex:
         self.allSeeds[seed] = None
 
 
-
-
-
+    def mkNode(self,*args):
+        node = DispatchNode(*args)
+        return lambda expr: self.dispatch_function(expr,node)
 
 
 
@@ -289,49 +330,49 @@ class BaseDispatcher:
     def __getitem__(self,argtuple):
         argct = self.argct
         node = self._dispatcher or self._startNode() or _NF
-        expr, dispatch_function, val, init = node
-        while dispatch_function:
-            if val is None:
+        expr, factory, func, init = node
+        while factory:
+            if func is None:
                 self._acquire()
                 try:
-                    if node[2] is None: node[2] = val = DispatchNode(*init)
+                    if node[2] is None: node[2] = func = factory(*init)
                 finally:
                     self._release()
             if expr<argct:
-                expr, dispatch_function, val, init = node = \
-                    dispatch_function(argtuple[expr], val) or _NF
+                expr, factory, func, init = node = \
+                    func(argtuple[expr]) or _NF
             else:
                 cache = ExprCache(argtuple,self.expr_defs)
                 try:
-                    expr, dispatch_function, val, init = node = \
-                        dispatch_function(cache[expr], val) or _NF
-                    while dispatch_function:
-                        if val is None:
+                    expr, factory, func, init = node = \
+                        func(cache[expr]) or _NF
+                    while factory:
+                        if func is None:
                             self._acquire()
                             try:
                                 if node[2] is None:
-                                    node[2] = val = DispatchNode(*init)
+                                    node[2] = func = factory(*init)
                             finally:
                                 self._release()
                         if expr<argct:
-                            expr, dispatch_function, val, init = node = \
-                                dispatch_function(argtuple[expr], val) or _NF
+                            expr, factory, func, init = node = \
+                                func(argtuple[expr]) or _NF
                         else:
-                            expr, dispatch_function, val, init = node = \
-                                dispatch_function(cache[expr], val) or _NF
+                            expr, factory, func, init = node = \
+                                func(cache[expr]) or _NF
                     break
                 finally:
                     cache = None    # GC of values computed during dispatch
-        if isinstance(val,DispatchError):
-            val(*argtuple)
-        return val
+        if isinstance(func,DispatchError):
+            func(*argtuple)
+        return func
 
 try:
-    from dispatch._speedups import BaseDispatcher, DispatchNode
+    from dispatch._speedups import BaseDispatcher
 except ImportError:
-    pass
-else:
-    protocols.declareImplementation(DispatchNode,[IDispatchTable])
+    pass    # '''
+
+
 
 
 
@@ -377,7 +418,7 @@ class Dispatcher(BaseDispatcher):
         self.argct = len(args)
         global strategy; import strategy
         self.argMap = dict([(name,strategy.Argument(name=name)) for name in args])
-        lock = allocate_lock()
+        lock = self._lock = allocate_lock()
         self._acquire = lock.acquire
         self._release = lock.release
         self.clear()
@@ -408,46 +449,46 @@ class Dispatcher(BaseDispatcher):
         return parse_expr(expr_string,builder)
 
 
-    def _build_dispatcher(self, state=None):
-        if state is None:
+    def _build_dispatcher(self, memo=None, disp_ids=None, cases=None):
+
+        if memo is None:
             self._rebuild_indexes()
-            state = self.cases, tuple(self.disp_indexes), {}
-        (cases,disp_ids,memo) = state
-        key = (tuple(cases), disp_ids)
+            cases = self.cases
+            disp_ids = tuple(self.disp_indexes)
+            memo = {}
+
+        cases = tuple(cases)
+        key = (cases, disp_ids)
+
         if key in memo:
             return memo[key]
         elif not disp_ids:
             # No more criteria, so make a leaf node
-            node = [0,None, self.combine(cases), None]
+            node = [0, None, self.combine(cases), None]
         else:
-            best_id, case_map, remaining_ids = self._best_split(cases,disp_ids)
+            best_id, remaining_ids = self._best_split(cases,disp_ids)
+            build = instancemethod(
+                instancemethod(self._build_dispatcher, memo, memo.__class__),
+                remaining_ids, remaining_ids.__class__
+            )
+
             if best_id is None:
                 # None of our current cases had any meaningful tests on the
                 # "best" expression, so don't bother building a dispatch node.
                 # Instead, try again with the current expression removed.
-                node = self._build_dispatcher((cases, remaining_ids, memo))
+                node = build(cases)
             else:
-                def dispatch_table():
-                    build = self._build_dispatcher
-                    for key,subcases in case_map.items():
-                        yield key,build((subcases,remaining_ids,memo))
-                def reseed(key):
-                    self._acquire()
-                    try:
-                        self.disp_indexes[best_id].addSeed(key)
-                        case_map[key] = [
-                            sm for sm in cases if key in sm[0].get(best_id)
-                        ]
-                        node[2][key] = retval = self._build_dispatcher(
-                            (case_map[key], remaining_ids, memo)
-                        )
-                        return retval
-                    finally:
-                        self._release()
-                node = [best_id[0],best_id[1], None, (dispatch_table, reseed)]
+                index = self.disp_indexes[best_id]
+                node = [
+                    best_id[0], index.mkNode, None,
+                    (index, cases, build, self._lock)
+                ]
 
         memo[key] = node
         return node
+
+
+
 
     def _rebuild_indexes(self):
         if self.dirty:
@@ -609,9 +650,9 @@ class Dispatcher(BaseDispatcher):
 
         if best_id is not None:
             remaining_ids.remove(best_id)
-            best_map = self.disp_indexes[best_id].casemap_for(cases)
 
-        return best_id, best_map, tuple(remaining_ids)
+        return best_id, tuple(remaining_ids)
+
 
     def _dispatch_id(self,(expr,disp_func),criterion):
         """Replace expr/criterion with a local key"""
@@ -620,7 +661,7 @@ class Dispatcher(BaseDispatcher):
         expr = self.getExpressionId(expr)
         disp = expr, criterion.dispatch_function
         if disp not in self.disp_indexes:
-            self.disp_indexes[disp] = CriterionIndex()
+            self.disp_indexes[disp] = CriterionIndex(criterion.dispatch_function)
         return expr
 
 

@@ -274,7 +274,7 @@ class CriteriaTests(TestCase):
         self.assertEqual(list(i.seeds({})),[None,id(ob)])
 
     def testCriterionIndex(self):
-        i = functions.CriterionIndex()
+        i = functions.CriterionIndex(None)  # XXX
         i[SubclassCriterion(int)] = 42
         self.assertEqual(i.casemap_for([42]), {int:[42],None:[]})
         i.addSeed(int)  # make sure seed isn't duplicated
@@ -1179,10 +1179,10 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
         self.assertEqual(g.constraints.successors([yid,yxid]),{yxid:1})
         self.assertEqual(g.constraints.successors([xid,yxid]),{yxid:1})
 
-        best_id, best_map, remaining_ids = g._best_split(g.cases, [yxid,yid])
+        best_id, remaining_ids = g._best_split(g.cases, [yxid,yid])
         self.assertEqual(best_id, yid)
 
-        best_id, best_map, remaining_ids = g._best_split(g.cases, [yxid,xid])
+        best_id, remaining_ids = g._best_split(g.cases, [yxid,xid])
         self.assertEqual(best_id, xid)
 
 

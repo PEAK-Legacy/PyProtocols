@@ -229,17 +229,17 @@ cdef class ExprCache:
         return f
 
 
-class DispatchNode(dict):
 
-    """A mapping w/lazily population and supporting 'reseed()' operations"""
 
-    #protocols.advise(instancesProvide=[IDispatchTable])
 
-    __slots__ = 'reseed'
 
-    def __init__(self, contents, reseed):
-        self.reseed = reseed
-        dict.__init__(self,contents())
+
+
+
+
+
+
+
 
 
 
@@ -254,16 +254,16 @@ cdef class BaseDispatcher:
         argct = len(argtuple)
         node = self._dispatcher or self._startNode() or _NF
 
-        dispatch_function = <object>PyList_GET_ITEM(<PyListObject *>node,1)
-        val = <object>PyList_GET_ITEM(<PyListObject *>node,2)
+        factory = <object>PyList_GET_ITEM(<PyListObject *>node,1)
+        func = <object>PyList_GET_ITEM(<PyListObject *>node,2)
 
-        while dispatch_function is not None:
+        while factory is not None:
 
-            if val is None:
+            if func is None:
                 self._acquire()
                 try:
                     if node[2] is None:
-                        node[2] = val = DispatchNode(
+                        node[2] = func = factory(
                             *<object>PyList_GET_ITEM(<PyListObject *>node,3)
                         )
                 finally:
@@ -271,11 +271,11 @@ cdef class BaseDispatcher:
 
             expr = <object>PyList_GET_ITEM(<PyListObject *>node,0)
             if expr<argct:
-                node = dispatch_function(
-                    <object>PyTuple_GET_ITEM(<PyTupleObject *>argtuple,expr), val
+                node = func(
+                    <object>PyTuple_GET_ITEM(<PyTupleObject *>argtuple,expr)
                 ) or _NF
-                dispatch_function = <object>PyList_GET_ITEM(<PyListObject *>node,1)
-                val = <object>PyList_GET_ITEM(<PyListObject *>node,2)
+                factory = <object>PyList_GET_ITEM(<PyListObject *>node,1)
+                func = <object>PyList_GET_ITEM(<PyListObject *>node,2)
 
 
 
@@ -288,39 +288,39 @@ cdef class BaseDispatcher:
             else:
                 cache = ExprCache(argtuple,self.expr_defs)
                 try:
-                    node = dispatch_function(cache[expr], val) or _NF
-                    dispatch_function = <object>PyList_GET_ITEM(<PyListObject *>node,1)
-                    val = <object>PyList_GET_ITEM(<PyListObject *>node,2)
-                    while dispatch_function is not None:
-                        if val is None:
+                    node = func(cache[expr]) or _NF
+                    factory = <object>PyList_GET_ITEM(<PyListObject *>node,1)
+                    func = <object>PyList_GET_ITEM(<PyListObject *>node,2)
+                    while factory is not None:
+                        if func is None:
                             self._acquire()
                             try:
                                 if node[2] is None:
-                                    node[2] = val = DispatchNode(
+                                    node[2] = func = factory(
                                         *<object>PyList_GET_ITEM(<PyListObject *>node,3)
                                     )
                             finally:
                                 self._release()
                         expr = <object>PyList_GET_ITEM(<PyListObject *>node,0)
                         if expr<argct:
-                            node = dispatch_function(
-                                <object>PyTuple_GET_ITEM(<PyTupleObject *>argtuple,expr), val
+                            node = func(
+                                <object>PyTuple_GET_ITEM(<PyTupleObject *>argtuple,expr)
                             ) or _NF
                         else:
-                            node = dispatch_function(cache[expr], val) or _NF
+                            node = func(cache[expr]) or _NF
 
-                        dispatch_function = <object>PyList_GET_ITEM(<PyListObject *>node,1)
-                        val = <object>PyList_GET_ITEM(<PyListObject *>node,2)
+                        factory = <object>PyList_GET_ITEM(<PyListObject *>node,1)
+                        func = <object>PyList_GET_ITEM(<PyListObject *>node,2)
 
                     break
 
                 finally:
                     cache = None    # GC of values computed during dispatch
 
-        if PyInstance_Check(val) and isinstance(val,DispatchError):
-            val(*argtuple)
+        if PyInstance_Check(func) and isinstance(func,DispatchError):
+            func(*argtuple)
 
-        return val
+        return func
 
 
 

@@ -748,9 +748,9 @@ def most_specific_signatures(cases):
 
     if len(cases)==1:
         # Shortcut for common case
-        return cases[:]
+        return list(cases)
 
-    best, rest = cases[:1], cases[1:]
+    best, rest = list(cases[:1]), list(cases[1:])
 
     for new_sig,new_meth in rest:
 
@@ -784,7 +784,7 @@ def ordered_signatures(cases):
     overlapping, equivalent, or disjoint with one another, but are more
     specific than any other case in the lists that follow."""
 
-    rest = cases[:]
+    rest = list(cases)
 
     while rest:
         best = most_specific_signatures(rest)
