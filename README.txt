@@ -66,10 +66,10 @@ PyProtocols Release 0.9
     Twisted 1.0.5 or later.
 
 
+ Obtaining the Package and Documentation
 
-
-
-
+    Please see the "PyProtocols Home Page":http://peak.telecommunity.com/PyProtocols.html
+    for download links, CVS links, reference manuals, etc.
 
 
 
