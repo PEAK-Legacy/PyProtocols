@@ -369,8 +369,13 @@ class Dispatcher:
 
     def __setitem__(self,signature,method):
         """Update indexes to include 'signature'->'method'"""
-        from dispatch.strategy import Signature
+        cond = self.parseRule(signature)
+        if cond is not None:
+            for signature in IDispatchPredicate(cond):
+                self[signature] = method
+            return
 
+        from dispatch.strategy import Signature
         self.__lock.acquire()
         try:
             signature = Signature(
@@ -383,6 +388,24 @@ class Dispatcher:
             self._addConstraints(signature)
         finally:
             self.__lock.release()
+
+
+    [dispatch.on('rule')]
+    def parseRule(self,rule,frame=None,depth=3):
+        """Parse 'rule' if it's a string/unicode, otherwise return 'None'"""
+
+    [parseRule.when([str,unicode])]
+    def parseRule(self,rule,frame,depth):
+        frame = frame or sys._getframe(depth)
+        return self.parse(rule, frame.f_locals, frame.f_globals)
+
+    [parseRule.when(object)]
+    def parseRule(self,rule,frame,depth):
+        return None
+
+
+
+
 
 
     def _addCase(self,case):
@@ -405,6 +428,24 @@ class Dispatcher:
 
         self.cases.append(case)
         self._dispatcher = None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -532,11 +573,12 @@ class GenericFunction(Dispatcher):
 
 
     def when(self,cond):
-        """Add following function to this GF, w/'cond' as a guard"""
+        """Add following function to this GF, w/'cond' as a guard
 
-        if isinstance(cond,(str,unicode)):
-            frm = sys._getframe(1)
-            cond = self.parse(cond, frm.f_locals, frm.f_globals)
+        If 'cond' is parseable, it will be parsed using the caller's frame
+        locals and globals.
+        """
+        cond = self.parseRule(cond) or cond
 
         def registerMethod(frm,name,value,old_locals):
 
@@ -564,7 +606,6 @@ class GenericFunction(Dispatcher):
             return value
 
         return add_assignment_advisor(registerMethod)
-
 
 
 

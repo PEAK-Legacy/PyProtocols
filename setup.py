@@ -32,6 +32,7 @@ setup(
 
     test_suite  = 'protocols.tests.test_suite',
     package_dir = {'':'src'},
+    package_data = {'': ['*.txt']},
     packages    = find_packages('src'),
     cmdclass    = SETUP_COMMANDS,
     features    = {'speedups': speedups}

@@ -1273,17 +1273,17 @@ TestClasses = (
     TestGraph, TestTests, ExpressionTests, SimpleGenerics, GenericTests,
 )
 
+def test_combiners():
+    from protocols.tests import doctest
+    return doctest.DocFileSuite(
+        'combiners.txt', optionflags=doctest.ELLIPSIS, package='dispatch',
+    )
+    
 def test_suite():
-    s = []
-    for t in TestClasses:
-        s.append(makeSuite(t,'test'))
-
-    return TestSuite(s)
-
-
-
-
-
+    return TestSuite(
+        [test_combiners(), ] +
+        [makeSuite(t,'test') for t in TestClasses]
+    )
 
 
 

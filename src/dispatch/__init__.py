@@ -154,8 +154,8 @@ def on(argument_name):
     """
 
     def callback(frm,name,value,old_locals):
-        import dispatch.functions
-        return dispatch.functions._mkGeneric(value,argument_name)
+        from dispatch.functions import _mkGeneric
+        return _mkGeneric(value,argument_name)
 
     from protocols.advice import add_assignment_advisor
     return add_assignment_advisor(callback)
