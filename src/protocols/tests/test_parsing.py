@@ -699,18 +699,12 @@ class PredicateTests(TestCase):
 
     def testSimplePreds(self):
 
-        def defmethod(gf,cond,func):
-            namespaces = locals(),globals(),__builtins__
-            builder    = TestBuilder(gf.args,*namespaces)
-            gf.addMethod(parse_expr(cond,builder), func)
+        from protocols.dispatch import GenericFunction,Min,Max,defmethod
 
-        from protocols.dispatch import GenericFunction,Min,Max
-
-        classify = GenericFunction(args=['age'])
-        defmethod(classify,'not not age<2',  lambda age:"infant")
+        classify = defmethod(None, 'not not age<2', lambda age:"infant")
         defmethod(classify,'age<13', lambda age:"preteen")
         defmethod(classify,'age<5',  lambda age:"preschooler")
-        defmethod(classify,'age<20', lambda age:"teenager")
+        defmethod(classify,'20>age', lambda age:"teenager")
         defmethod(classify,'not age<20',lambda age:"adult")
         defmethod(classify,'age>=55',lambda age:"senior")
         defmethod(classify,'age==16',lambda age:"sweet sixteen")
@@ -729,6 +723,12 @@ class PredicateTests(TestCase):
         self.assertEqual(classify(99),"senior")
         self.assertEqual(classify(Min),"infant")
         self.assertEqual(classify(Max),"senior")
+
+
+
+
+
+
 
 
 

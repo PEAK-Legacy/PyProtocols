@@ -722,11 +722,32 @@ class TestBuilder:
         finally:
             self.__class__ = TestBuilder
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    _mirror_ops = {
+        '>': '<', '>=': '<=', '=>':'<=',
+        '<': '>', '<=': '>=', '=<':'>=',
+        '<>': '<>', '!=': '<>', '==':'==',
+        'is': 'is', 'is not': 'is not'
+    }
+
     def Compare(self,initExpr,((op,other),)):
         left = build(self.expr_builder,initExpr)
         right = build(self.expr_builder,other)
-        if isinstance(left,Const):
-            left,right = right,left
+        if isinstance(left,Const) and op in self._mirror_ops:
+            left,right,op = right,left,self._mirror_ops[op]
         if isinstance(right,Const):
             return Signature([(left, Inequality(op,right.value))])
         else:
@@ -735,39 +756,18 @@ class TestBuilder:
             )
 
 
-
     def And(self,items):
         sig = build(self,items[0])
         for expr in items[1:]:
             sig &= build(self,expr)
         return sig
 
+
     def Or(self,items):
         sig = build(self,items[0])
         for expr in items[1:]:
             sig |= build(self,expr)
         return sig
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -793,8 +793,8 @@ class NotBuilder(TestBuilder):
     Or  = TestBuilder.And
 
     _rev_ops = {
-        '>': '<=', '>=': '<',
-        '<': '>=', '<=': '>',
+        '>': '<=', '>=': '<', '=>': '<',
+        '<': '>=', '<=': '>', '=<': '>',
         '<>': '==', '!=': '==', '==':'!=',
         'in': 'not in', 'not in': 'in',
         'is': 'is not', 'is not': 'is'

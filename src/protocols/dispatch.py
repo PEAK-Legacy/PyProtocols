@@ -44,7 +44,7 @@ from UserDict import UserDict
 from protocols import Interface, Attribute, Protocol, Adapter, StickyAdapter
 from protocols.advice import getMRO
 import protocols, operator
-from types import ClassType, InstanceType
+from types import ClassType, InstanceType, FunctionType, NoneType
 ClassTypes = (ClassType, type)
 from sys import _getframe
 from weakref import WeakKeyDictionary
@@ -56,7 +56,7 @@ __all__ = [
     'most_specific_signatures', 'ordered_signatures',
     'dispatch_by_mro', 'next_method', 'IDispatchableExpression',
     'IGenericFunction', 'Min', 'Max', 'Inequality', 'IDispatchTable',
-    'EXPR_GETTER_ID','RAW_VARARGS_ID','RAW_KWDARGS_ID',
+    'EXPR_GETTER_ID','RAW_VARARGS_ID','RAW_KWDARGS_ID', 'defmethod',
 ]
 
 
@@ -81,6 +81,7 @@ RAW_KWDARGS_ID = 2
 
 
 class ITest(Interface):
+
     """A test to be applied to an expression
 
     A test comprises a "dispatch function" (the kind of test to be applied,
@@ -107,8 +108,18 @@ class ITest(Interface):
         tests with the same 'dispatch_function' that are being applied to the
         same expression."""
 
+    def __eq__(other):
+        """Return true if equal"""
+
+    def __ne__(other):
+        """Return false if equal"""
+
     def implies(otherTest):
         """Return true if truth of this test implies truth of 'otherTest'"""
+
+
+
+
 
     def subscribe(listener):
         """Call 'listener.testChanged()' if test's applicability changes
@@ -122,7 +133,6 @@ class ITest(Interface):
 
 
 class IDispatchFunction(Interface):
-
     """Test to be applied to an expression to navigate a dispatch node"""
 
     def __call__(ob,table):
@@ -130,8 +140,26 @@ class IDispatchFunction(Interface):
 
         'table' is an 'IDispatchTable' mapping test seeds to dispatch nodes.
         The dispatch function should return the appropriate entry from the
-        dictionary.
-        """
+        dictionary."""
+
+    def __eq__(other):
+        """Return true if equal"""
+
+    def __ne__(other):
+        """Return false if equal"""
+
+    def __hash__():
+        """Return hashcode"""
+
+
+
+
+
+
+
+
+
+
 
 
 class IDispatchTable(Interface):
@@ -148,21 +176,8 @@ class IDispatchTable(Interface):
         """Add 'key' to dispatch table and return the node it should have"""
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class ISignature(Interface):
+
     """Mapping from expression id -> applicable class/dispatch test
 
     Note that signatures do not/should not interpret expression IDs; the IDs
@@ -178,16 +193,42 @@ class ISignature(Interface):
     def implies(otherSig):
         """Return true if this signature implies 'otherSig'"""
 
+    def __eq__(other):
+        """Return true if equal"""
+
+    def __ne__(other):
+        """Return false if equal"""
+
+
+
+
 
 class IDispatchPredicate(Interface):
+
     """Sequence of signatures"""
+
+    def __eq__(other):
+        """Return true if equal"""
+
+    def __ne__(other):
+        """Return false if equal"""
 
 
 class IDispatchableExpression(Interface):
+
     """Expression definition suitable for dispatching"""
 
     def asFuncAndIds(generic):
         """Return '(func,idtuple)' pair for expression computation"""
+
+    def __eq__(other):
+        """Return true if equal"""
+
+    def __ne__(other):
+        """Return false if equal"""
+
+    def __hash__():
+        """Return hashcode"""
 
 
 
@@ -231,8 +272,10 @@ class IGenericFunction(Interface):
         of any other expression whose ID is passed to it.  'RAW_VARARGS_ID'
         and 'RAW_KWDARGS_ID' correspond to the raw varargs tuple and raw
         keyword args dictionary supplied to the generic function on a given
-        invocation.
-        """
+        invocation."""
+
+    def parse(expr_string, local_dict, global_dict):
+        """Parse 'expr_string' --> ISignature or IDispatchPredicate"""
 
     def testChanged():
         """Notify that a test has changed meaning, invalidating any indexes"""
@@ -241,8 +284,6 @@ class IGenericFunction(Interface):
         """Empty all signatures, methods, tests, expressions, etc."""
 
     # copy() ?
-
-
 
 def dispatch_by_mro(ob,table):
 
@@ -783,6 +824,7 @@ class GenericFunction:
 
     Note: this class is *not* threadsafe!  It probably needs to be, though.  :(
     """
+    protocols.advise(instancesProvide=[IGenericFunction])
 
     def __init__(self, args=(), method_combiner=single_best_method):
         self.method_combiner = method_combiner
@@ -815,7 +857,6 @@ class GenericFunction:
             cases = self.cases
             self.clear()
             map(self._addCase, cases)
-
 
 
     def _build_dispatcher(self, state=None):
@@ -1052,6 +1093,11 @@ class GenericFunction:
                 return expr_id
 
 
+    def parse(self,expr_string,local_dict,global_dict):
+        from predicates import TestBuilder
+        from ast_builder import parse_expr
+        builder = TestBuilder(self.args,local_dict,global_dict,__builtins__)
+        return parse_expr(expr_string,builder)
 
 
 
@@ -1059,6 +1105,42 @@ class GenericFunction:
 
 
 
+defmethod = GenericFunction(['gf','cond','func','local_dict','global_dict'])
+
+def defmethod_simple(gf,cond,func,local_dict=None,global_dict=None):
+    """Add a method to an existing GF, using a predicate"""
+    gf = IGenericFunction(gf)
+    gf.addMethod(cond,func)
+    return gf
+
+defmethod[(IGenericFunction,IDispatchPredicate)] = defmethod_simple
+
+# from this point forward, we could use 'when' if it was available...
+
+
+#[when('gf in IGenericFunction and cond in str')]
+def defmethod_string(gf,cond,func,local_dict=None,global_dict=None):
+    """Add a method to an existing GF, using a string condition"""
+
+    if global_dict is None:
+        global_dict = getattr(func,'func_globals',globals())
+    if local_dict is None:
+        local_dict = global_dict
+
+    cond = gf.parse(cond,local_dict,global_dict)
+    return defmethod(gf,cond,func)
+
+defmethod[(IGenericFunction,str)] = defmethod_string
+
+
+#[when('gf in NoneType and func in FunctionType')]
+def defmethod_create(gf,cond,func,local_dict=None,global_dict=None):
+    """Create a new generic function, using function to get args info"""
+    import inspect  # XXX nested args, var, kw, docstring...
+    gf = GenericFunction(inspect.getargspec(func)[0])
+    return defmethod(gf,cond,func,local_dict,global_dict)
+
+defmethod[(NoneType,NullTest,FunctionType)] = defmethod_create
 
 
 
