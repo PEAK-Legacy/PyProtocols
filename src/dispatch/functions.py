@@ -11,7 +11,7 @@ from types import FunctionType, ClassType, InstanceType
 ClassTypes = (ClassType, type)
 
 __all__ = [
-    'GenericFunction', 'NullTest', 'DispatchNode'
+    'GenericFunction', 'NullTest', 'Dispatcher', 'DispatchNode'
 ]
 
 
@@ -203,68 +203,20 @@ declareForProto(protocols.IBasicSequence,proto,
 
 
 
-def _mkNormalizer(func,dispatcher):
-    funcname = func.__name__
-    if funcname=='<lambda>':
-        funcname = "anonymous"
+class Dispatcher:
 
-    args, varargs, kwargs, defaults = inspect.getargspec(func)
+    """Extensible multi-dispatch mapping object"""
 
-    if defaults:
-        tmpd = ["=__gfDefaults[%s]" % i for i in range(len(defaults))]
-    else:
-        tmpd = None
+    protocols.advise(instancesProvide=[IDispatcher])
 
-    argspec = inspect.formatargspec(
-        args, varargs, kwargs, tmpd, formatvalue=lambda x:x)
-
-    allargs = inspect.formatargspec(args,varargs,kwargs)
-    outargs = inspect.formatargspec(args, varargs, kwargs,
-        formatvarargs=lambda name:name, formatvarkw=lambda name:name,
-        join=lambda seq:','.join(seq))
-    outargs = outargs[1:-1]+','
-    if outargs==',':
-        outargs=''
-        retargs = []
-    else:
-        retargs = filter(None,outargs.replace(' ','').split(','))
-
-    d ={}
-    s = """
-def setup(__dispatcher,__gfDefaults):
-
-    def %(funcname)s%(argspec)s:
-        return __dispatcher[(%(outargs)s)]%(allargs)s
-
-    return %(funcname)s
-""" % locals()
-    exec s in globals(),d
-    return d['setup'](dispatcher,defaults), retargs
-
-defaultNormalize = lambda *__args: __args
-
-
-class GenericFunction:
-    """Extensible multi-dispatch generic function"""
-    
-    protocols.advise(instancesProvide=[IGenericFunction])
-    delegate = None
-
-    def __init__(self,func,method_combiner=None):
-        self.delegate, self.args = _mkNormalizer(func, self)
-        self.delegate.__dict__ = dict(
-            [(k,getattr(self,k))
-                for k in dir(self.__class__) if not k.startswith('_')]
-        )
-        self.delegate.__doc__ = self.__doc__ = func.__doc__
-        protocols.adviseObject(self.delegate,[IGenericFunction])
-        self.__name__ = func.__name__; self.__call__ = self.delegate
-
+    def __init__(self,args,method_combiner=None):
+        self.args = args
         if method_combiner is None:
             from strategy import single_best_method as method_combiner
         self.method_combiner = method_combiner
         self.__lock = allocate_lock()
         self.clear()
+
 
     def clear(self):
         self.__lock.acquire()
@@ -282,6 +234,13 @@ class GenericFunction:
         self._dispatcher = None
         from dispatch.strategy import TGraph; self.constraints=TGraph()
         self._setupArgs()
+
+
+    def parse(self,expr_string,local_dict,global_dict):
+        from dispatch.predicates import TestBuilder
+        from dispatch.ast_builder import parse_expr
+        builder=TestBuilder(self.args,local_dict,global_dict,__builtins__)
+        return parse_expr(expr_string,builder)
 
 
 
@@ -360,8 +319,8 @@ class GenericFunction:
         raise NoApplicableMethods
 
 
-    # We can't be used as a method, but make pydoc think we're a callable
-    __get__ = None  
+
+
 
 
 
@@ -390,59 +349,18 @@ class GenericFunction:
             map(self._addCase, cases)
 
 
-    def addMethod(self,predicate,function):
-        for signature in IDispatchPredicate(predicate):
-            self[signature] = function
-
-
     def testChanged(self):
         self.dirty = True
         self._dispatcher = None
 
 
-
-
-
-
-
-
-
-
-    def when(self,cond):
-        """Add following function to this GF, w/'cond' as a guard"""
-
-        if isinstance(cond,(str,unicode)):
-            frm = sys._getframe(1)
-            cond = self.parse(cond, frm.f_locals, frm.f_globals)
-
-        def registerMethod(frm,name,value,old_locals):
-
-            kind,module,locals_,globals_ = getFrameInfo(frm)
-
-            if kind=='class':
-
-                # 'when()' in class body; defer adding the method
-                def registerClassSpecificMethod(cls):
-                    import strategy
-                    req = strategy.Signature(
-                        [(strategy.Argument(0),ITest(cls))]
-                    )
-                    self.addMethod(cond & req, value)
-                    return cls
-
-                addClassAdvisor(registerClassSpecificMethod,frame=frm)
-
-            else:
-                self.addMethod(cond,value)
-
-            if old_locals.get(name) in (self,self.delegate):
-                return self.delegate
-
-            return value
-
-        return add_assignment_advisor(registerMethod)
-
-
+    def _setupArgs(self):
+        self.args_by_name = abn = {}
+        self.argids = argids = {}
+        from dispatch.strategy import Argument
+        for n,p in zip(self.args,range(len(self.args))):
+            abn[n] = arg = self.__argByNameAndPos(n,p)
+            argids[self.getExpressionId(Argument(name=n))] = True
 
 
 
@@ -561,17 +479,6 @@ class GenericFunction:
                 return expr_id
 
 
-    def parse(self,expr_string,local_dict,global_dict):
-        self.__lock.acquire()
-        try:
-            from dispatch.predicates import TestBuilder
-            from dispatch.ast_builder import parse_expr
-            builder=TestBuilder(self.args,local_dict,global_dict,__builtins__)
-            return parse_expr(expr_string,builder)
-        finally:
-            self.__lock.release()
-
-
     def _addConstraints(self, signature):
         pre = []
         for key,test in signature.items():
@@ -580,13 +487,35 @@ class GenericFunction:
             pre.append(key)
 
 
-    def _setupArgs(self):
-        self.args_by_name = abn = {}
-        self.argids = argids = {}
-        from dispatch.strategy import Argument
-        for n,p in zip(self.args,range(len(self.args))):
-            abn[n] = arg = self.__argByNameAndPos(n,p)
-            argids[self.getExpressionId(Argument(name=n))] = True
+
+
+
+class GenericFunction(Dispatcher):
+
+    """Extensible multi-dispatch generic function"""
+    
+    protocols.advise(instancesProvide=[IGenericFunction])
+
+    delegate = None
+
+    def __init__(self,func,method_combiner=None):
+        self.delegate, args = _mkNormalizer(func, self)
+        self.delegate.__dict__ = dict(
+            [(k,getattr(self,k))
+                for k in dir(self.__class__) if not k.startswith('_')]
+        )
+        self.delegate.__doc__ = self.__doc__ = func.__doc__
+        protocols.adviseObject(self.delegate,[IGenericFunction])
+        self.__name__ = func.__name__; self.__call__ = self.delegate
+        Dispatcher.__init__(self,args,method_combiner)
+
+    # We can't be used as a method, but make pydoc think we're a callable
+    __get__ = None  
+
+
+    def addMethod(self,predicate,function):
+        for signature in IDispatchPredicate(predicate):
+            self[signature] = function
 
 
 
@@ -602,6 +531,39 @@ class GenericFunction:
 
 
 
+    def when(self,cond):
+        """Add following function to this GF, w/'cond' as a guard"""
+
+        if isinstance(cond,(str,unicode)):
+            frm = sys._getframe(1)
+            cond = self.parse(cond, frm.f_locals, frm.f_globals)
+
+        def registerMethod(frm,name,value,old_locals):
+
+            kind,module,locals_,globals_ = getFrameInfo(frm)
+
+            if kind=='class':
+
+                # 'when()' in class body; defer adding the method
+                def registerClassSpecificMethod(cls):
+                    import strategy
+                    req = strategy.Signature(
+                        [(strategy.Argument(0),ITest(cls))]
+                    )
+                    self.addMethod(cond & req, value)
+                    return cls
+
+                addClassAdvisor(registerClassSpecificMethod,frame=frm)
+
+            else:
+                self.addMethod(cond,value)
+
+            if old_locals.get(name) in (self,self.delegate):
+                return self.delegate
+
+            return value
+
+        return add_assignment_advisor(registerMethod)
 
 
 
@@ -610,6 +572,44 @@ class GenericFunction:
 
 
 
+def _mkNormalizer(func,dispatcher):
+    funcname = func.__name__
+    if funcname=='<lambda>':
+        funcname = "anonymous"
 
+    args, varargs, kwargs, defaults = inspect.getargspec(func)
+
+    if defaults:
+        tmpd = ["=__gfDefaults[%s]" % i for i in range(len(defaults))]
+    else:
+        tmpd = None
+
+    argspec = inspect.formatargspec(
+        args, varargs, kwargs, tmpd, formatvalue=lambda x:x)
+
+    allargs = inspect.formatargspec(args,varargs,kwargs)
+    outargs = inspect.formatargspec(args, varargs, kwargs,
+        formatvarargs=lambda name:name, formatvarkw=lambda name:name,
+        join=lambda seq:','.join(seq))
+    outargs = outargs[1:-1]+','
+    if outargs==',':
+        outargs=''
+        retargs = []
+    else:
+        retargs = filter(None,outargs.replace(' ','').split(','))
+
+    d ={}
+    s = """
+def setup(__dispatcher,__gfDefaults):
+
+    def %(funcname)s%(argspec)s:
+        return __dispatcher[(%(outargs)s)]%(allargs)s
+
+    return %(funcname)s
+""" % locals()
+    exec s in globals(),d
+    return d['setup'](dispatcher,defaults), retargs
+
+defaultNormalize = lambda *__args: __args
 
 

@@ -2,7 +2,7 @@ from protocols import Interface, Attribute
 
 __all__ = [
     'IDispatchFunction', 'ITest', 'ISignature', 'IDispatchPredicate',
-    'AmbiguousMethod', 'NoApplicableMethods',
+    'IDispatcher', 'AmbiguousMethod', 'NoApplicableMethods',
     'IDispatchableExpression', 'IGenericFunction', 'IDispatchTable',
     'EXPR_GETTER_ID','RAW_VARARGS_ID','IExtensibleFunction',
 ]
@@ -203,6 +203,47 @@ class IDispatchableExpression(Interface):
 
 
 
+class IDispatcher(Interface):
+
+    """Multi-dispatch mapping object"""
+
+    def __getitem__(argtuple):
+        """Return the rule body (or combo thereof) that matches 'argtuple'"""
+
+    def __setitem__(signature,body):
+        """Store 'body' as the rule body for arg tuples matching 'signature'"""
+        
+
+    def parse(expr_string, local_dict, global_dict):
+        """Parse 'expr_string' --> ISignature or IDispatchPredicate"""
+
+
+    def argByName(name):
+        """Return 'asFuncAndIds()' for argument 'name'"""
+
+    def argByPos(pos):
+        """Return 'asFuncAndIds()' for argument number 'pos'"""
+
+    def getExpressionId(expr):
+        """Return an expression ID for use in 'asFuncAndIds()' 'idtuple'
+
+        Note that the constants 'EXPR_GETTER_ID', 'RAW_VARARGS_ID', and
+        'RAW_KWDARGS_ID' may be used in place of calling this method, if
+        one of the specified expressions is desired.
+
+        'EXPR_GETTER_ID' corresponds to a function that will return the value
+        of any other expression whose ID is passed to it.  'RAW_VARARGS_ID'
+        and 'RAW_KWDARGS_ID' correspond to the raw varargs tuple and raw
+        keyword args dictionary supplied to the generic function on a given
+        invocation."""
+
+    def testChanged():
+        """Notify that a test has changed meaning, invalidating any indexes"""
+
+    def clear():
+        """Empty all signatures, methods, tests, expressions, etc."""
+
+
 class IExtensibleFunction(Interface):
 
     def __call__(*__args,**__kw):
@@ -232,51 +273,10 @@ class IExtensibleFunction(Interface):
         """
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-class IGenericFunction(IExtensibleFunction):
-
-    def argByName(name):
-        """Return 'asFuncAndIds()' for argument 'name'"""
-
-    def argByPos(pos):
-        """Return 'asFuncAndIds()' for argument number 'pos'"""
-
-    def getExpressionId(expr):
-        """Return an expression ID for use in 'asFuncAndIds()' 'idtuple'
-
-        Note that the constants 'EXPR_GETTER_ID', 'RAW_VARARGS_ID', and
-        'RAW_KWDARGS_ID' may be used in place of calling this method, if
-        one of the specified expressions is desired.
-
-        'EXPR_GETTER_ID' corresponds to a function that will return the value
-        of any other expression whose ID is passed to it.  'RAW_VARARGS_ID'
-        and 'RAW_KWDARGS_ID' correspond to the raw varargs tuple and raw
-        keyword args dictionary supplied to the generic function on a given
-        invocation."""
-
-    def parse(expr_string, local_dict, global_dict):
-        """Parse 'expr_string' --> ISignature or IDispatchPredicate"""
-
-    def testChanged():
-        """Notify that a test has changed meaning, invalidating any indexes"""
-
-    def clear():
-        """Empty all signatures, methods, tests, expressions, etc."""
+class IGenericFunction(IExtensibleFunction, IDispatcher):
+    """Extensible function that stores methods in an IDispatcher"""
 
     # copy() ?
-
-
 
 
 
