@@ -190,19 +190,6 @@ class IDispatchableExpression(Interface):
         """Return hashcode"""
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 class ISimpleDispatchPredicate(Interface):
 
     """Adaptation-based predicate for single-dispatch functions"""
@@ -210,6 +197,11 @@ class ISimpleDispatchPredicate(Interface):
     def declareAdapter(protocol, factory):
         """Declare 'factory' as an adapter to 'protocol' from this predicate"""
         
+
+
+
+
+
 
 class IExtensibleFunction(Interface):
     
@@ -223,25 +215,33 @@ class IExtensibleFunction(Interface):
         predicate types: 'ISimpleDispatchPredicate' and 'IDispatchPredicate'.
         """
 
+    def when(cond):
+        """Add following function to this GF, w/'cond' as a guard
 
+        This is typically used in place of 'dispatch.when()' if you only intend
+        to use 'SimpleGeneric' functions in a module, or when adding a new
+        method to a generic function in another module.  For example, instead
+        of::
 
+            from foo import barFunc
 
+            @dispatch.when(XYZ)
+            def barFunc(x,y,z):
+                # code for situation XYZ
 
+        You can use::
 
+            import foo
 
+            @foo.barFunc.when(XYZ)
+            def whatever(x,y,z):
+                # code for situation XYZ
 
-
-
-
-
-
-
-
-
-
-
-
-
+        After the execution of this alternate form, 'whatever' will be bound
+        to the 'whatever' function as shown, but it will also have been added
+        to 'foo.barFunc' under condition 'XYZ'.  (In the first form, 'barFunc'
+        will be bound to the 'foo.barFunc' generic function instead.)
+        """
 
 
 class IGenericFunction(IExtensibleFunction):

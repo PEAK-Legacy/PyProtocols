@@ -859,6 +859,47 @@ class SimpleGenerics(TestCase):
 
 
 
+    def testWhenMethods(self):
+
+        m = GenericFunction(args=['v'])
+        m.when(Signature(v=LandVehicle))
+        def foo(v):
+            return "land"
+
+        import types
+        self.failUnless(isinstance(m,GenericFunction))
+        self.failUnless(isinstance(foo,types.FunctionType))
+
+        m.when(Signature(v=WaterVehicle))
+        def m(v):
+            return "water"
+
+        self.failUnless(isinstance(m,GenericFunction))
+        self.assertEqual(m(LandVehicle()),"land")
+        self.assertEqual(m(WaterVehicle()),"water")
+        
+        s = dispatch.SimpleGeneric("x")
+        s.when(LandVehicle)
+        def bar(v):
+            return "land"
+
+        self.failUnless(isinstance(s,SimpleGeneric))
+        self.failUnless(isinstance(bar,types.FunctionType))
+
+        s.when(WaterVehicle)
+        def s(v):
+            return "water"
+
+        self.failUnless(isinstance(s,SimpleGeneric))
+        self.assertEqual(s(LandVehicle()),"land")
+        self.assertEqual(s(WaterVehicle()),"water")
+
+
+
+
+
+
+
 class GenericTests(TestCase):
 
     def testBasicSingleDispatch(self):

@@ -93,17 +93,17 @@ class SimpleGeneric:
         )
         
 
+    def when(self,cond):
+        """Add following function to this GF, using 'cond' as a guard"""
 
+        def callback(frm,name,value,old_locals):
+            self.addMethod(cond, value)
+            if old_locals.get(name) is self:
+                return self
+            return value
 
-
-
-
-
-
-
-
-
-
+        return add_assignment_advisor(callback)
+        
 
 
 
@@ -315,14 +315,14 @@ class GenericFunction:
         # XXX nested args, var, kw, docstring...
         return klass(inspect.getargspec(func)[0])
 
-
-
-
-
-
-
-
-
+    def when(self,cond):
+        """Add following function to this GF, w/'cond' as a guard"""
+        def callback(frm,name,value,old_locals):
+            defmethod(self, cond, value, frm.f_locals, frm.f_globals)
+            if old_locals.get(name) is self:
+                return self
+            return value
+        return add_assignment_advisor(callback)
 
 
 
