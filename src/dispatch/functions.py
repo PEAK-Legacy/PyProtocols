@@ -368,44 +368,44 @@ class Dispatcher:
         return node
 
     def __getitem__(self,argtuple):
-        try:
-            node = self._dispatcher
-            argct = self.argct
-            cache = None
+        argct = self.argct
+        node = self._dispatcher
+        if node is None:
+            node = self._startNode()
 
-            if node is None:
-                node = self._startNode()
-
-            while type(node) is DispatchNode:
-                (expr, dispatch_function) = node.expr_id
-                if node.contents:
-                    self._acquire()
-                    try:
-                        if node.contents:
-                            node.build()
-                    finally:
-                        self._release()
-
-                if expr<argct:
-                    node = dispatch_function(argtuple[expr], node)
-                else:
-                    if cache is None:
-                        cache = ExprCache(argtuple,self.expr_defs)
+        while type(node) is DispatchNode:
+            (expr, dispatch_function) = node.expr_id
+            if node.contents:
+                self._acquire()
+                try:
+                    if node.contents: node.build()
+                finally:
+                    self._release()
+            if expr<argct:
+                node = dispatch_function(argtuple[expr], node)
+            else:
+                cache = ExprCache(argtuple,self.expr_defs)
+                try:
                     node = dispatch_function(cache[expr], node)
-        finally:
-            cache = get = None    # allow GC of values computed during dispatch
+                    while type(node) is DispatchNode:
+                        (expr, dispatch_function) = node.expr_id
+                        if node.contents:
+                            self._acquire()
+                            try:
+                                if node.contents: node.build()
+                            finally:
+                                self._release()
+                        if expr<argct:
+                            node = dispatch_function(argtuple[expr], node)
+                        else:
+                            node = dispatch_function(cache[expr], node)
+                    break
+                finally:                    
+                    cache = None    # GC of values computed during dispatch
 
         if node is not None:
             return node
-
         raise NoApplicableMethods
-
-
-
-
-
-
-
 
 
     def _rebuild_indexes(self):
