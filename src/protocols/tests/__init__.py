@@ -1,5 +1,5 @@
 from unittest import TestSuite, TestCase, makeSuite
-from protocols import adapt, advise
+from protocols import adapt, advise, Interface, Attribute
 
 class APITests(TestCase):
 
@@ -79,6 +79,47 @@ class APITests(TestCase):
         assert adapt(c,AdaptingProtocol,None) == ("adapted",c)
         assert adapt(42,AdaptingProtocol,None) == ("adapted",42)
         assert adapt(42,42,None) is None
+
+    def checkAttribute(self):
+
+        for i in range(10)+[None]:
+
+            class AbstractBase(Interface):
+                value = Attribute("testing", "value", i)
+
+            ob = AbstractBase()
+            assert ob.value == i
+
+            for j in range(10):
+                ob.value = j
+                assert ob.value==j
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def test_suite():
 
