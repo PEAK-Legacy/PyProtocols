@@ -28,7 +28,7 @@ class DispatchNode(dict):
         dict.__init__(self,contents())
 
 
-_NF = (None,None, NoApplicableMethods, (None,None))
+_NF = (0,None, NoApplicableMethods, (None,None))
 
 
 
@@ -285,7 +285,90 @@ class ExprCache(object):
 
 
 
-class Dispatcher:
+class BaseDispatcher:
+    def __getitem__(self,argtuple):
+        argct = self.argct
+        node = self._dispatcher or self._startNode() or _NF
+        expr, dispatch_function, val, init = node
+        while dispatch_function:
+            if val is None:
+                self._acquire()
+                try:
+                    if node[2] is None: node[2] = val = DispatchNode(*init)
+                finally:
+                    self._release()
+            if expr<argct:
+                expr, dispatch_function, val, init = node = \
+                    dispatch_function(argtuple[expr], val) or _NF
+            else:
+                cache = ExprCache(argtuple,self.expr_defs)
+                try:
+                    expr, dispatch_function, val, init = node = \
+                        dispatch_function(cache[expr], val) or _NF
+                    while dispatch_function:
+                        if val is None:
+                            self._acquire()
+                            try:
+                                if node[2] is None:
+                                    node[2] = val = DispatchNode(*init)
+                            finally:
+                                self._release()
+                        if expr<argct:
+                            expr, dispatch_function, val, init = node = \
+                                dispatch_function(argtuple[expr], val) or _NF
+                        else:
+                            expr, dispatch_function, val, init = node = \
+                                dispatch_function(cache[expr], val) or _NF
+                    break
+                finally:
+                    cache = None    # GC of values computed during dispatch
+        if val is NoApplicableMethods:
+            raise NoApplicableMethods
+        return val
+        
+try:
+    from dispatch._speedups import BaseDispatcher, DispatchNode
+except ImportError:
+    pass
+else:
+    protocols.declareImplementation(DispatchNode,[IDispatchTable])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class Dispatcher(BaseDispatcher):
     """Extensible multi-dispatch mapping object"""
 
     protocols.advise(instancesProvide=[IDispatcher])
@@ -336,7 +419,7 @@ class Dispatcher:
             return memo[key]
         elif not disp_ids:
             # No more criteria, so make a leaf node
-            node = [None,None, self.combine(cases), None]
+            node = [0,None, self.combine(cases), None]
         else:
             best_id, case_map, remaining_ids = self._best_split(cases,disp_ids)
             if best_id is None:
@@ -366,47 +449,6 @@ class Dispatcher:
 
         memo[key] = node
         return node
-
-    def __getitem__(self,argtuple):
-        argct = self.argct
-        node = self._dispatcher or self._startNode() or _NF
-        expr, dispatch_function, val, init = node
-        while dispatch_function is not None:
-            if val is None:
-                self._acquire()
-                try:
-                    if node[2] is None: node[2] = val = DispatchNode(*init)
-                finally:
-                    self._release()
-            if expr<argct:
-                expr, dispatch_function, val, init = node = \
-                    dispatch_function(argtuple[expr], val) or _NF
-            else:
-                cache = ExprCache(argtuple,self.expr_defs)
-                try:
-                    expr, dispatch_function, val, init = node = \
-                        dispatch_function(cache[expr], val) or _NF
-                    while dispatch_function is not None:
-                        if val is None:
-                            self._acquire()
-                            try:
-                                if node[2] is None:
-                                    node[2] = val = DispatchNode(*init)
-                            finally:
-                                self._release()
-                        if expr<argct:
-                            expr, dispatch_function, val, init = node = \
-                                dispatch_function(argtuple[expr], val) or _NF
-                        else:
-                            expr, dispatch_function, val, init = node = \
-                                dispatch_function(cache[expr], val) or _NF
-                    break
-                finally:
-                    cache = None    # GC of values computed during dispatch
-        if val is NoApplicableMethods:
-            raise NoApplicableMethods
-        return val
-
 
     def _rebuild_indexes(self):
         if self.dirty:
@@ -646,7 +688,8 @@ class AbstractGeneric(Dispatcher):
             "The purpose of this class is to support *custom* method combiners"
         )
 
-
+    def __call__(__self,*args,**kw):
+        return __self.delegate(*args,**kw)
 
 
 

@@ -12,10 +12,11 @@ HAPPYDOC_IGNORE = ['-i', 'tests', '-i', 'setup', '-i', 'setuptools']
 execfile('src/setup/common.py')
 
 speedups = Feature(
-    "optional C speed-enhancement module",
+    "optional C speed-enhancement modules",
     standard = True,
     ext_modules = [
         Extension("protocols._speedups", ["src/protocols/_speedups.pyx"]),
+        Extension("dispatch._speedups", ["src/dispatch/_speedups.pyx"]),
     ]
 )
 

@@ -510,7 +510,7 @@ def dispatch_by_inequalities(ob,table):
                 return table[ranges[mid]]
 
 try:
-    from protocols._speedups import \
+    from _speedups import \
         concatenate_ranges, dispatch_by_inequalities, Min, Max
 except ImportError:
     pass
