@@ -52,7 +52,7 @@ setup(
 
     url="http://peak.telecommunity.com/PyProtocols.html",
 
-    test_module = TEST_MODULE,
+    test_suite = 'protocols.tests.test_suite',
     package_dir = {'':'src'},
     packages    = packages,
     cmdclass = SETUP_COMMANDS,

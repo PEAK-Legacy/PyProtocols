@@ -5,9 +5,6 @@ the package; it's only actually used while 'setup.py' is running."""
 
 # Set up default parameters
 
-if 'TEST_MODULE' not in globals():
-    TEST_MODULE = packages[0]+'.tests'
-
 if 'HAPPYDOC_OUTPUT_PATH' not in globals():
     HAPPYDOC_OUTPUT_PATH = 'docs/html/reference'
 
@@ -32,6 +29,9 @@ try:
 except ImportError:
     build_ext = old_build_ext
     EXT = '.c'
+
+
+
 
 
 
