@@ -7,7 +7,7 @@ execfile('src/setup/prologue.py')
 # Metadata
 
 PACKAGE_NAME = "PyProtocols"
-PACKAGE_VERSION = "0.7"
+PACKAGE_VERSION = "0.8"
 
 HAPPYDOC_IGNORE = [
     '-i', 'examples',  '-i', 'old', '-i', 'tests', '-i', 'setup',

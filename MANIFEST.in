@@ -1,0 +1,2 @@
+recursive-include docs *.tex *.html *.pdf
+recursive-include src/setup *.py
