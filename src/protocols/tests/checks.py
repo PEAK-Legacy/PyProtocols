@@ -380,7 +380,7 @@ def makeInstanceTests(base,Picklable,NewStyle):
     class AdviseModule(base):
         def setUp(self):
             from types import ModuleType
-            self.ob = ModuleType()
+            self.ob = ModuleType('x')
 
     class AdviseInstance(base):
         def setUp(self):
