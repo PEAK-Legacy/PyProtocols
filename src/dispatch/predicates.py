@@ -517,7 +517,7 @@ class MultiTest(object):
             if key in self:
                 yield key
 
-
+    def appliedTo(self,expr): return Signature([(expr, self)])
 
 
 
@@ -534,14 +534,21 @@ class MultiTest(object):
 class AndTest(MultiTest):
     """All tests must return true for expression"""
 
+    def __invert__(self):
+        return OrTest(*[~test for test in self.tests])
+
     def __contains__(self,key):
         for test in self.tests:
             if key not in test:
                 return False
         return True
 
+
 class OrTest(MultiTest):
     """At least one test must return true for expression"""
+
+    def __invert__(self):
+        return AndTest(*[~test for test in self.tests])
 
     def __contains__(self,key):
         for test in self.tests:
@@ -565,18 +572,11 @@ class OrTest(MultiTest):
 
 
 
-
-
-
-
-
-
-
 class NotTest(MultiTest):
 
     elim_single = False
 
-    def __new__(klass, test):
+    def xxx__new__(klass, test):
         test = ITest(test)
         if isinstance(test,NotTest):
             return test.test
@@ -593,23 +593,11 @@ class NotTest(MultiTest):
         self.tests = test,
         self.dispatch_function = test.dispatch_function
 
+    def __invert__(self):
+        return self.test
+
     def __contains__(self,key):
         return key not in self.test
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -620,7 +608,13 @@ def dispatch_by_truth(ob,table):
         return table.get(False)
 
 
+
+
+
+
+
 class TruthTest(object):
+
     """Test representing truth or falsity of an expression"""
 
     protocols.advise(instancesProvide=[ITest])
@@ -648,8 +642,14 @@ class TruthTest(object):
     def __ne__(self,otherTest):
         return not self.__eq__(otherTest)
 
+    def __invert__(self):
+        return TruthTest(not self.truth)
+
     def matches(self,table):
         return self.truth,
+
+    def appliedTo(self,expr): return Signature([(expr, self)])
+
 
 
 
@@ -714,18 +714,18 @@ class TestBuilder:
             if op=='in' or op=='not in':
                 right = sequence_test(right.value) or ITest(right.value)
                 if op=='not in':
-                    right = NotTest(right)
+                    right = ~right
             elif op=='is' or op=='is not':
                 if right.value is None:
                     right = ITest(NoneType)
                     if op=='is not':
-                        right = NotTest(right)
+                        right = ~right
                 else:
                     left, right = Call(is_,left,right), TruthTest(op=='is')
             else:
                 right = Inequality(op,right.value)
 
-            return Signature([(left, right)])
+            return right.appliedTo(left)  #Signature([(left, right)])
 
         else:
             # Both sides involve variables, so it's a boolean test  :(
@@ -832,7 +832,7 @@ def convertIsInstanceToClassTest(expr,test):
     typecheck = _tupleToOrTest(expr.argexprs[1].value)
 
     if not test.truth:
-        typecheck = NotTest(typecheck)
+        typecheck = ~typecheck
 
     return Signature([(expr.argexprs[0],typecheck)])
 

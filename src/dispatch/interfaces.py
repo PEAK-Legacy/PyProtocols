@@ -73,12 +73,22 @@ class ITest(Interface):
     def __ne__(other):
         """Return false if equal"""
 
+    def __invert__():
+        """Return an inverse version of this test (i.e. 'not test')"""
+        
     def implies(otherTest):
         """Return true if truth of this test implies truth of 'otherTest'"""
+
 
     def matches(table):
         """Return iterable of keys from 'table' that this test is true for"""
 
+
+    def appliedTo(expr):
+        """Return an 'ISignature' or 'IDispatchPredicate' for 'expr in test'
+
+        'expr' must be an 'IDispatchableExpression'
+        """
 
     def subscribe(listener):
         """Call 'listener.testChanged()' if test's applicability changes
@@ -109,16 +119,6 @@ class IDispatchFunction(Interface):
 
     def __hash__():
         """Return hashcode"""
-
-
-
-
-
-
-
-
-
-
 
 
 class IDispatchTable(Interface):

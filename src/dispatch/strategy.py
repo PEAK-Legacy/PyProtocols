@@ -163,11 +163,9 @@ def dispatch_by_mro(ob,table):
 
 
 class ClassTest(Adapter):
-
     """Test that indicates expr is of a particular class"""
 
     protocols.advise(instancesProvide=[ITest], asAdapterForTypes=ClassTypes)
-
     dispatch_function = staticmethod(dispatch_by_mro)
 
     def seeds(self,table):
@@ -202,6 +200,8 @@ class ClassTest(Adapter):
             if key in self:
                 yield key
 
+    def __invert__(self): from predicates import NotTest; return NotTest(self)
+    def appliedTo(self,expr): return Signature([(expr, self)])
 
 class _ExtremeType(object):     # Courtesy of PEP 326
 
@@ -245,11 +245,9 @@ def dispatch_by_inequalities(ob,table):
 
 
 class Inequality(object):
-
     """Test that indicates target matches specified constant inequalities"""
 
     protocols.advise(instancesProvide=[ITest])
-
     dispatch_function = staticmethod(dispatch_by_inequalities)
 
     def __init__(self,op,val):
@@ -284,6 +282,8 @@ class Inequality(object):
                 return True
         return False
 
+    def __invert__(self): from predicates import NotTest; return NotTest(self)
+    def appliedTo(self,expr): return Signature([(expr, self)])
 
     def implies(self,otherTest):
         for r in self.ranges:
@@ -405,8 +405,8 @@ class ProtocolTest(StickyAdapter):
             if key in self:
                 yield key
 
-
-
+    def __invert__(self): from predicates import NotTest; return NotTest(self)
+    def appliedTo(self,expr): return Signature([(expr, self)])
 
     def implies(self,otherTest):
 

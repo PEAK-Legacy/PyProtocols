@@ -62,13 +62,13 @@ class NullTest:
         # NullTest is true for any key
         return list(table)
 
+    def appliedTo(self,expr): return Signature([(expr, self)])
+
+    def __invert__(self):
+        from predicates import NotTest
+        return NotTest(self)
+
 NullTest = NullTest()
-
-
-
-
-
-
 
 
 

@@ -409,17 +409,17 @@ class TestTests(TestCase):
 
 
     def testSimplifications(self):
-        self.assertEqual(NotTest(TruthTest(1)), TruthTest(0))
-        self.assertEqual(NotTest(NotTest(TruthTest(1))), TruthTest(27))
+        self.assertEqual((~TruthTest(1)), TruthTest(0))
+        self.assertEqual((~(~TruthTest(1))), TruthTest(27))
 
         self.assertEqual(
-            NotTest(AndTest(Inequality('>=',10),Inequality('<=',20))),
-            OrTest(NotTest(Inequality('>=',10)),NotTest(Inequality('<=',20)))
+            (~AndTest(Inequality('>=',10),Inequality('<=',20))),
+            OrTest((~Inequality('>=',10)),(~Inequality('<=',20)))
         )
 
         self.assertEqual(
-            NotTest(OrTest(Inequality('>=',10),Inequality('<=',20))),
-            AndTest(NotTest(Inequality('>=',10)),NotTest(Inequality('<=',20)))
+            (~OrTest(Inequality('>=',10),Inequality('<=',20))),
+            AndTest((~Inequality('>=',10)),(~Inequality('<=',20)))
         )
 
         self.assertEqual(

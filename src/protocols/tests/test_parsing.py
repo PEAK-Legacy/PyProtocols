@@ -745,7 +745,7 @@ class PredicateTests(TestCase):
         self.assertEqual(pe('x not in int'), Signature(x=NotTest(int)))
         self.assertEqual(pe('x in (1,2,3)'), Signature(x=in_test([1,2,3])))
         self.assertEqual(pe('x not in (1,2,3)'),
-            Signature(x=NotTest(in_test([1,2,3]))))
+            Signature(x=~in_test([1,2,3])))
 
         self.assertEqual(pe('x is 1'),
             Signature([(Call(predicates.is_,Argument(name='x'),Const(1)),
@@ -774,7 +774,7 @@ class PredicateTests(TestCase):
         self.assertEqual(pe('isinstance(x,(int,(str,unicode)))'),
             Signature(x=OrTest(int,str,unicode)))
         self.assertEqual(pe('not isinstance(x,(int,(str,unicode)))'),
-            Signature(x=NotTest(OrTest(int,str,unicode))))
+            Signature(x=~OrTest(int,str,unicode)))
 
 
     def testParseDNF(self):
