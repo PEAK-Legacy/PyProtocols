@@ -163,7 +163,7 @@ class APITests(TestCase):
 
 
 from protocols import protocolForType, protocolForURI, sequenceOf
-from protocols import declareImplementation
+from protocols import declareImplementation, Variation
 from UserDict import UserDict
 
 IGetSetMapping  = protocolForType(dict,['__getitem__','__setitem__'])
@@ -178,12 +178,12 @@ multimap = sequenceOf(IGetMapping)
 
 declareImplementation(UserDict,[IGetSetMapping])
 
+IMyUnusualMapping = Variation(IGetSetMapping)
 
+class MyUserMapping(object):
+    pass
 
-
-
-
-
+declareImplementation(MyUserMapping,[IMyUnusualMapping])
 
 
 
@@ -234,15 +234,15 @@ class GenerationTests(TestCase):
         assert seq == [d1,d2]
         assert seq[0] is d1 and seq[1] is d2
 
-
-
-
-
-
-
-
-
-
+    def checkVariation(self):
+        d = {}
+        assert adapt(d,IMyUnusualMapping,None) is d # GetSet implies variation
+        d = MyUserMapping(); assert adapt(d,IMyUnusualMapping,None) is d
+        assert adapt(d,IGetSetMapping,None) is None # but not the other way
+        self.assertEqual(repr(IMyUnusualMapping),
+          "Variation(TypeSubset(<type 'dict'>,('__getitem__', '__setitem__')))")
+        self.assertEqual(repr(Variation(Interface,42)),
+          "Variation(<class 'protocols.interfaces.Interface'>,42)")
 
 def test_suite():
 

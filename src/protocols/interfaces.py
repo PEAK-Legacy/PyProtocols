@@ -260,7 +260,7 @@ class Variation(Protocol):
         # Note: Protocol is a ``classic'' class, so we don't use super()
         Protocol.__init__(self)
 
-        declareAdapterForProtocol(self,NO_ADAPTER_NEEDED,baseProtocol)
+        api.declareAdapterForProtocol(self,NO_ADAPTER_NEEDED,baseProtocol)
 
 
     def __repr__(self):
@@ -268,7 +268,7 @@ class Variation(Protocol):
         if self.context is None:
             return "Variation(%r)" % self.baseProtocol
 
-        return "Variation(%r,%r)" % self.baseProtocol, self.context
+        return "Variation(%r,%r)" % (self.baseProtocol, self.context)
 
 
 
