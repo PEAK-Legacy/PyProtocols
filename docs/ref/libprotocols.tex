@@ -2733,7 +2733,7 @@ recognize that the class can be adapted to \class{ISomeOtherInterface}.
 declared for it (either as ``class provides'' or ``instances provide''), may
 have unexpected results, because Zope uses inheritance of a single descriptor
 to control declarations.  In general, it will only work if the class whose
-\member{bases} are changed, has no declarations of its own.  (XXX MS4?)
+\member{bases} are changed, has no declarations of its own.
 
 \item You cannot declare an implication relationship from a Zope
 \class{Interface}, because Zope only supports implication via
@@ -2773,23 +2773,23 @@ store information about what interface a class or object provides.  But each has
 a different interpretation of the contents, and does not expect to find
 ``foreign'' interfaces contained within.  So, until this issue between Zope and
 Twisted is resolved, it is not very useful to create interfaces that extend
-both Zope and Twisted interfaces.  (XXX MS4?)
+both Zope and Twisted interfaces.
 
 \item Zope does not currently appear to support classes inheriting direct
-declarations (e.g. \code{classProvides}).  This may be a bug in the current
-version.  (XXX MS4?)
+declarations (e.g. \code{classProvides}).  This appears to be a by-design
+limitation.
 
 \end{itemize}
 
 The current implementation of support for Zope X3 interfaces is currently based
-on the Zope X3 CVS version; it does not work with older releases such as the
-``milestone 2'' release.
-
+on the Zope X3 Milestone 4 version; it will not work with older releases.  Zope
+X3 Milestone 4 requires Python 2.3.2 or better, so even though PyProtocols works
+with 2.2.2 and up in general, you will need 2.3.2 to use PyProtocols with Zope X3.
 \newpage
 \subsubsection{\module{protocols.twisted_support} --- Support for Twisted Interfaces}
 \declaremodule[protocols.twistedsupport]{}{protocols.twisted_support}
 
-Importing this module enables experimental support for using Twisted 1.0.5
+Importing this module enables experimental support for using Twisted 1.1.0
 \class{Interface} objects with the \module{protocols} package, by registering
 an adapter from Twisted's \class{MetaInterface} to \class{IOpenProtocol}.  The
 adapter supports the following subset of the declaration API:
