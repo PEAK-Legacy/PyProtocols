@@ -164,7 +164,7 @@ def setup(__gfProtocol, __gfDefaults):
 
 # Bootstrap SimpleGeneric declaration helper function -- itself a SimpleGeneric
 
-#[dispatch.on('ob')]
+[dispatch.on('ob')]
 def declarePredicate(ob,proto,factory):
     """Declare a SimpleGeneric dispatch predicate"""
 

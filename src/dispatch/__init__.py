@@ -74,9 +74,9 @@ def generic(combiner=None):
     '[dispatch.generic()]' instead of '@dispatch.generic()'.
     """
     def callback(frm,name,value,old_locals):
-        from dispatch.functions import GenericFunction
         return GenericFunction(value,combiner).delegate
 
+    from dispatch.functions import GenericFunction
     from protocols.advice import add_assignment_advisor
     return add_assignment_advisor(callback)
 

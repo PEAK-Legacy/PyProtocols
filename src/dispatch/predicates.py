@@ -625,7 +625,6 @@ class TestBuilder:
     def mkOp(name):
         op = getattr(ExprBuilder,name)
         def method(self,*args):
-            print self,name,op
             return Signature([(op(self.expr_builder,*args), self.mode)])
         return method
 
@@ -639,6 +638,7 @@ class TestBuilder:
             return build(self,expr)
         finally:
             self.__class__ = TestBuilder
+
 
 
 
