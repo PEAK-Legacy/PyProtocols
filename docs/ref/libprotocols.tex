@@ -50,7 +50,7 @@ components.
 
 For framework developers, this package offers an opportunity to replace
 tedious and repetitive type-checking code (such as \function{isinstance()},
-\function{type()}, \function{hasattr()}, or interface checks) with simple
+\function{type()}, \function{hasattr()}, or interface checks) with single
 calls to \function{adapt()} instead.  In addition, if the framework has
 objects that represent interfaces or protocols, the framework developer can
 make them usable with this package's declaration API by adding adapters for
@@ -140,17 +140,15 @@ framework-specific implementations of this ``interface object'' approach.
 Since classes and most interface object implementations can be used as
 dictionary keys, and because their Python source code can serve as (or
 be converted to) useful documentation, both of these approaches are viable
-ways to create usable protocol objects for use with the \module{protocols}
-package.
+ways to create protocol objects usable with the \module{protocols} package.
 
-In addition, using inheritance between classes or interface objects permits
-the definition of simple implication relationships between protocol objects.
-Inheriting from a protocol to create a new protocol means that the new
-protocol \strong{implies} the old protocol.  That is, any implementation
-or adaptation to the new protocol, is implied to be usable in a place
-where the old protocol was required.  (We will have more to say about direct
-and adapted implication relationships later on, in section
-\ref{proto-implication}.)
+In addition, inheriting from a class or interface objects is a simple way to
+define implication relationships between protocol objects.  Inheriting from a
+protocol to create a new protocol means that the new protocol \strong{implies}
+the old protocol.  That is, any implementation or adaptation to the new
+protocol, is implied to be usable in a place where the old protocol was
+required.  (We will have more to say about direct and adapted implication
+relationships later on, in section \ref{proto-implication}.)
 
 At this point, we still haven't described any mechanisms for making adapters
 available, or declaring what protocols are supported by a class or object
@@ -299,27 +297,28 @@ and Protocols''.
 The first difference is that \exception{TypeError} is treated differently in
 each implementation.  \pep{246} says that if a \function{__conform__} or
 \function{__adapt__} method raises a \exception{TypeError}, it should be
-treated in the same way as if the method returned \constant{None}.
-
-This was a workaround for the issue of accidentally calling an unbound class
+treated in the same way as if the method returned \constant{None}.  This was
+a workaround for the issue of accidentally calling an unbound class
 method, in the case where a component or protocol supplied to
-\function{adapt()} was a class.  The \module{protocols} implementation of
-\function{adapt()} attempts to catch such errors also, but will reraise any
-exception that appears to come from \emph{within} the execution of the
-\function{__conform__} or \function{__adapt__} method.  So if these methods
-raise a \exception{TypeError}, it will be passed through to the caller of
-\function{adapt}, and thus raising \exception{TypeError} should not be used
-in place of returning \constant{None}.
+\function{adapt()} was a class.
+
+The \module{protocols} implementation of \function{adapt()} attempts to catch
+such errors also, but will reraise any exception that appears to come from
+\emph{within} the execution of the \function{__conform__} or
+\function{__adapt__} method.  So if these methods raise a \exception{TypeError},
+it will be passed through to the caller of \function{adapt}.  Thus, if you
+are writing one of these methods, you should not raise a \exception{TypeError}
+to signal the lack of an adaptation.  Rather, you should return \constant{None}.
 
 Second, \exception{NotImplementedError} is raised when no adaptation is
-found, and no default is supplied, rather than \exception{TypeError}.
-And third, \function{protocols.adapt()} has an optional \var{factory}
-argument that the \pep{246} \function{adapt()} does not.
+found, and no default is supplied, rather than the \exception{TypeError}
+specified by \pep{246}.  And third, \function{protocols.adapt()} has an optional
+\var{factory} argument that the \pep{246} \function{adapt()} does not.
 
 These differences are the result of experience using the \module{protocols}
 package with PEAK, and advances in the Python state-of-the-art since
 \pep{246} was written (over two years ago).  We believe that they make the
-adaptation protocol more robust, more predictable, and more usable for
+adaptation protocol more robust, more predictable, and easier to use for
 its most common applications.
 
 
