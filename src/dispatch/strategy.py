@@ -177,7 +177,7 @@ class DispatchNode(dict):
         self.lock = lock
         dict.__init__(
             self,
-            [(key,build(subcases))
+            [(key,build(tuple(subcases)))   # XXX use a set?
                 for key,subcases in index.casemap_for(cases).items()]
         )
 
@@ -186,7 +186,7 @@ class DispatchNode(dict):
         try:
             self.index.addSeed(key)
             self[key] = retval = self.build(
-                self.index.casemap_for(self.cases)[key]
+                tuple(self.index.casemap_for(self.cases)[key])  # XXX set?
             )
             return retval
         finally:
@@ -406,8 +406,6 @@ class AbstractCriterion(object):
     def __and__(self,other):
         from predicates import AndCriterion
         return AndCriterion(self,other)
-
-
 
 
     def implies(self,other):

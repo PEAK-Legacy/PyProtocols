@@ -330,18 +330,17 @@ class Dispatcher(BaseDispatcher):
 
         if memo is None:
             self._rebuild_indexes()
-            cases = self.cases
+            cases = tuple(range(len(self.cases)))
             disp_ids = tuple(self.disp_indexes)
             memo = {}
 
-        cases = tuple(cases)
         key = (cases, disp_ids)
 
         if key in memo:
             return memo[key]
         elif not disp_ids:
             # No more criteria, so make a leaf node
-            node = [0, None, self.combine(cases), None]
+            node = [0, None, self.combine([self.cases[n] for n in cases]),None]
         else:
             best_id, remaining_ids = self._best_split(cases,disp_ids)
             build = instancemethod(
@@ -363,6 +362,7 @@ class Dispatcher(BaseDispatcher):
 
         memo[key] = node
         return node
+
 
 
 
@@ -399,12 +399,12 @@ class Dispatcher(BaseDispatcher):
             self._release()
 
     def _addCase(self,case):
+        case_num = len(self.cases)
         for disp_id, criterion in case[0].items():
-            self.disp_indexes[disp_id][criterion] = case
+            self.disp_indexes[disp_id][criterion] = case_num
 
         self.cases.append(case)
         self._dispatcher = None
-
 
 
 

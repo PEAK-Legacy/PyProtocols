@@ -1179,10 +1179,10 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
         self.assertEqual(g.constraints.successors([yid,yxid]),{yxid:1})
         self.assertEqual(g.constraints.successors([xid,yxid]),{yxid:1})
 
-        best_id, remaining_ids = g._best_split(g.cases, [yxid,yid])
+        best_id, remaining_ids = g._best_split(range(len(g.cases)), [yxid,yid])
         self.assertEqual(best_id, yid)
 
-        best_id, remaining_ids = g._best_split(g.cases, [yxid,xid])
+        best_id, remaining_ids = g._best_split(range(len(g.cases)), [yxid,xid])
         self.assertEqual(best_id, xid)
 
 
