@@ -620,7 +620,7 @@ guidelines you should follow when using \function{adapt()} or creating
 \method{__conform__} and \method{__adapt__} methods, to ensure that adapted
 objects are as usable as unadapted objects.
 
-First, adaptation should be \strong{reflexive}.  That is, if you
+First, adaptation should be \strong{idempotent}.  That is, if you
 \function{adapt()} an object to a protocol, and then \function{adapt()} the
 return value to the same protocol, the same object should be returned the
 second time.  If you are using the \module{protocols} declaration API, it
@@ -671,7 +671,7 @@ requires.)
 
 \end{itemize}
 
-In some respects, these rules are similar to dealing with objects in strongly
+In some respects, these rules are similar to dealing with objects in statically
 typed languages like Java.  In Java, if one simply has an ``object'', it is not
 possible to perform operations specific to an interface, without first
 ``casting'' the object to that interface.  But, the object that was ``cast''
