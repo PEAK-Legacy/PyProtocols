@@ -492,10 +492,10 @@ its most common applications.
 
 \subsection{Defining and Subclassing Interfaces \label{protocols-defining}}
 
-The easiest way to define an interface with the protocols package is to subclass
-\class{protocols.Interface}.  \class{Interface} does not supply any data or
-methods of its own, so you are free to define whatever you need.  There are two
-common styles of defining interfaces, illustrated below:
+The easiest way to define an interface with the \module{protocols} package is
+to subclass \class{protocols.Interface}.  \class{Interface} does not supply any
+data or methods of its own, so you are free to define whatever you need. There
+are two common styles of defining interfaces, illustrated below:
 
 \begin{verbatim%
 }from protocols import Interface
@@ -663,7 +663,7 @@ module.  (The interfaces are also exported directly from the top level of the
 \module{protocols} package.)
 
 You will rarely use or subclass any of these interface objects, unless you are
-customizing or extending the system.  Three of the interfaces exist exclusively
+customizing or extending the system.  Four of the interfaces exist exclusively
 for documentation purposes, while the rest are used in \function{adapt()} calls
 made by the API.
 
@@ -709,6 +709,13 @@ has an \function{__adapt__} method as described in section \ref{adapt-protocol}.
 \class{IAdaptingProtocol} is a subclass of \class{IProtocol}, so of course
 \function{adapt()} accepts such objects as protocols.
 
+\item[IImplicationListener] \hfill \\
+This interface is for objects that want to receive notification when new
+implication relationships (i.e. adapters) are registered between two protocols.
+If you have objects that want to keep track of what interfaces they support,
+you may want those object to implement this interface so they can be kept
+informed of new protocol-to-protocol adapters.
+
 \end{description}
 
 The other three interfaces are critical to the operation of the declaration API,
@@ -726,13 +733,6 @@ Declaration API'', since customization and extension are all that the
 details are useful for.
 
 \begin{description}
-
-
-
-
-
-
-
 
 
 
@@ -756,23 +756,23 @@ also supplies and declares an adapter factory that adapts Zope X3's
 interface objects to the \class{IOpenProtocol} interface, thus allowing
 you to use Zope interfaces in calls to the declaration API.  Similar adapters
 for other frameworks' interfaces may be added, if there is sufficient demand
-and/or contributed code, and the frameworks' authors will not add the adapters
+and/or contributed code, and the frameworks' authors do not add the adapters
 to their frameworks.
 
 
 \item[IOpenImplementor] \hfill \\
 An \class{IOpenImplementor} is a class or type that can be told (via the
 declaration API) what protocols its instances provide (or support via an
-\class{IAdapterFactory}).  (Note that this implies that the instances have
-a \class{__conform__} method, otherwise they would not be able to tell
-\function{adapt()} about the declared support.)
+\class{IAdapterFactory}).  Note that this implies that the instances have
+a \function{__conform__} method, or else they would not be able to tell
+\function{adapt()} about the declared support!
 
 Support for this interface is optional, since types that don't support it
 can still have their instances be adapted by \class{IOpenProtocol} objects.
 The \module{protocols} package does not supply any implementations or adapters
-for this interface, either.  It is intended primarily as a hook for metaclasses
-to receive notification about protocol declarations for their instances (i.e.
-classes), as we will discuss later.
+for this interface, either.  It is intended primarily as a hook for classes
+to be able to receive notification about protocol declarations for their
+instances.
 
 
 
@@ -782,31 +782,31 @@ Because objects' behavior usually comes from a class definition, it's not that
 often that you will declare that a specific object provides or supports an
 interface.  But objects like functions and modules do not have a class
 definition, and classes themselves sometimes provide an interface.  (For
-example, one could define an \class{IClass} interface that class objects
-provide.)  So, the declaration API needs to also be able to declare what
-protocols an individual object (such as a function, module, or class) supports
-or provides.
+example, one could say that class objects provide an \class{IClass} interface.)
+So, the declaration API needs to also be able to declare what protocols an
+individual object (such as a function, module, or class) supports or provides.
 
 That's what the \class{IOpenProvider} interface is for.  An
 \class{IOpenProvider} is an object with a \class{__conform__} method, that can
 be told (via the declaration API) what protocols it provides (or supports via
 an \class{IAdapterFactory}).
 
-(Notice that this is different from \class{IOpenImplementor}, which deals with
+Notice that this is different from \class{IOpenImplementor}, which deals with
 an class or type's instances.  \class{IOpenProvider} deals with the object
 itself.  A single object can potentially be both an \class{IOpenProvider} and an
-\class{IOpenImplementor}, if it is a class or type.)
+\class{IOpenImplementor}, if it is a class or type.
 
 The \module{protocols} package supplies and declares an adapter factory that
-adapts Python functions, modules, and ``classic class'' instances to support
-this interface.  (XXX should we also supply a mixin for new-style classes?)
-Thus, it is acceptable to pass a Python function, module, or instance of a
-``classic'' class to any declaration API that expects an \class{IOpenProvider}
-argument.
+can adapt most Python objects to support this interface, assuming that they
+have a \code{__dict__} attribute.  Thus, it is acceptable to pass a Python
+function, module, or instance of a  ``classic'' class to any declaration API
+that expects an \class{IOpenProvider} argument.
+
+We'll talk more about making protocol declarations for individual objects
+(as opposed to types) in section \ref{protocols-instances}, ``Protocol
+Declarations for Individual Objects''.
 
 \end{description}
-
-
 
 
 
@@ -891,10 +891,10 @@ from the object to each of the specified protocols.  Note, therefore, that
 \var{ob} must be adaptable to \class{IOpenProvider}, and the listed protocols
 must be adaptable to \class{IOpenProtocol}.  See
 \function{declareAdapterForObject()} in section \ref{protocols-contents} for
-details.
+details.  Also, see section \ref{protocols-instances}, ``Protocol Declarations
+for Individual Objects'', for more information on using
+\function{adviseObject}.
 \end{funcdesc}
-
-
 
 
 
@@ -906,10 +906,11 @@ And for declaring all other kinds of protocol relationships:
 \optional{, forTypes=[ ]} \optional{, forProtocols=[ ]}
 \optional{, forObjects=[ ]}}
 
-Declare that \var{factory} provides the protocols listed in \var{provides}
-as an adapter for the classes/types listed in \var{forTypes}, for objects
-providing the protocols listed in \var{forProtocols}, and for the specific
-objects listed in \var{forObjects}.
+Declare that \var{factory} is an \class{IAdapterFactory} whose return value
+provides the protocols listed in \var{provides} as an adapter for the
+classes/types listed in \var{forTypes}, for objects providing the protocols
+listed in \var{forProtocols}, and for the specific objects listed in
+\var{forObjects}.
 
 This function is shorthand for calling the primitive declaration
 functions for each of the protocols listed in \var{provides} and each of the
@@ -919,7 +920,7 @@ sources listed in the respective keyword arguments.
 Although these forms are easier to use than raw \code{declareAdapterForX}
 calls, they still require explicit reference to the types or objects involved.
 For the most common use cases, such as declaring protocol relationships to a
-class, or declaring an adapter class, it is easiest to use the ``magic''
+class, or declaring an adapter class, it is usually easier to use the ``magic''
 \function{protocols.advise()} function, which we will discuss next.
 
 
@@ -940,8 +941,7 @@ class, or declaring an adapter class, it is easiest to use the ``magic''
 
 
 
-
-\subsubsection{Convenience Declarations in Class, Interface and Module Bodies}
+\subsubsection{Convenience Declarations in Class, Interface and Module Bodies \label{protcols-advise}}
 
 Adapters, interfaces, and protocol implementations are usually defined in
 Python \code{class} statements.  To make it more convenient to make protocol
@@ -967,7 +967,7 @@ interface.
 \note{When used in a class body, this function works by temporarily replacing
 the \code{__metaclass__} of the class.  If your class sets an explicit
 \code{__metaclass__}, it must do so \emph{before} \function{advise()} is
-called, or the protocol declarations will not occur.}
+called, or the protocol declarations will not occur!}
 \end{funcdesc}
 
 
@@ -986,19 +986,19 @@ Keyword arguments accepted by \function{advise()}:
 
 \begin{description}
 
-\item[instancesProvide]= \var{protocols} \hfill \\
+\item[instancesProvide = \var{protocols}] \hfill \\
 A sequence of protocols that instances of the containing class provide, without
 needing an adapter.  Supplying this argument is equivalent to calling
 \code{declareImplementation(\var{containing class},\var{protocols})}.
 
-\item[instancesDoNotProvide]= \var{protocols} \hfill \\
+\item[instancesDoNotProvide = \var{protocols}] \hfill \\
 A sequence of protocols that instances of the containing class do not provide.
 This is primarily intended for "rejecting" protocols provided or supported
 by base classes of the containing class.  Supplying this argument is equivalent
 to calling \code{declareImplementation(\var{containing
 class},instancesDoNotProvide=\var{protocols})}.
 
-\item[asAdapterForTypes]= \var{types} \hfill \\
+\item[asAdapterForTypes = \var{types}] \hfill \\
 Declare the containing class as an adapter for \var{types}, to the protocols
 listed by the \code{instancesProvide} argument (which must also be supplied).
 Supplying this argument is equivalent to calling
@@ -1008,7 +1008,7 @@ object that provides \class{IAdapterFactory}; i.e., its constructor should
 accept being called with two arguments: the object to be adapted, and the
 target protocol.)
 
-\item[asAdapterForProtocols]= \var{protocols} \hfill \\
+\item[asAdapterForProtocols = \var{protocols}] \hfill \\
 Declare the containing class as an adapter for \var{protocols}, to the
 protocols listed by the \code{instancesProvide} argument (which must also be
 supplied).  Supplying this argument is equivalent to calling
@@ -1023,7 +1023,7 @@ target protocol.)
 
 
 
-\item[protocolExtends]= \var{protocols} \hfill \\
+\item[protocolExtends = \var{protocols}] \hfill \\
 Declare that the containing class is a protocol that extends (i.e., implies)
 the listed protocols.  This keyword argument is intended for use inside class
 statements that themselves define protocols, such as \class{Interface}
@@ -1064,7 +1064,7 @@ as an \class{Interface} subclass.
 
 
 
-\item[protocolIsSubsetOf]= \var{protocols} \hfill \\
+\item[protocolIsSubsetOf = \var{protocols}] \hfill \\
 Declare that the containing class is a protocol that is implied (extended) by
 the listed protocols.  This is just like \code{protocolExtends}, but in the
 ``opposite direction''.  It allows you to declare (in effect) that some other
@@ -1075,25 +1075,26 @@ Using this keyword argument is equivalent to calling
 \code{declareAdapter(NO_ADAPTER_NEEDED, [\var{containing class}],
 forProtocols=\var{protocols})}.
 
-\item[classProvides]= \var{protocols} \hfill \\
+\item[classProvides = \var{protocols}] \hfill \\
 Declare that the containing class \emph{itself} provides the specified
 protocols.  Supplying this argument is equivalent to calling
 \code{adviseObject(\var{containing class}, \var{protocols})}.  Note that this
-means that the containing class \emph{must} support the \class{IOpenProvider}
-interface (i.e., it has a metaclass or adapter that provide the necessary
-behavior).  XXX Could we loosen this by double-dispatch via the protocol? That,
-and perhaps adapters for 'type' and 'class'?
+means that the containing class must support the \class{IOpenProvider}
+interface.  The \module{protocols} package supplies default adapters to
+support \class{IOpenProvider} for both classic and new-style classes, as long
+as they do not have custom \function{__conform__} methods.  See section
+\ref{protocols-instances}, ``Protocol Declarations for Individual Objects''
+for more details.
 
-\item[classDoesNotProvide]= \var{protocols} \hfill \\
+\item[classDoesNotProvide = \var{protocols}] \hfill \\
 Declare that the containing class \emph{itself} does not provide the specified
 protocols.  This is for classes that need to reject inherited class-level
 \code{classProvides} declarations.  Supplying this argument is equivalent to
 calling \code{adviseObject(\var{containing class},
-doesNotProvide=\var{protocols})}.  Note that this means that the containing
-class \emph{must} support the \class{IOpenProvider} interface (i.e., it has a
-metaclass or adapter that provide the necessary behavior).
+doesNotProvide=\var{protocols})}, and the \class{IOpenProvider} requirements
+mentioned above for \code{classProvides} apply here as well.
 
-\item[moduleProvides]= \var{protocols} (module context only) \hfill \\
+\item[moduleProvides = \var{protocols}] (module context only) \hfill \\
 A sequence of protocols that the enclosing module provides.  Equivalent to
 \code{adviseObject(\var{containing module}, \var{protocols})}.
 
@@ -1104,13 +1105,18 @@ A sequence of protocols that the enclosing module provides.  Equivalent to
 
 
 
-
 \subsection{Creating and Using Adapters}
 
 IAdapterFactory
 
-\subsection{Protocol Implication and Adapter Precedence
-\label{proto-implication}}
+Defining __conform__ - interactions?
+
+
+\subsection{Protocol Declarations for Individual Objects \label{protocols-instances}}
+
+...
+
+\subsection{Protocol Implication and Adapter Precedence \label{proto-implication}}
 
 subsetting, extending...
 
@@ -1140,13 +1146,10 @@ subsetting, extending...
 
 
 
-
-
-
-
-
-
 \subsection{Package Contents and Contained Modules\label{protocols-contents}}
+
+The following functions, classes, and interfaces are available from the
+top-level \module{protocols} package:
 
 \begin{funcdesc}{adapt}{component, protocol,
 \optional{, default \optional{, factory}}}
@@ -1167,6 +1170,43 @@ A detailed description of this function's operations and purpose may be found in
 section \ref{adapt-protocol}.
 \end{funcdesc}
 
+\begin{classdesc*}{Interface}
+Subclass this to create an interface.  See section \ref{protocols-defining}
+for more details.
+\end{classdesc*}
+
+
+
+
+
+
+
+
+
+
+
+
+
+\begin{funcdesc}{advise}{**kw}
+Declare protocol relationships for the containing class or module.  All
+parameters must be supplied as keyword arguments.  This function must be
+called directly from a class or module body, or a \exception{SyntaxError}
+results at runtime.  Different arguments are accepted, according to whether
+the function is called within a class or module.
+
+When invoked in the top-level code of a module, this function only accepts
+the \code{moduleProvides} keyword argument.  When invoked in the body of a
+class definition, this function accepts any keyword arguments \emph{except}
+\code{moduleProvides}.  The complete list of keyword arguments can be found
+in section \ref{protcols-advise}.
+
+\note{When used in a class body, this function works by temporarily replacing
+the \code{__metaclass__} of the class.  If your class sets an explicit
+\code{__metaclass__}, it must do so \emph{before} \function{advise()} is
+called, or the protocol declarations will not occur!}
+\end{funcdesc}
+
+
 \begin{funcdesc}{NO_ADAPTER_NEEDED}{component, protocol}
 This function simply returns \var{component}.  It is a placeholder used whenever
 an object, type, or protocol directly implements or implies another protocol.
@@ -1176,6 +1216,7 @@ adapter.  Some protocol implementations, such as the one for Zope interfaces,
 are unable to handle adapters other than \function{NO_ADAPTER_NEEDED} and
 \function{DOES_NOT_SUPPORT}.
 \end{funcdesc}
+
 
 \begin{funcdesc}{DOES_NOT_SUPPORT}{component, protocol}
 This function simply returns \constant{None}.  It is a placeholder used whenever
@@ -1187,6 +1228,88 @@ are unable to handle adapters other than \function{NO_ADAPTER_NEEDED} and
 \function{DOES_NOT_SUPPORT}.
 \end{funcdesc}
 
+\begin{funcdesc}{declareImplementation}{typ
+\optional{, instancesProvide=[ ]} \optional{, instancesDoNotProvide=[ ]}}
+
+Declare that instances of class or type \var{typ} do or do not provide
+implementations of the specified protocols.  \var{instancesProvide} and
+\var{instancesDoNotProvide} must be sequences of protocol objects that
+provide (or are adaptable to) the \class{IOpenProtocol} interface,
+such as \class{protocols.Interface} subclasses, or Zope \class{Interface}
+objects.
+
+This function is shorthand for calling \function{declareAdapterForType()}
+with \function{NO_ADAPTER_NEEDED} and \function{DOES_NOT_SUPPORT} as adapters
+from the type to each of the specified protocols.  Note, therefore, that the
+listed protocols must be adaptable to \class{IOpenProtocol}.  See
+\function{declareAdapterForType()} in section \ref{protocols-contents} for
+details.
+\end{funcdesc}
+
+
+\begin{funcdesc}{adviseObject}{ob
+\optional{, provides=[ ]} \optional{, doesNotProvide=[ ]}}
+Declare that \var{ob} provides (or does not provide) the specified protocols.
+This is shorthand for calling \function{declareAdapterForType()}
+with \function{NO_ADAPTER_NEEDED} and \function{DOES_NOT_SUPPORT} as adapters
+from the object to each of the specified protocols.  Note, therefore, that
+\var{ob} must be adaptable to \class{IOpenProvider}, and the listed protocols
+must be adaptable to \class{IOpenProtocol}.  See
+\function{declareAdapterForObject()} in section \ref{protocols-contents} for
+details.  Also, see section \ref{protocols-instances}, ``Protocol Declarations
+for Individual Objects'', for more information on using
+\function{adviseObject}.
+\end{funcdesc}
+
+
+
+
+
+
+
+
+
+\begin{funcdesc}{declareAdapter}{factory, provides,
+\optional{, forTypes=[ ]} \optional{, forProtocols=[ ]}
+\optional{, forObjects=[ ]}}
+
+Declare that \var{factory} is an \class{IAdapterFactory} whose return value
+provides the protocols listed in \var{provides} as an adapter for the
+classes/types listed in \var{forTypes}, for objects providing the protocols
+listed in \var{forProtocols}, and for the specific objects listed in
+\var{forObjects}.
+
+This function is shorthand for calling the primitive declaration
+functions (\function{declareAdapterForType},
+\function{declareAdapterForProtocol}, and \function{declareAdapterForObject})
+for each of the protocols listed in \var{provides} and each of the
+items listed in the respective keyword arguments.
+\end{funcdesc}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 \begin{classdesc*}{Protocol}
 \class{Protocol} is a base class that implements the \class{IOpenProtocol}
 interface, supplying internal adapter registries for adapting from other
@@ -1197,23 +1320,64 @@ your programs.  Any object that implements the simpler \class{IProtocol} or
 \function{adapt()} function.  Compliance with the \class{IOpenProtocol}
 interface is only required to use the \module{protocols} declaration API.
 (That is, functions whose names begin with \code{declare} or \code{advise}.)
+
+To create protocols dynamically, you can create individual \class{Protocol}
+instances, and then use them with the declaration API.  You can also subclass
+\class{Protocol} to create your own protocol types.  If you override
+\function{__init__}, however, be sure to call \function{Protocol.__init__()}
+in your subclass' \function{__init__} method.
 \end{classdesc*}
 
 
 \begin{classdesc}{InterfaceClass}{name, bases, dictionary}
-\class{InterfaceClass}, a subclass of \class{Protocol}, is a metaclass used to
-create new interfaces (i.e., protocol objects) using class statements.  You
-may set a class' \code{__metaclass__} to \class{InterfaceClass}, or simply
-subclass \class{Interface}.  Normally, you will only use \class{InterfaceClass}
-if you need to combine it with another metaclass, in a subclass of
-\class{Interface}.
+\class{InterfaceClass}, a subclass of \class{Protocol} and \class{type}, is a
+metaclass used to create new interfaces (i.e., protocol objects) using class
+statements.  You may set a class' \code{__metaclass__} to
+\class{InterfaceClass}, or simply subclass \class{Interface}.  Normally, you
+will only use \class{InterfaceClass} if you need to combine it with another
+metaclass, in a subclass of \class{Interface}.
 \end{classdesc}
 
 
-\begin{classdesc*}{Interface}
-Subclass this to create an interface.  See section \ref{protocols-defining}
-for more details.
-\end{classdesc*}
+
+
+
+
+
+
+
+
+
+
+
+
+ProviderMixin
+
+
+\begin{funcdesc}{metamethod}{func}
+Wrap \var{func} in a manner analagous to \function{classmethod} or
+\function{staticmethod}, but as a metaclass-level method that may be redefined
+by metaclass instances for their instances.  For example, if a metaclass wants
+to define a \function{__conform__} method for its instances (i.e. classes), and
+those instances (classes) want to define a \function{__conform__} method for
+\emph{their} instances, the metaclass should wrap its \function{__conform__}
+method with \function{metamethod}.  Otherwise, the metaclass'
+\function{__conform__} method will be hidden by the class-level
+\function{__conform__} defined for the class' instances.
+\end{funcdesc}
+
+
+\begin{funcdesc}{supermeta}{typ, ob}
+Emulates the Python built-in \function{super()} function, but with support for
+metamethods.  If you ordinarily would use \function{super()}, but are calling a
+\function{metamethod}, you should use \function{supermeta()} instead.  This is
+because Python 2.2 does not support using super with properties (which is
+effectively what metamethods are).
+\end{funcdesc}
+
+
+
+
 
 
 
@@ -1237,13 +1401,15 @@ to \class{IOpenImplementor}, its \function{declareClassImplements} method is
 called as well.
 \end{funcdesc}
 
+
 \begin{funcdesc}{declareAdapterForObject}{protocol, adapter, ob \optional{,
 depth=1}}
 Declare that \var{adapter} adapts the object \var{ob} to \var{protocol}, by
-adapting \var{ob} to \class{IOpenProvider} and calling its
-\function{declareProvides} method.  \var{protocol} is also adapted to
-\class{IOpenProtocol}, and its \function{registerObject} method is called.
+adapting \var{protocol} to \class{IOpenProtocol} and calling its
+\function{registerObject} method.  Typically, \var{ob} must support
+\class{IOpenProvider}.  See section \ref{protocols-instances} for details.
 \end{funcdesc}
+
 
 \begin{funcdesc}{declareAdapterForProtocol}{protocol, adapter, proto \optional{,
 depth=1}}
@@ -1252,19 +1418,17 @@ to \var{protocol}, by adapting \var{protocol} to \class{IOpenProtocol} and
 calling its \function{addImpliedProtocol} method.
 \end{funcdesc}
 
-declareImplementation
 
-adviseObject
+the 7 I* interfaces
 
-declareAdapter
+Attribute  (needs tests!)
 
-advise
 
-Attribute
 
-metamethod
 
-supermeta
+
+
+
 
 
 
@@ -1277,28 +1441,28 @@ composeAdapters
 
 updateWithSimplestAdapter
 
-\subsubsection{\module{protocols.classic} --- Adapters to support built-in types
-and Zope Interfaces}
+IMPLEMENTATION_ERROR
+
 
 \subsubsection{\module{protocols.advice} --- Metaclasses and other ``Magic''}
 
-addClassAdvisor, isClassAdvisor, getFrameInfo
+addClassAdvisor
+
+isClassAdvisor
+
+getFrameInfo
+
+getMRO
+
+classicMRO
+
+determineMetaclass
+
+minimalBases
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+\subsubsection{\module{protocols.classic} --- Adapters to support built-in types
+and Zope Interfaces}
 
 
 
@@ -1323,8 +1487,7 @@ or \code{advise}.)
 
 Although the \module{protocols} package supplies a default implementation of
 this interface (\class{protocols.Protocol}), you may use any object that
-provides this interface -- and declares that it does so -- as a protocol for
-the declaration APIs.
+supports this interface as a protocol for the declaration APIs.
 
 \class{IOpenProtocol} is a subclass of \class{IAdaptingProtocol}.  A complete
 description of the methods this interface requires is in section
@@ -1334,6 +1497,7 @@ description of the methods this interface requires is in section
 IOpenProtocol
 
 metaclass issues, fwd ref to metamethod and supermeta
+
 
 
 
