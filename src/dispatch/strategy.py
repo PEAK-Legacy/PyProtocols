@@ -594,16 +594,16 @@ def method_chain(methods):
             return method   # not a function, therefore not chainable
 
         if args and args[0]=='next_method':
-            next_method = method_chain(methods)
-            return instancemethod(method,next_method,type(next_method))
-        else:
-            return method
+            if getattr(method,'im_self',None) is None:
+                next_method = method_chain(methods)
+                return instancemethod(method,next_method,type(next_method))
+
+        return method
 
     def no_applicable(*args,**kw):
         raise NoApplicableMethods(args,kw)
 
     return no_applicable
-
 
 
 

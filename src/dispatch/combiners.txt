@@ -307,6 +307,17 @@ create interesting method combinations:
     ...
     NoApplicableMethods...
 
+    >>> mc1 = strategy.method_chain([f2,f3])
+    >>> mc1()
+    f2
+    f3
+    'done'
+    >>> mc2 = strategy.method_chain([f1,mc1])
+    >>> mc2()
+    f1
+    f2
+    f3
+    'done'
 
 ``method_list(methods)``
     Returns a callable that when called, yields the results of calling each of
