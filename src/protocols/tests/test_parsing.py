@@ -1,7 +1,7 @@
 """Test generic functions expression parsing"""
 
 from unittest import TestCase, makeSuite, TestSuite
-from dispatch import *
+from dispatch import *; from dispatch.functions import *
 from dispatch.predicates import *; from dispatch.strategy import *
 from dispatch.ast_builder import *
 from dispatch import predicates

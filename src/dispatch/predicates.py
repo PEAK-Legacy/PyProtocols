@@ -1,6 +1,6 @@
-from dispatch.interfaces import *
+from dispatch import *
 from dispatch.strategy import Inequality, Signature, ExprBase, Argument
-from dispatch.functions import NullTest, as
+from dispatch.functions import NullTest
 from dispatch.ast_builder import build
 
 import protocols, operator

@@ -7,7 +7,7 @@ from types import ClassType, InstanceType
 
 import dispatch,protocols
 from dispatch import *
-from dispatch.predicates import *
+from dispatch.predicates import *; from dispatch.functions import *
 from protocols import Interface,advise,declareImplementation
 from dispatch import strategy
 from dispatch.strategy import *

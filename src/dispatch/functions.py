@@ -3,7 +3,7 @@
 from __future__ import generators
 from dispatch.interfaces import *
 
-import protocols, inspect, sys
+import protocols, inspect, sys, dispatch
 from protocols.advice import add_assignment_advisor,getFrameInfo,addClassAdvisor
 from protocols.interfaces import allocate_lock
 from new import instancemethod
@@ -11,7 +11,7 @@ from types import FunctionType, ClassType, InstanceType
 ClassTypes = (ClassType, type)
 
 __all__ = [
-    'GenericFunction', 'NullTest', 'as', 'on', 'generic'
+    'GenericFunction', 'NullTest', 'DispatchNode'
 ]
 
 
@@ -62,19 +62,19 @@ NullTest = NullTest()
 
 
 
-def as(*decorators):
-    """Use Python 2.4 decorators w/Python 2.2+"""
 
-    if len(decorators)>1:
-        decorators = list(decorators)
-        decorators.reverse()
 
-    def callback(frame,k,v,old_locals):
-        for d in decorators:
-            v = d(v)
-        return v
 
-    return add_assignment_advisor(callback)
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -164,11 +164,10 @@ def setup(__gfProtocol, __gfDefaults):
 
 # Bootstrap SimpleGeneric declaration helper function -- itself a SimpleGeneric
 
+[dispatch.on('ob')]
 def declarePredicate(ob,proto,factory):
     """Declare a SimpleGeneric dispatch predicate"""
     
-declarePredicate = _mkGeneric(declarePredicate,'ob')
-
 proto = declarePredicate.protocol
 
 def declareForType(typ,proto,factory):
@@ -188,6 +187,7 @@ declareForProto(protocols.IOpenProtocol,proto,
 
 declareForProto(protocols.IBasicSequence,proto,
     lambda ob:(ob,declareForSequence))
+
 
 
 
@@ -608,88 +608,6 @@ class GenericFunction:
 
 
 
-
-
-
-
-
-def generic(combiner=None):
-    """Use the following function as the skeleton for a generic function
-
-    This is roughly equivalent to doing 'func = GenericFunction(func,combiner)'
-    after the function definition, but instead of returning a 'GenericFunction'
-    instance, it returns a generated Python function object that wraps the
-    generic function in a way that speeds up its execution relative to a "bare"
-    'GenericFunction'.  Also, the function that this creates can be used
-    as a method in a class, while a plain 'GenericFunction' instance cannot.
-    """
-    def callback(frm,name,value,old_locals):
-        return GenericFunction(value,combiner).delegate
-
-    return add_assignment_advisor(callback)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def on(argument_name):
-    """Use the following function as a skeleton for a single-dispatch function
-
-    Single-dispatch functions may have a slight speed advantage over
-    predicate-dispatch generic functions when you only need to dispatch based
-    on the first argument's type or protocol, and do not need arbitrary
-    predicates.
-
-    Also, single-dispatch functions do not require you to adapt the first
-    argument when dispatching based on protocol or interface, and if the
-    dispatch argument has a '__conform__' method, it will attempt to use it,
-    rather than simply dispatching based on class information the way
-    predicate dispatch functions do.
-    
-    The created generic function will use the documentation from the supplied
-    function as its docstring.  And, it will dispatch methods based on the
-    argument named by 'argument_name'.  For example::
-
-        @dispatch.on('y')
-        def doSomething(x,y,z):
-            '''Doc for 'doSomething()' generic function goes here'''
-
-        @doSomething.when([SomeClass,OtherClass])
-        def doSomething(x,y,z):
-            # do something when 'isinstance(y,(SomeClass,OtherClass))'
-
-        @doSomething.when(IFoo)
-        def doSomething(x,y,z):
-            # do something to a 'y' that has been adapted to 'IFoo'
-    """
-
-    def callback(frm,name,value,old_locals):
-        return _mkGeneric(value,argument_name)
-
-    return add_assignment_advisor(callback)
-    
 
 
 
