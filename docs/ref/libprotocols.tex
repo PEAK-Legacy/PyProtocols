@@ -2953,7 +2953,7 @@ given to \function{addClassAdvisor()}.
 \begin{funcdesc}{getFrameInfo}{frame}
 Return a \code{(\var{kind},\var{module},\var{locals},\var{globals})} tuple for
 the supplied frame object.  The returned \var{kind} is a string: either
-``exec'', ``module'', ``class'', ``function call'', ``class-exec'', or ``unknown''.
+``exec'', ``module'', ``class'', ``function call'', or ``unknown''.
 \var{module} is the module object the frame is/was executed in, or
 \constant{None} if the frame's globals could not be correlated with a module in
 \code{sys.modules}.  \var{locals} and \var{globals} are the frame's local

@@ -183,7 +183,7 @@ def advise(**kw):
         )
         return
 
-    elif kind not in ("class","class-exec"):
+    elif kind != "class":
         raise SyntaxError(
             "protocols.advise() must be called directly in a class or"
             " module body, not in a function or exec."

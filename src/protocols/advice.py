@@ -124,8 +124,7 @@ def supermeta(typ,ob):
 def getFrameInfo(frame):
     """Return (kind,module,locals,globals) for a frame
 
-    'kind' is one of "exec", "module", "class", "function call", "class-exec",
-    or "unknown".
+    'kind' is one of "exec", "module", "class", "function call", or "unknown".
     """
 
     f_locals = frame.f_locals
@@ -146,7 +145,7 @@ def getFrameInfo(frame):
         # some kind of funky exec
         kind = "exec"
         if hasModule and not sameNamespace:
-            kind="class-exec"
+            kind="class"
     elif sameNamespace and not hasModule:
         kind = "module"
     elif sameName and not sameNamespace:
@@ -159,6 +158,7 @@ def getFrameInfo(frame):
         kind = "unknown"
 
     return kind,module,f_locals,f_globals
+
 
 
 
@@ -190,7 +190,7 @@ def addClassAdvisor(callback, depth=2,frame=None):
     frame = frame or sys._getframe(depth)
     kind, module, caller_locals, caller_globals = getFrameInfo(frame)
 
-    if kind not in ("class","class-exec"):
+    if kind != "class":
         raise SyntaxError(
             "Advice must be in the body of a class statement"
         )
