@@ -142,9 +142,7 @@ class CriteriaTests(TestCase):
             self.failUnless(klass in seeds)
             self.failUnless(object in seeds)
             self.failIf(len(seeds)<>2)
-            self.failUnless(
-                ICriterion(klass).dispatch_function is strategy.dispatch_by_mro
-            )
+            self.checkCriterionBasics(klass,strategy.dispatch_by_mro)
 
     def testCriterionAdaptation(self):
         self.failUnless(Hummer in ICriterion(Wheeled))
@@ -161,6 +159,8 @@ class CriteriaTests(TestCase):
         self.failUnless(len(seeds)==4)
         class BrokenBike(Bicycle): advise(instancesDoNotProvide=[Wheeled])
         self.failIf(BrokenBike in ICriterion(Wheeled))
+
+
 
     def testSignatures(self):
         a0 = Argument(0); a1 = Argument(1)
@@ -231,6 +231,88 @@ class CriteriaTests(TestCase):
             self.failUnless(v2 > v1)
             self.failUnless(v2 >= v2)
 
+    def testIdentityDispatch(self):
+        ob1, ob2, ob3 = object(),object(),object()
+        id1, id2, id3 = map(id, [ob1,ob2,ob3])
+        table = {id1:1,id2:2,None:3}
+        self.assertEqual(strategy.dispatch_by_identity(Vehicle,table), 3)
+        self.assertEqual(strategy.dispatch_by_identity(ob1,table), 1)
+        self.assertEqual(strategy.dispatch_by_identity(ob2,table), 2)
+        self.assertEqual(strategy.dispatch_by_identity(ob3,table), 3)
+
+
+
+
+
+    def checkCriterionBasics(self,criterion,dispfunc):
+        criterion = ICriterion(criterion)
+        self.failUnless(criterion.dispatch_function is dispfunc)
+        self.failUnless(criterion.implies(NullCriterion))
+        self.failUnless(criterion.implies(criterion))
+        self.failIf(criterion.implies(~criterion))
+        self.failIf((~criterion).implies(criterion))
+        self.assertEqual(criterion,criterion)
+        self.assertNotEqual(criterion,NullCriterion)
+        self.assertNotEqual(criterion,~criterion)
+        self.assertEqual(criterion,~~criterion)
+
+        d = {}
+        for seed in criterion.seeds(d):
+            d[seed] = seed in criterion
+
+        matches = list(criterion.matches(d))
+        for seed in matches:
+            self.failUnless(d[seed])
+            del d[seed]
+
+        for value in d.values():
+            self.failIf(value)  # should have returned all the true values
+
+        criterion.subscribe(self)
+        criterion.unsubscribe(self)
+
+
+    def testTruth(self):
+        for t in True,False:
+            self.checkCriterionBasics(
+                TruthCriterion(t),strategy.dispatch_by_truth
+            )
+
+
+
+
+
+
+
+
+    def testPointers(self):
+        anOb = object()
+        ptr = Pointer(anOb)
+        self.assertEqual(id(anOb),ptr)
+        self.assertEqual(hash(id(anOb)),hash(ptr))
+        class X: pass
+        anOb = X()
+        ptr = Pointer(anOb)
+        oid = id(anOb)
+        self.assertEqual(oid,ptr)
+        self.assertEqual(hash(oid),hash(ptr))
+        del anOb
+        self.assertNotEqual(oid,ptr)
+        self.assertEqual(ptr,ptr)
+        self.assertEqual(hash(oid),hash(ptr))
+
+
+    def testIdentityCriterion(self):
+        ob = object()
+        i = Pointer(ob)
+        self.checkCriterionBasics(i,strategy.dispatch_by_identity)
+        i = ICriterion(i)
+
+        self.assertEqual(list(i.seeds({})),[None,id(ob)])
+
+
+
+
 
 
 
@@ -246,8 +328,7 @@ class CriteriaTests(TestCase):
 
     def testSubclassCriterion(self):
         s = SubclassCriterion(Vehicle)
-        self.failUnless(
-            ICriterion(s).dispatch_function is strategy.dispatch_by_subclass )
+        self.checkCriterionBasics(s,strategy.dispatch_by_subclass)
 
         # seeds()
         self.assertEqual( s.seeds({}), [Vehicle,None])
@@ -261,15 +342,12 @@ class CriteriaTests(TestCase):
         # implies()
         self.failUnless( s.implies(SubclassCriterion(object)) )
         self.failUnless( SubclassCriterion(LandVehicle).implies(s) )
-        self.failUnless( s.implies(NullCriterion) )
         self.failIf( s.implies(SubclassCriterion(LandVehicle)) )
         self.failIf( SubclassCriterion(object).implies(s) )
 
         # eq/ne/invert
         self.assertEqual( s, SubclassCriterion(Vehicle))
         self.assertNotEqual( s, SubclassCriterion(LandVehicle))
-        self.assertNotEqual( s, NullCriterion)
-        self.assertEqual( ~s, NotCriterion(s) )
 
         # matches()
         table = {LandVehicle:1,object:2,None:3}
@@ -284,6 +362,10 @@ class CriteriaTests(TestCase):
         self.assertEqual(strategy.dispatch_by_subclass(None,table), 3)
         self.assertRaises(AttributeError,
             strategy.dispatch_by_subclass, Bicycle,table)
+
+
+
+
 
     def testInequalities(self):
         self.assertRaises(ValueError, Inequality, '', 1)
@@ -308,8 +390,8 @@ class CriteriaTests(TestCase):
         t4 = Inequality('<',"abc")
         self.failUnless(("a","a") in t4); self.failIf(("b","b") in t4)
 
-
-
+        for t in t1,t2,t3,t4:
+            self.checkCriterionBasics(t,strategy.dispatch_by_inequalities)
 
 
 

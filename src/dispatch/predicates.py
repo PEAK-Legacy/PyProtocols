@@ -2,6 +2,7 @@ from __future__ import generators
 from dispatch import *
 from dispatch.strategy import Inequality, Signature, ExprBase, default
 from dispatch.strategy import SubclassCriterion, NullCriterion
+from dispatch.strategy import AbstractCriterion, Pointer
 from dispatch.ast_builder import build
 
 import protocols, operator, dispatch
@@ -38,7 +39,6 @@ def add_dict(d1,d2):
 
 
 
-
 class ExprBuilder:
 
     simplify_comparisons = True
@@ -55,7 +55,7 @@ class ExprBuilder:
             if name in ns:
                 return Const(ns[name])
 
-        raise NameError(name) #return Var(name,*self.namespaces)
+        raise NameError(name)
 
     def Const(self,value):
         return Const(value)
@@ -408,11 +408,11 @@ class Call(ExprBase):
 
 
 
-class MultiCriterion(object):
+class MultiCriterion(AbstractCriterion):
     """Abstract base for boolean combinations of criteria"""
 
-    protocols.advise(instancesProvide=[ICriterion])
     elim_single = True
+    __slots__ = 'dispatch_function','criteria'
 
     def __new__(klass,*criteria):
         criteria, all = map(ICriterion,criteria), []
@@ -449,49 +449,14 @@ class MultiCriterion(object):
         for criterion in self.criteria:
             criterion.unsubscribe(listener)
 
-    def __contains__(self,key):
-        raise NotImplementedError
-
-    def __eq__(self,other):
-        return other.__class__ is self.__class__ and \
-            self.criteria==other.criteria
-
-    def __ne__(self,other):
-        return not self.__eq__(other)
-
-    def implies(self,other):
-        other = ICriterion(other)
-        for seed in self.seeds({}):
-            if seed in self and seed not in other:
-                return False
-        for seed in other.seeds({}):
-            if seed in self and seed not in other:
-                return False
-        return True
-
     def __repr__(self):
         return '%s%r' % (self.__class__.__name__,tuple(self.criteria))
-
-    def matches(self,table):
-        for key in table:
-            if key in self:
-                yield key
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 class AndCriterion(MultiCriterion):
     """All criteria must return true for expression"""
+
+    __slots__ = ()
 
     def __invert__(self):
         return OrCriterion(*[~cri for cri in self.criteria])
@@ -505,6 +470,8 @@ class AndCriterion(MultiCriterion):
 
 class OrCriterion(MultiCriterion):
     """At least one criterion must return true for expression"""
+
+    __slots__ = ()
 
     def __invert__(self):
         return AndCriterion(*[~cri for cri in self.criteria])
@@ -523,36 +490,27 @@ class OrCriterion(MultiCriterion):
 
 
 
-
-
-
-
-
-
-
-
 class NotCriterion(MultiCriterion):
 
     elim_single = False
 
+    __slots__ = ()
+
     def __init__(self, criterion):
-        criterion = self.criterion = ICriterion(criterion)
+        criterion = ICriterion(criterion)
         self.criteria = criterion,
         self.dispatch_function = criterion.dispatch_function
 
     def __invert__(self):
-        return self.criterion
+        return self.criteria[0]
 
     def __contains__(self,key):
-        return key not in self.criterion
+        return key not in self.criteria[0]
 
 
 
 def dispatch_by_truth(ob,table):
-    if ob:
-        return table.get(True)
-    else:
-        return table.get(False)
+    return table.get(bool(ob))
 
 
 
@@ -572,16 +530,16 @@ def dispatch_by_truth(ob,table):
 
 
 
-class TruthCriterion(object):
 
+class TruthCriterion(AbstractCriterion):
     """Criterion representing truth or falsity of an expression"""
 
-    protocols.advise(instancesProvide=[ICriterion])
+    __slots__ = 'truth'
 
     dispatch_function = staticmethod(dispatch_by_truth)
 
     def __init__(self,truth=True):
-        self.truth = not not truth  # force boolean
+        self.truth = bool(truth)
 
     def seeds(self,table):
         return True,False
@@ -592,14 +550,8 @@ class TruthCriterion(object):
     def implies(self,other):
         return self.truth in ICriterion(other)
 
-    def subscribe(self,listener): pass
-    def unsubscribe(listener):    pass
-
     def __eq__(self,other):
         return isinstance(other,TruthCriterion) and self.truth==other.truth
-
-    def __ne__(self,other):
-        return not self.__eq__(other)
 
     def __invert__(self):
         return TruthCriterion(not self.truth)
@@ -611,8 +563,6 @@ class TruthCriterion(object):
         return "TruthCriterion(%r)" % self.truth
 
 
-
-
 [dispatch.generic()]
 def expressionSignature(expr,criterion):
     """Return an ISignature that applies 'criterion' to 'expr'"""
@@ -622,40 +572,7 @@ def expressionSignature(expr,criterion):
     return Signature([(expr,criterion)])
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class CriteriaBuilder:
-
     bind_globals = True
     simplify_comparisons = True
     mode = TruthCriterion(True)
@@ -680,7 +597,6 @@ class CriteriaBuilder:
         finally:
             self.__class__ = CriteriaBuilder
 
-
     _mirror_ops = {
         '>': '<', '>=': '<=', '=>':'<=',
         '<': '>', '<=': '>=', '=<':'>=',
@@ -688,11 +604,13 @@ class CriteriaBuilder:
         'is': 'is', 'is not': 'is not'
     }
 
-
-
-
-
-
+    _rev_ops = {
+        '>': '<=', '>=': '<', '=>': '<',
+        '<': '>=', '<=': '>', '=<': '>',
+        '<>': '==', '!=': '==', '==':'!=',
+        'in': 'not in', 'not in': 'in',
+        'is': 'is not', 'is not': 'is'
+    }
 
 
     def Compare(self,initExpr,((op,other),)):
@@ -703,6 +621,9 @@ class CriteriaBuilder:
             left,right,op = right,left,self._mirror_ops[op]
 
         if isinstance(right,Const):
+            if not self.mode.truth:
+                op = self._rev_ops[op]
+
             if op=='in' or op=='not in':
                 cond = compileIn(left,right.value,op=='in')
                 if cond is not None:
@@ -711,11 +632,10 @@ class CriteriaBuilder:
                 if op=='is' or op=='is not':
                     if right.value is None:
                         right = ICriterion(NoneType)
-                        if op=='is not':
-                            right = ~right
                     else:
-                        left = Call(is_,left,right)
-                        right = TruthCriterion(op=='is')
+                        right = ICriterion(Pointer(right.value))
+                    if op=='is not':
+                        right = ~right
                 else:
                     right = Inequality(op,right.value)
                 return Signature([(left, right)])
@@ -731,8 +651,6 @@ class CriteriaBuilder:
 
     def Or(self,items):
         return reduce(operator.or_,[build(self,expr) for expr in items])
-
-
 
 
 
@@ -792,21 +710,21 @@ class NotBuilder(CriteriaBuilder):
     And = CriteriaBuilder.Or
     Or  = CriteriaBuilder.And
 
-    _rev_ops = {
-        '>': '<=', '>=': '<', '=>': '<',
-        '<': '>=', '<=': '>', '=<': '>',
-        '<>': '==', '!=': '==', '==':'!=',
-        'in': 'not in', 'not in': 'in',
-        'is': 'is not', 'is not': 'is'
-    }
 
-    def Compare(self,initExpr,((op,other),)):
-        op = self._rev_ops[op]
-        try:
-            self.__class__ = CriteriaBuilder
-            return CriteriaBuilder.Compare(self,initExpr,((op,other),))
-        finally:
-            self.__class__ = NotBuilder
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

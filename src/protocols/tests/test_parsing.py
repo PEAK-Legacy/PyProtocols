@@ -702,8 +702,8 @@ class PredicateTests(TestCase):
         parse = GenericFunction(lambda x,y,z:None).parse
         pe = lambda e: parse(e,locals(),globals())
 
-        x_cmp_y = lambda n: Signature([
-            (Call(getattr(operator,n),x,y),TruthCriterion())
+        x_cmp_y = lambda n,t=True: Signature([
+            (Call(getattr(operator,n),x,y),TruthCriterion(t))
         ])
 
         x,y = Argument(name='x'),Argument(name='y')
@@ -729,8 +729,8 @@ class PredicateTests(TestCase):
             self.assertEqual(pe('x %s y' % op), x_cmp_y(name))
             self.assertEqual(pe('x %s y' % not_op), x_cmp_y(not_name))
 
-            self.assertEqual(pe('not x %s y' % op), x_cmp_y(not_name))
-            self.assertEqual(pe('not x %s y' % not_op), x_cmp_y(name))
+            self.assertEqual(pe('not x %s y' % op),x_cmp_y(name,False))
+            self.assertEqual(pe('not x %s y' % not_op),x_cmp_y(not_name,False))
 
 
 
@@ -747,13 +747,24 @@ class PredicateTests(TestCase):
         self.assertEqual(pe('x not in (1,2,3)'),
             Signature(x=~in_test([1,2,3])))
 
-        self.assertEqual(pe('x is 1'),
-            Signature([(Call(predicates.is_,Argument(name='x'),Const(1)),
-                TruthCriterion())]))
+        self.assertEqual(pe('x is y'),
+            Signature([(Call(predicates.is_,Argument(name='x'),
+                Argument(name='y')),TruthCriterion())]
+            )
+        )
+        self.assertEqual(pe('x is not y'),
+            Signature([(Call(predicates.is_not,Argument(name='x'),
+                Argument(name='y')),TruthCriterion())]
+            )
+        )
 
-        self.assertEqual(pe('x is not 1'),
-            Signature([(Call(predicates.is_,Argument(name='x'),Const(1)),
-                TruthCriterion(False))]))
+        self.assertEqual(pe('x is TestCase'),
+            Signature([(Argument(name='x'),ICriterion(Pointer(TestCase)))])
+        )
+
+        self.assertEqual(pe('x is not TestCase'),
+            Signature([(Argument(name='x'),~ICriterion(Pointer(TestCase)))])
+        )
 
         # optimization when 'is None' and type tests occur on an expression
         self.assertEqual(pe('x is None'),Signature(x=types.NoneType))

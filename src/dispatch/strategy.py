@@ -12,7 +12,13 @@
     Inequality -- Index handler for checking that an expression has a range
         relation (i.e. <,>,<=,>=,==,!=) to a constant value
 
+    IdentityCriterion -- Index handler for checking that an expression 'is' a
+        particular object
+
     Min, Max -- Extreme values for use with 'Inequality'
+
+    Pointer -- hashable/comparable object pointer, with weakref support, used
+        to implement 'IdentityCriterion'
 
     Predicate, Signature, PositionalSignature, Argument -- primitives to
         implement indexable multiple dispatch predicates
@@ -33,12 +39,6 @@
 
 
 
-
-
-
-
-
-
 from __future__ import generators
 from protocols import Protocol, Adapter, StickyAdapter
 from protocols.advice import getMRO
@@ -46,17 +46,16 @@ import protocols, operator, inspect
 from types import ClassType, InstanceType
 ClassTypes = (ClassType, type)
 from sys import _getframe
-from weakref import WeakKeyDictionary
+from weakref import WeakKeyDictionary, proxy
 from dispatch.interfaces import *
-from dispatch.functions import NullCriterion
 from new import instancemethod
 
 __all__ = [
     'ProtocolCriterion', 'ClassCriterion', 'SubclassCriterion', 'Inequality',
     'Min', 'Max', 'Predicate', 'Signature', 'PositionalSignature', 'Argument',
     'most_specific_signatures', 'ordered_signatures', 'separate_qualifiers',
-    'method_chain', 'method_list', 'all_methods', 'safe_methods',
-    'default',
+    'method_chain', 'method_list', 'all_methods', 'safe_methods', 'Pointer',
+    'default', 'IdentityCriterion', 'NullCriterion',
 ]
 
 rev_ops = {
@@ -64,6 +63,7 @@ rev_ops = {
     '<': '>=', '<=': '>', '=<': '>',
     '<>': '==', '!=': '==', '==':'!='
 }
+
 
 
 
@@ -162,14 +162,101 @@ def dispatch_by_subclass(ob,table):
     return table[None]
 
 
-class ClassCriterion(Adapter):
+class AbstractCriterion(object):
+
+    """Common behaviors for typical criteria"""
+
+    protocols.advise(instancesProvide=[ICriterion])
+
+    __slots__ = ()
+
+    def matches(self,table):
+        for key in table:
+            if key in self:
+                yield key
+
+    def __invert__(self):
+        from predicates import NotCriterion
+        return NotCriterion(self)
+
+    def subscribe(self,listener):
+        pass
+
+    def unsubscribe(self,listener):
+        pass
+
+    def __contains__(self,key):
+        raise NotImplementedError
+
+
+    def __eq__(self,other):
+        other = ICriterion(other,None)
+        return other is not None and \
+            self.dispatch_function is other.dispatch_function and \
+            _seedMap(self)==_seedMap(other)
+
+
+    def __ne__(self,other):
+        return not self.__eq__(other)
+
+
+
+
+
+    def implies(self,other):
+        other = ICriterion(other)
+        for seed in self.seeds({}):
+            if seed in self and seed not in other:
+                return False
+        for seed in other.seeds({}):
+            if seed in self and seed not in other:
+                return False
+        return True
+
+
+def _seedMap(ob):
+    return dict([(seed,seed in ob) for seed in ob.seeds({})])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class ClassCriterion(AbstractCriterion):
     """Criterion that indicates expr is of a particular class"""
 
+    __slots__ = 'subject'
+    
     protocols.advise(
         instancesProvide=[ICriterion], asAdapterForTypes=ClassTypes
     )
 
     dispatch_function = staticmethod(dispatch_by_mro)
+
+    def __init__(self,cls):
+        self.subject = cls
 
     def seeds(self,table):
         return [self.subject,object]
@@ -189,52 +276,47 @@ class ClassCriterion(Adapter):
     def __repr__(self):
         return self.subject.__name__
 
-    def subscribe(self,listener): pass
-    def unsubscribe(self,listener): pass
-
     def __eq__(self,other):
         return type(self) is type(other) and self.subject is other.subject
 
-    def __ne__(self,other):
-        return not self.__eq__(other)
-
-    def matches(self,table):
-        for key in table:
-            if key in self:
-                yield key
-
-    def __invert__(self):
-        from predicates import NotCriterion
-        return NotCriterion(self)
 
 
 
 
 
 
+_guard = object()
+
+class Pointer(int):
+
+    __slots__ = 'proxy'
+
+    def __new__(cls,ob):
+        self = int.__new__(cls,id(ob))
+        try:
+            self.proxy=proxy(ob,self.invalidate)
+        except TypeError:
+            self.proxy=ob
+        return self
+
+    def invalidate(self,ref):
+        self.proxy = _guard
+
+    def __eq__(self,other):
+        return self is other or int(self)==other and self.proxy is not _guard
+
+    def __repr__(self):
+        if self.proxy is _guard:
+            return "Pointer(<invalid at 0x%s>)" % hex(self)
+        else:
+            return "Pointer(%r)" % self.proxy
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+def dispatch_by_identity(ob,table):
+    oid = id(ob)
+    if oid in table:
+        return table[oid]
+    return table[None]
 
 
 
@@ -244,10 +326,52 @@ class ClassCriterion(Adapter):
 
 
 
-class SubclassCriterion(object):
+class IdentityCriterion(AbstractCriterion):
+    """Criterion that is true when target object is the same"""
+
+    protocols.advise(instancesProvide=[ICriterion],asAdapterForTypes=[Pointer])
+
+    __slots__ = 'ptr'
+
+    dispatch_function = staticmethod(dispatch_by_identity)
+
+    def __init__(self,ptr):
+        self.ptr = ptr
+
+    def seeds(self,table):
+        return None,self.ptr
+
+    def implies(self,other):
+        return self.ptr in ICriterion(other)
+
+    def __contains__(self,ob):
+        return ob==self.ptr
+
+    def __repr__(self):
+        return `self.ptr`
+
+
+class NullCriterion(AbstractCriterion):
+    """A "wildcard" Criterion that is always true"""
+
+    dispatch_function = staticmethod(lambda ob,table: None)
+
+    def seeds(self,table):      return ()
+    def __contains__(self,ob):  return True
+    def implies(self,other):    return False
+    def __repr__(self):         return "NullCriterion"   
+    def matches(self,table):    return list(table)
+
+NullCriterion = NullCriterion()
+
+
+
+
+class SubclassCriterion(AbstractCriterion):
     """Criterion that indicates expr is a subclass of a particular class"""
 
-    protocols.advise(instancesProvide=[ICriterion])
+    __slots__ = 'klass'
+
     dispatch_function = staticmethod(dispatch_by_subclass)
 
     def __init__(self,klass):
@@ -266,23 +390,22 @@ class SubclassCriterion(object):
     def __repr__(self):
         return "SubclassCriterion(%s)" % (self.klass.__name__,)
 
-    def subscribe(self,listener): pass
-    def unsubscribe(self,listener): pass
-
     def __eq__(self,other):
         return type(self) is type(other) and self.klass is other.klass
 
-    def __ne__(self,other):
-        return not self.__eq__(other)
 
-    def __invert__(self):
-        from predicates import NotCriterion
-        return NotCriterion(self)
 
-    def matches(self,table):
-        for key in table:
-            if key in self:
-                yield key
+
+
+
+
+
+
+
+
+
+
+
 
 
 class _ExtremeType(object):     # Courtesy of PEP 326
@@ -367,10 +490,10 @@ except ImportError:
 
 
 
-class Inequality(object):
+class Inequality(AbstractCriterion):
     """Criterion that indicates target matches specified const. inequalities"""
 
-    protocols.advise(instancesProvide=[ICriterion])
+    __slots__ = 'val','ranges','op'
     dispatch_function = staticmethod(dispatch_by_inequalities)
 
     def __init__(self,op,val):
@@ -414,18 +537,12 @@ class Inequality(object):
                 return False
         return True
 
-    def subscribe(self,listener): pass
-    def unsubscribe(self,listener): pass
-
     def __repr__(self):
         return 'Inequality(%s%r)' % (self.op, self.val)
 
     def __eq__(self,other):
         return self.__class__ is other.__class__ and self.op==other.op and \
             self.val==other.val
-
-    def __ne__(self,other):
-        return not self.__eq__(other)
 
     def matches(self,table):
         eq = (self.val,self.val)
@@ -447,6 +564,12 @@ def concatenate_ranges(range_map):
         output.append((l,h))
         last = h
     return output
+
+
+
+
+
+
 
 
 class _Notifier(Protocol):
@@ -490,7 +613,7 @@ class _Notifier(Protocol):
         return result
 
 
-class ProtocolCriterion(StickyAdapter):
+class ProtocolCriterion(StickyAdapter,AbstractCriterion):
 
     """Criterion that indicates instances of expr's class provide a protocol"""
 
@@ -523,14 +646,12 @@ class ProtocolCriterion(StickyAdapter):
                     return bases[base][0] is not protocols.DOES_NOT_SUPPORT
         return False
 
-    def matches(self,table):
-        for key in table:
-            if key in self:
-                yield key
 
-    def __invert__(self):
-        from predicates import NotCriterion
-        return NotCriterion(self)
+
+
+
+
+
 
 
     def implies(self,other):

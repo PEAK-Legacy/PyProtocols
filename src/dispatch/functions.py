@@ -11,8 +11,7 @@ from types import FunctionType, ClassType, InstanceType
 ClassTypes = (ClassType, type)
 
 __all__ = [
-    'GenericFunction', 'NullCriterion', 'Dispatcher', 'DispatchNode',
-    'AbstractGeneric',
+    'GenericFunction', 'Dispatcher', 'DispatchNode', 'AbstractGeneric',
 ]
 
 
@@ -34,6 +33,7 @@ class DispatchNode(dict):
         if self.contents:
             self.update(dict(self.contents()))
             self.contents = None
+
 
 
 
@@ -108,47 +108,6 @@ class CriterionIndex:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-class NullCriterion:
-
-    """A "wildcard" Criterion that is always true"""
-
-    protocols.advise(instancesProvide=[ICriterion])
-
-    dispatch_function = staticmethod(lambda ob,table: None)
-
-    def seeds(self,table):
-        return ()
-
-    def __contains__(self,ob):   return True
-    def implies(self,other): return False
-
-    def __repr__(self): return "NullCriterion"
-
-    def subscribe(self,listener): pass
-    def unsubscribe(self,listener): pass
-
-    def matches(self,table):
-        # NullCriterion is true for any key
-        return list(table)
-
-    def __invert__(self):
-        from predicates import NotCriterion
-        return NotCriterion(self)
-
-NullCriterion = NullCriterion()
 
 
 
@@ -457,7 +416,7 @@ class Dispatcher:
                 self[signature] = method
             return
 
-        from dispatch.strategy import Signature
+        from dispatch.strategy import Signature, NullCriterion
         self.__lock.acquire()
         try:
             signature = Signature(
