@@ -993,7 +993,7 @@ needing an adapter.  Supplying this argument is equivalent to calling
 
 \item[instancesDoNotProvide = \var{protocols}] \hfill \\
 A sequence of protocols that instances of the containing class do not provide.
-This is primarily intended for "rejecting" protocols provided or supported
+This is primarily intended for ``rejecting'' protocols provided or supported
 by base classes of the containing class.  Supplying this argument is equivalent
 to calling \code{declareImplementation(\var{containing
 class},instancesDoNotProvide=\var{protocols})}.
@@ -1230,25 +1230,189 @@ Maybe it should be a subsubsection.
 
 \subsection{Protocol Implication and Adapter Precedence \label{proto-implication}}
 
-transitivity
+So far, we've only dealt with simple one-to-one relationships between
+protocols, types, and adapter factories.  We haven't looked, for example, at
+what happens when you define that class X instances provide interface IX,
+that AXY is an adapter factory that adapts interface IX to interface IY, and
+class Z subclasses class X.  (As you might expect, what happens is that Z
+instances will be wrapped with an AXY adapter when you call
+\code{adapt(instanceOfZ, IY)}.)
 
-adapters can be composed
+Adaptation relationships declared via the declaration API are
+\strong{transitive}.  This means that if you declare an adaptation from item A
+to item B, and from item B to item C, then there is an \strong{adapter path}
+from A to C.  An adapter path is effectively a sequence of adapter factories
+that can be applied one by one to get from a source (type, object, or protocol)
+to a desired destination protocol.
 
-``adapter path''
+Adapter paths are automatically composed by the types, objects, and protocols
+used with the declaration API, using the \function{composeAdapters()} function.
+Adapter paths are said to have a \strong{depth}, which is the number of steps
+taken to get from the source to the destination protocol.  For example, if
+factory AB adapts from A to B, and factory BC adapts from B to C, then an
+adapter factory composed of AB and BC would have a depth of 2.  However, if we
+registered another adapter, AC, that adapts directly from A to C, this adapter
+path would have a depth of 1.
 
-``shortest path''
+Naturally, adapter paths with lesser depth are more desirable, as they are less
+likely to be a ``lossy'' conversion, and are more likely to be efficient.  For
+this reason, shorter paths take precedence over longer paths.  Whenever an
+adapter factory is declared between two points that previously required a
+longer path, all adapter paths that previously included the longer path segment
+are updated to use the newly shortened route.  Whenever an adapter factory is
+declared that would \emph{lengthen} an existing path, it is ignored.
 
-overriding existing declarations
+The net result is that the overall network of adapter paths will tend to
+stabilize over time.  As an added benefit, it is safe to define circular
+adapter paths (e.g. A to B, B to C, C to A), as only the shortest useful
+adapter paths are generated.
 
-ambiguous override
 
-how circularity is avoided
 
-Use of subsetting to create ``context'' of sorts
+We've previously mentioned the special adapter factories
+\function{NO_ADAPTER_NEEDED} and \function{DOES_NOT_SUPPORT}.  There are a
+couple of special rules regarding these adapters that we need to add.  Any
+adapter path that contains \function{DOES_NOT_SUPPORT} can be reduced to a
+single instance of \function{DOES_NOT_SUPPORT}, and any adapter path that
+contains \function{NO_ADAPTER_NEEDED} is equivalent to the same adpater path
+without it. These changes can be used to simplify adapter paths, but are only
+taken into consideration when comparing paths, if the ``unsimplified'' version
+of the adapter paths are the same length.
 
-GC consequences of implication: protocols must hold references to implied
-protocols, so subsetting means subset protocol will exist as long as the
-superset protocol does.
+Lets' consider two adapter paths between A and C.  Each proceeds by way of B.
+(i.e., they go from A to B to C.)  Which one is preferable?  Both
+adapters have a depth of 2, because there are two steps (A to B, B to C).  But
+suppose one adapter path contains two arbitrary adapter factories, and the
+other is composed of one factory plus \function{NO_ADAPTER_NEEDED}.  Clearly,
+that path is superior, since it effectively contains only one adapter instead
+of two.
+
+This simplification, however, can \emph{only} be applied when the unsimplified
+paths are of the same length.  Why?  Consider our example of two paths from A
+to B to C.  If someone declares a direct path from A to C (i.e. not via B or
+any other intermediate protocol), we want this path to take precedence over an
+indirect path, even if both paths ``simplify'' to the same length.  Only if we
+are choosing between two paths with the same number of steps can we can use the
+length of their simplified forms as a ``tiebreaker''.
+
+So what happens when choosing between paths of the same number of steps and the
+same simplified length?  A \exception{TypeError} occurs, unless one of these
+conditions applies:
+
+\begin{itemize}
+\item One of the paths simplifies to \function{DOES_NOT_SUPPORT}, in which case
+the other path is considered preferable.  (Some ability is better than none.)
+
+\item One of the paths simplifies to \function{NO_ADAPTER_NEEDED}, in which
+case it is considered preferable.  (It's better not to have to adapt.)
+
+\item Both of the paths are the same object, in which case no change is
+required to the existing path.  (The declaration is redundant.)
+\end{itemize}
+
+Notice that this means that it is not possible to override an existing adapter
+path unless you are improving on it a way visible to the system.  This doesn't
+mean, however, that you can't take advantage of existing declarations, while
+still overriding some of them.
+
+Suppose that there exists a set of existing adapters and protocols defined by
+some frameworks, and we are writing an application using them.  We would like,
+however, for our application to be able to override certain existing
+relationships.  Say for example that we'd like to have an adapter path from A
+to C that's custom for our application, but we'd like to ``inherit'' all the
+other adaptations to C, so that by default any C implementation is still useful
+for our application.
+
+The simple solution is to define a new protocol D as a \strong{subset} of
+protocol C.  This is effectively saying that \function{NO_ADAPTER_NEEDED} can
+adapt from C to D. All existing declarations adapting to C, are now usable as
+adaptations to D, but they will have lower precedence than any direct
+adaptation to D. So now we define our direct adaptation from A to D, and it
+will take precedence over any A to C to D path. But, any existing path that
+goes to C will be ``inherited'' by D.
+
+Speaking of inheritance, please note that inheritance between types/classes has
+no effect on adapter path depth calculations.  Instead, any path defined for a
+subclass takes absolute precedence over paths defined for a superclass, because
+the subclass is effectively a different starting point.  In other words, if A
+is a class, and Q subclasses A, then an adapter path between Q and some
+protocol is a different path than the path between A and that protocol.  There
+is no comparison between the two, and no conflict.  However, if a path from Q
+to a desired protocol does not exist, then the existing best path for A will be
+used.
+
+Sometimes, one wishes to subclass a class without taking on its full
+responsibilities.  It may be that we want Q to use A's implementation, but we
+do not want to support some of A's protocols. In that case, we can declare
+\function{DOES_NOT_SUPPORT} adapters for those protocols, and these will ensure
+that the corresponding adapter paths for A are not used.
+
+
+
+
+
+This is called \strong{rejecting inherited declarations}.  It is not,
+generally speaking, a good idea.  If you want to use an existing class'
+implementation, but do not wish to abide by its contracts (protocols), you
+should be using \strong{delegation} rather than inheritance.  That is, you
+should define your new class so that it has an attribute that is an instance of
+the old class.  For example, if you are tempted to subclass Python's built-in
+dictionary type, but you do not want your subclass to really \emph{be} a
+dictionary, you should simply have an attribute that is a dictionary.
+
+Because rejecting inherited declarations is a good indication that inheritance
+is being used improperly, the \module{protocols} package does not encourage the
+practice.  Declaring a protocol as \function{DOES_NOT_SUPPORT} does not
+propagate to implied protocols, so every rejected protocol \emph{must} be
+listed explicitly.  If class A provided protocol B, and protocol B derived
+from (i.e. implied) protocol C, then you must explicitly reject both B and C
+if you do not want your subclass to support them.
+
+This approach may not be ideal if you are creating such ``contextual''
+protocols dynamically.  Note that every protocol or object that implies
+protocol D in our example above will be holding a reference to D.  This means
+that even if we discard D when we are done with it, D itself will not be
+garbage collected until all the protocols that imply it are.
+
+Because most protocols are used to describe application behavior, this isn't an
+issue for most applications.  If you don't currently worry about making sure
+that your classes get garbage collected  -- not the instances, but the classes
+\emph{themselves} -- then you probably won't worry about it for protocols
+either.
+
+Only applications or frameworks that dynamically generate protocols (and
+declare adaptations to them) need to consider this issue. Such applications or
+frameworks may wish to implement their own custom protocol types for dealing
+with these issues, or to handle persistent storage of dynamically generated
+protocols, use weak references for adaptation registries, etc.  See section
+\ref{customizing-adaptation} for more information on customizing and extending
+the adaptation framework in these ways.
+
+
+
+
+
+\begin{seealso}
+
+The logic of composing and comparing adapter paths is implemented via the
+\function{composeAdapters()} and \function{minimumAdapter()} functions in the
+\module{protocols.adapters} module.  See section \ref{protocol-adapters-module}
+for more details on these and other functions that relate to adapter paths.
+
+
+\end{seealso}
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
