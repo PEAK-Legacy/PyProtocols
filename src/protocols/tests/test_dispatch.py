@@ -5,10 +5,10 @@ from unittest import TestCase, makeSuite, TestSuite
 import operator, string
 from types import ClassType, InstanceType
 
-from protocols.dispatch import *
-from protocols.predicates import *
+from dispatch import *
+from dispatch.predicates import *
 from protocols import Interface,advise,declareImplementation
-import protocols.dispatch
+from dispatch import strategy
 
 class Vehicle(object):  pass
 class LandVehicle(Vehicle): pass
@@ -217,7 +217,7 @@ class TestTests(TestCase):
         )
 
         self.assertEqual(
-            protocols.dispatch.concatenate_ranges(
+            strategy.concatenate_ranges(
                 {(Min,27):[], (27,27):[], (27,Max):[],
                  (Min,19):[], (19,19):[], (19,27): [],
                 }
@@ -225,7 +225,7 @@ class TestTests(TestCase):
             [(Min,19),(19,27),(27,Max)],
         )
         self.assertEqual(
-            protocols.dispatch.concatenate_ranges(
+            strategy.concatenate_ranges(
                 {(Min,19):[], (27,27):[], (19,Max):[],
                   (19,27):[], (19,19):[], (27,Max):[],
                 }

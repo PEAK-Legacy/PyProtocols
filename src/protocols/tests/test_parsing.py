@@ -1,10 +1,10 @@
 """Test generic functions expression parsing"""
 
 from unittest import TestCase, makeSuite, TestSuite
-from protocols.dispatch import *
-from protocols.predicates import *
-from protocols.ast_builder import *
-from protocols import predicates
+from dispatch import *
+from dispatch.predicates import *
+from dispatch.ast_builder import *
+from dispatch import predicates
 import operator,sys,types
 MAXINT = `sys.maxint`
 
