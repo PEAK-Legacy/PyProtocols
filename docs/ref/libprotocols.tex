@@ -885,10 +885,10 @@ For declaring protocols related to a specific, individual instance:
 \begin{funcdesc}{adviseObject}{ob
 \optional{, provides=[ ]} \optional{, doesNotProvide=[ ]}}
 Declare that \var{ob} provides (or does not provide) the specified protocols.
-This is shorthand for calling \function{declareAdapterForType()}
+This is shorthand for calling \function{declareAdapterForObject()}
 with \function{NO_ADAPTER_NEEDED} and \function{DOES_NOT_SUPPORT} as adapters
 from the object to each of the specified protocols.  Note, therefore, that
-\var{ob} must be adaptable to \class{IOpenProvider}, and the listed protocols
+\var{ob} may need to support \class{IOpenProvider}, and the listed protocols
 must be adaptable to \class{IOpenProtocol}.  See
 \function{declareAdapterForObject()} in section \ref{protocols-contents} for
 details.  Also, see section \ref{protocols-instances}, ``Protocol Declarations
@@ -1241,25 +1241,25 @@ objects.
 This function is shorthand for calling \function{declareAdapterForType()}
 with \function{NO_ADAPTER_NEEDED} and \function{DOES_NOT_SUPPORT} as adapters
 from the type to each of the specified protocols.  Note, therefore, that the
-listed protocols must be adaptable to \class{IOpenProtocol}.  See
-\function{declareAdapterForType()} in section \ref{protocols-contents} for
-details.
+listed protocols must be adaptable to \class{IOpenProtocol}.
 \end{funcdesc}
 
 
 \begin{funcdesc}{adviseObject}{ob
 \optional{, provides=[ ]} \optional{, doesNotProvide=[ ]}}
 Declare that \var{ob} provides (or does not provide) the specified protocols.
-This is shorthand for calling \function{declareAdapterForType()}
+This is shorthand for calling \function{declareAdapterForObject()}
 with \function{NO_ADAPTER_NEEDED} and \function{DOES_NOT_SUPPORT} as adapters
 from the object to each of the specified protocols.  Note, therefore, that
-\var{ob} must be adaptable to \class{IOpenProvider}, and the listed protocols
-must be adaptable to \class{IOpenProtocol}.  See
-\function{declareAdapterForObject()} in section \ref{protocols-contents} for
-details.  Also, see section \ref{protocols-instances}, ``Protocol Declarations
-for Individual Objects'', for more information on using
-\function{adviseObject}.
+\var{ob} may need to support \class{IOpenProvider}, and the listed protocols
+must be adaptable to \class{IOpenProtocol}.  See section
+\ref{protocols-instances}, ``Protocol Declarations for Individual Objects'',
+for more information on using \function{adviseObject}.
 \end{funcdesc}
+
+
+
+
 
 
 
