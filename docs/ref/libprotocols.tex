@@ -1913,7 +1913,6 @@ method with \function{metamethod}.  Otherwise, the metaclass'
 \method{__conform__} defined for the class' instances.
 \end{funcdesc}
 
-
 \begin{funcdesc}{supermeta}{typ, ob}
 Emulates the Python built-in \function{super()} function, but with support for
 metamethods.  If you ordinarily would use \function{super()}, but are calling a
@@ -1921,9 +1920,10 @@ metamethods.  If you ordinarily would use \function{super()}, but are calling a
 because Python 2.2 does not support using super with properties (which is
 effectively what metamethods are).
 
-Note that if you are subclassing \class{ProviderMixin}
+Note that if you are subclassing \class{ProviderMixin} or \class{Protocol}, you
+will need to use \function{supermeta()} to call almost any inherited methods,
+since most of the methods provided are wrapped with \function{metamethod()}.
 \end{funcdesc}
-
 
 \begin{funcdesc}{declareAdapterForType}{protocol, adapter, typ \optional{,
 depth=1}}
@@ -1947,10 +1947,10 @@ adapting \var{protocol} to \class{IOpenProtocol} and calling its
 \begin{funcdesc}{declareAdapterForProtocol}{protocol, adapter, proto \optional{,
 depth=1}}
 Declare that \var{adapter} adapts objects that provide protocol \var{proto}
-to \var{protocol}, by adapting \var{protocol} to \class{IOpenProtocol} and
-calling its \function{addImpliedProtocol} method.
-\end{funcdesc}
+to \var{protocol}, by calling
+\code{adapt(\var{proto},IOpenProtocol).addImpliedProtocol(\var{protocol},\var{adapter},\var{depth})}.
 
+\end{funcdesc}
 
 
 
@@ -2298,8 +2298,9 @@ and \method{get()} methods.  Values stored in the mapping will be
 \declaremodule{protocols-advice}{protocols.advice}
 
 This module provides a variety of utility functions and classes used by the
-\module{protocols} package.  None of them are really specific to the package,
-and so may be useful to other libraries or applications.
+\module{protocols} package.  None of them are really specific to the
+\module{protocols} package, and so may be useful to other libraries or
+applications.
 
 \begin{funcdesc}{addClassAdvisor}{callback \optional{, depth=\constant{2}}}
 Set up \var{callback} to be called with the containing class, once it is
@@ -2333,7 +2334,6 @@ by \function{addClassAdvisor()}.  If so, then \var{ob} will have a
 if any, and a \member{callback} attribute containing the callback that was
 given to \function{addClassAdvisor()}.
 \end{funcdesc}
-
 
 \begin{funcdesc}{getFrameInfo}{frame}
 Return a \code{(\var{kind},\var{module},\var{locals},\var{globals})} tuple for
@@ -2419,52 +2419,298 @@ it holds a live reference to the object.
 
 \subsection{Big Example 2 --- Extending the Framework for Context\label{protocols-context}}
 
-Although most common uses for protocols can be served by using \class{Interface}
-objects, there are sometimes situations that call for a dynamically created
-protocol, or a new kind of protocol with added or changed behaviors.
+Now it's time for our second ``big'' example.  This time, we're going to add
+an extension to the \module{protocols} framework to support ``contextual
+adaptation''.  The tools we've covered so far are probably adequate to support
+80-90\% of situations requiring adaptation.  But, they are essentially global
+in nature: only one adapter path is allowed between any two points.  What if we
+need to define a different adaptation in a specific context?
 
-For these situations, one may wish to use the \class{Protocol} or
-\class{InterfaceClass} classes directly.
+For example, let's take the documentation framework we began designing in
+section \ref{protocols-example1}.  Suppose we'd like, for the duration of a
+single documentation run, to replace the factory that adapts from
+\class{FunctionType} to \class{IDocumentable}?  For example, we might like to
+do this so that functions used by our ``finite state machine'' objects as
+``transitions'' are documented differently than regular functions.
 
+Using only the tools described so far, we can't do this if
+\class{IDocumentable} is a single object.  The framework that registered the
+\class{FunctionAsDocumentable} adapter effectively ensured that we cannot
+replace that adapter with another, since it is already the shortest adapter
+path.  What can we do?
 
+In section \ref{proto-implication}, we discussed how we could create ``subset''
+protocols and ``inherit'' adapter declarations from existing protocols.  In
+this way, we could create a new subset protocol of \class{IDocumentable}, and
+then register our context-specific adapters with that subset.  These subset
+protocols are just as fast as the original protocols in looking up adapters, so
+there's no performance penalty.
 
+But who creates the subset protocol?  The client or the framework?  And how do
+we get the framework to use our subset instead of its built-in
+\class{IDocumentable} protocol?
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+To answer these questions, we will create an extension to the
+\module{protocols} framework that makes it easy for frameworks to manage
+``contextual'' or ``local'' protocols.  Then, framework creators will have a
+straightforward way to support context-specific adapter overrides.
 
 
-\subsection{Examples}
+
+
+As before, we'll start by envisioning our ideal situation.  Let's assume that
+our documentation tools are object-based.  That is, we instantiate a
+``documentation set'' or ``documentation run'' object in order to generate
+documentation.  How do we want to register adapters?  Well, we could have the
+framework add a bunch of methods to do this, but it seems more straightforward
+to simply supply the interfaces as attributes of the ``documentation set'' or
+``documentation run'' object, e.g.:
+
+\begin{verbatim%
+}from theDocTool import DocSet
+from myAdapters import specialFunctionAdapter
+from types import FunctionType
+import protocols
+
+myDocs = DocSet()
+
+protocols.registerAdapter(
+    specialFunctionAdapter,
+    provides = [myDocs.IDocumentable],
+    forTypes = [FunctionType]
+)
+
+myDocs.run()
+\end{verbatim}
+
+So, instead of importing the interface, we access it as an attribute of some
+relevant ``context'' object, and declare adapters for it.  Anything we don't
+declare a ``local'' adapter for, will use the adapters declared for the
+underlying ``global'' protocol.
+
+Naturally, the framework author could implement this by writing code in the
+\class{DocSet} class' \method{__init__} method, to create the new
+``local'' protocol and register it as a subset of the ``global''
+\class{IDocumentable} interface.  But that would be time-consuming and error
+prone, and therefore discourage the use of such ``local'' protocols.
+
+Again, let's consider what our ideal situation would be.  The author of the
+\class{DocSet} class should be able to do something like:
+
+
+
+\begin{verbatim%
+}class DocSet:
+
+    from doctool.interfaces import IDocumentable, ISignature
+
+    IDocumentable = subsetPerInstance(IDocumentable)
+    ISignature = subsetPerInstance(ISignature)
+
+    # ... etc.
+\end{verbatim}
+
+Our hypothetical \class{subsetPerInstance} class would be a descriptor that
+did all the work needed to provide a ``localized'' version of each interface
+for each instance of \class{DocSet}.  Code in the \class{DocSet} class would
+always refer to \code{self.IDocumentable} or \code{self.ISignature}, rather
+than using the ``global'' versions of the interfaces.  Thus, we can now
+register adapters that are unique to a specific \class{DocSet}, but still use
+any globally declared adapters as defaults.
+
+Okay, so that's our hypothetical ideal.  How do we implement it?  I personally
+like to try writing the ideal thing, to find out what other pieces are needed.
+So let's start with writing the \class{subsetPerInstance} descriptor, since
+that's really the only piece we know we need so far.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\begin{verbatim%
+}from protocols import Protocol, declareAdapterForProtocol, NO_ADAPTER_NEEDED
+
+class subsetPerInstance(object):
+
+    def __init__(self,protocol,name=None):
+
+        self.protocol = protocol
+        self.name = name or getattr(protocol,'__name__',None)
+
+        if not self.name:
+            raise TypeError("Descriptor needs a name for", protocol)
+
+
+    def __get__(self,ob,typ=None):
+
+        if ob is None:
+            return self
+
+        name = self.name
+        if getattr(type(ob),name) is not self or name in ob.__dict__:
+            raise TypeError(
+                "Descriptor is under more than one name or the wrong name",
+                self, name, type(ob)
+            )
+
+        local = Protocol()
+        declareAdapterForProtocol(local,NO_ADAPTER_NEEDED,self.protocol)
+
+        # save it in the instance's dictionary so we won't be called again
+        ob.__dict__[name] = local
+        return local
+
+
+    def __repr__(self):
+        return "subsetPerInstance(%r)" % self.protocol
+\end{verbatim}
+
+
+
+
+Whew.  Most of the complexity above comes from the need for the descriptor to
+know its ``name'' in the containing class.  As written, it will guess its name
+to be the name of the wrapped interface, if available.  It can also detect
+some potential aliasing/renaming issues that could occur.  The actual work of
+the descriptor occurs in just two lines, buried deep in the middle of the
+\method{__get__} method.
+
+As written, it's a handy enough tool.  We could leave things where they are
+right now and still get the job done.  But that would hardly be an example of
+extending the framework, since we didn't even subclass anything!
+
+So let's add another feature.  As it sits, our descriptor should work with both
+old and new-style classes, automatically generating one subset protocol for
+each instance of its containing class.  But, the subset protocol doesn't
+\emph{know} it's a subset protocol, or of what context.  If we were to print
+\code{DocSet().IDocumentable}, we'd just get something like
+\constant{<protocols.interfaces.Protocol instance at 0x00ABA220>}.
+
+Here's what we'd like it to do instead.  We'd like it to say something like
+\constant{LocalProtocol(<class 'IDocumentable'>, <DocSet instance at
+0x00AD9FB0>)}.  That is, we want the local protocol to:
+
+\begin{itemize}
+\item ``know'' it's a local protocol
+\item know what protocol it's a local subset of
+\item know what ``context'' object it's a local protocol for
+\end{itemize}
+
+What does this do for us?  Aside from debugging, it gives us a chance to find
+related interfaces, or access methods or data available from the context.
+Let's suppose our \class{specialFunctionAdapter} class needs to be able to
+adapt to \class{ISignature}.  If it uses the global \class{ISignature}, it
+won't have access to any context-specific adapters for \class{ISignature}.  How
+can we get it to use the \emph{local} \class{ISignature} instead?
+
+Remember that every adapter factory is passed two arguments: the component to
+adapt, and the protocol to adapt it to.  If the protocol is a local one, and it
+knows its ``context'' object, then the adapter could access other interfaces by
+retrieving them from the context.  (Along with anything else it needs from
+the context!)
+
+So, let's create a \class{LocalProtocol} class:
+
+\begin{verbatim%
+}class LocalProtocol(Protocol):
+
+    def __init__(self, baseProtocol, context):
+
+        self.baseProtocol = baseProtocol
+        self.context = context
+
+        # Note: Protocol is a ``classic'' class, so we don't use super()
+        Protocol.__init__(self)
+
+        declareAdapterForProtocol(self,NO_ADAPTER_NEEDED,baseProtocol)
+
+    def __repr__(self):
+        return "LocalProtocol(%r,%r)" % self.baseProtocol, self.context
+\end{verbatim}
+
+And now, we can replace these two lines in our earlier \method{__get__} method:
+
+\begin{verbatim%
+}        local = Protocol()
+        declareAdapterForProtocol(local,NO_ADAPTER_NEEDED,self.protocol)
+\end{verbatim}
+
+with this one:
+
+\begin{verbatim%
+}        local = LocalProtocol(self.protocol, ob)
+\end{verbatim}
+
+Thus, the new local protocol will know its context is the instance it was
+retrieved from.  Context-sensitive adapters will be able to retrieve their
+context from it, and if we are debugging, we'll be able to know what the
+original protocol was.
+
+
+
+
+
+Of course, to make this new extension really robust, we would need to add some
+more documentation.  For example, it might be good to add an
+\class{ILocalProtocol} interface that documents what local protocols do.
+Context-sensitive adapters would then be able to verify whether they are
+working with a local protocol or a global one.  Framework developers would also
+want to document what local interfaces are provided by their frameworks'
+objects, and authors of context-sensitive adapters need to document what
+interface they expect their local protocols' \member{context} attribute to
+supply!  Also, see below for a web site with some interesting papers on
+patterns for using localized adaptation of this kind.
+
+\begin{seealso}
+
+\seetitle[http://www.objectteams.org/]{Object Teams}{If you find the idea of
+context-specific interfaces and adapters interesting, you'll find ``Object
+Teams'' intriguing as well.  In effect, the ideas we've presented here map onto
+a subset of the ``Object Teams'' concept.  Our local interfaces correspond
+to their ``abstract roles'', our local adapters' instances map to their ``role
+instances'', and our contexts are their ``team instances''.  Adapting an object
+corresponds to their ``lifting'', and so on.  The main concept that's not
+directly supported by our implementation here is ``callin binding''.  (Callin
+binding is a way of (possibly temporarily) injecting hooks into an adapted
+object so that the adapter can be informed when the adapted object's methods
+are called directly by other code.)}
+
+\end{seealso}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\subsection{Additional Examples}
+
+XXX
+
 \subsubsection{Replacing introspection with Adaptation \label{introspect-elim}}
 
-
-
-
-
+XXX
 
 
 
