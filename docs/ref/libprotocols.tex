@@ -211,7 +211,7 @@ the \class{IOpenProtocol} interface, as will be described in section
 \ref{open-protocols}.
 
 Notice that the concepts of protocol objects, adpating protocols, and open
-protocols are themselves ``protocols".  The \module{protocols} package supplies
+protocols are themselves ``protocols''.  The \module{protocols} package supplies
 three interface objects that symbolize these concepts: \class{IProtocol},
 \class{IAdaptingProtocol}, and \class{IOpenProtocol}, respectively.  Just as
 the English phrases represent the concepts in this text, the interface objects
@@ -357,7 +357,7 @@ you go!
 In practice, however, this is like creating a new kind of number type for
 Python: doable, but tedious and perhaps best left to a specialist.  For that
 reason, the \module{protocols} package supplies some useful basic protocol
-types, and a "declaration API" that lets you declare how protocols, types, and
+types, and a ``declaration API'' that lets you declare how protocols, types, and
 objects should be adapted to one another.  The rest of this document deals
 with how to use those types and APIs.
 
@@ -365,7 +365,7 @@ Note, however, that you can still create your own kinds of protocol objects,
 or metaclasses that manage their own adapters, and many other things, using
 only the information supplied so far.  But, if you'd like to use your creations
 with the \module{protocols} declaration API, you'll need to read section
-\ref{customizing-adaptation}, ``Customizing and Extending the Declaration API".
+\ref{customizing-adaptation}, ``Customizing and Extending the Declaration API''.
 
 \subsubsection{Differences Between \function{protocols.adapt()} and \pep{246}}
 
@@ -439,14 +439,14 @@ class AbstractMapping(Interface):
         raise NotImplementedError
 \end{verbatim}
 
-The ``pure" style emphasizes the interface as seen by the caller, and is not
+The ``pure'' style emphasizes the interface as seen by the caller, and is not
 intended to be subclassed for implementation.  Notice that the \code{self}
 parameter is not included in its method definitions, because \code{self} is not
-supplied when calling the methods.  The ``ABC" style, on the other hand,
+supplied when calling the methods.  The ``ABC'' style, on the other hand,
 emphasizes implementation, as it is intended to be subclassed
 for that purpose.  Therefore, it includes method bodies, even for abstract
-methods.  Each style has different uses: ``ABC" is a popular rapid development
-style, while the ``pure" approach has some distinct documentation advantages.
+methods.  Each style has different uses: ``ABC'' is a popular rapid development
+style, while the ``pure'' approach has some distinct documentation advantages.
 
 
 \class{protocols.Interface} may be used as a base class for either style.  You
@@ -728,7 +728,7 @@ metamethod
 
 supermeta
 
-\subsubsection{\module{protocols.adapters} --- ``Adapter arithmetic" support}
+\subsubsection{\module{protocols.adapters} --- ``Adapter arithmetic'' support}
 
 minimumAdapter
 
@@ -739,7 +739,7 @@ updateWithSimplestAdapter
 \subsubsection{\module{protocols.classic} --- Adapters to support built-in types
 and Zope Interfaces}
 
-\subsubsection{\module{protocols.advice} --- Metaclasses and other ``Magic"}
+\subsubsection{\module{protocols.advice} --- Metaclasses and other ``Magic''}
 
 addClassAdvisor, isClassAdvisor, getFrameInfo
 
