@@ -31,4 +31,4 @@
 
 from dispatch.interfaces import *
 from dispatch.strategy import *
-from dispatch.functions import GenericFunction, defmethod, when
+from dispatch.functions import GenericFunction, defmethod, when, SimpleGeneric

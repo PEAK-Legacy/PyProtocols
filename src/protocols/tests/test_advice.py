@@ -126,8 +126,10 @@ class DecoratorTests(TestCase):
     def checkAssignAdvice(self):
 
         log = []
-        def track(f,k,v):
+        def track(f,k,v,d):
             log.append((f,k,v))
+            if k in f.f_locals:
+                del f.f_locals[k]   # simulate old-style advisor
 
         add_assignment_advisor(track,1)
         test_var = 1
@@ -158,6 +160,45 @@ class DecoratorTests(TestCase):
         [as(list, lambda x: (x,))]
         f1 = f
         self.assertEqual(f1, [f])
+
+
+    def check24DecoratorMode(self):
+
+        log = []
+        def track(f,k,v,d):
+            log.append((f,k,v))
+            return v
+
+        def foo(x): pass
+
+        add_assignment_advisor(track,1)(foo)
+        x = 1
+
+        self.assertEqual(log, [(sys._getframe(),'foo',foo)])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

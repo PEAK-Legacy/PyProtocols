@@ -2,9 +2,9 @@ from protocols import Interface, Attribute
 
 __all__ = [
     'IDispatchFunction', 'ITest', 'ISignature', 'IDispatchPredicate',
-    'AmbiguousMethod', 'NoApplicableMethods',
+    'AmbiguousMethod', 'NoApplicableMethods', 'ISimpleDispatchPredicate',
     'IDispatchableExpression', 'IGenericFunction', 'IDispatchTable',
-    'EXPR_GETTER_ID','RAW_VARARGS_ID','RAW_KWDARGS_ID',
+    'EXPR_GETTER_ID','RAW_VARARGS_ID','RAW_KWDARGS_ID', 'IExtensibleFunction',
 ]
 
 class AmbiguousMethod(Exception):
@@ -203,16 +203,51 @@ class IDispatchableExpression(Interface):
 
 
 
-class IGenericFunction(Interface):
+class ISimpleDispatchPredicate(Interface):
 
+    """Adaptation-based predicate for single-dispatch functions"""
+
+    def declareAdapter(protocol, factory):
+        """Declare 'factory' as an adapter to 'protocol' from this predicate"""
+        
+
+class IExtensibleFunction(Interface):
+    
     def __call__(*__args,**__kw):
         """Invoke the function and return results"""
 
+    def addMethod(predicate,method):
+        """Call 'method' when input matches 'predicate'
+
+        (Note that single and multiple-dispatch functions use different
+        predicate types: 'ISimpleDispatchPredicate' and 'IDispatchPredicate'.
+        """
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class IGenericFunction(IExtensibleFunction):
+
     def __setitem__(signature,method):
         """Call 'method' when input matches 'ISignature(signature)'"""
-
-    def addMethod(predicate,method):
-        """Call 'method' when input matches 'IDispatchPredicate(predicate)'"""
 
     def argByName(name):
         """Return 'asFuncAndIds()' for argument 'name'"""
@@ -243,4 +278,10 @@ class IGenericFunction(Interface):
         """Empty all signatures, methods, tests, expressions, etc."""
 
     # copy() ?
+
+
+
+
+
+
 

@@ -1,13 +1,13 @@
 from __future__ import generators
 import protocols, inspect
 from interfaces import *
-from strategy import single_best_method, NullTest, DispatchNode
+from strategy import single_best_method, NullTest, DispatchNode, ClassTypes
 from protocols.advice import as,add_assignment_advisor
 from protocols.interfaces import allocate_lock
 from types import FunctionType
 
 __all__ = [
-    'GenericFunction', 'defmethod', 'when',
+    'SimpleGeneric', 'GenericFunction', 'defmethod', 'when',
 ]
 
 
@@ -33,6 +33,129 @@ __all__ = [
 
 
 
+
+
+
+
+
+
+class SimpleGeneric:
+    """Single-dispatch generic function using adaptation
+
+    This class may have a slight speed advantage over 'GenericFunction' when
+    you only need to dispatch based on the first argument's type or protocol,
+    and do not need arbitrary predicates.
+
+    Also, this class does not require you to adapt the first argument when
+    dispatching based on protocol or interface, and if the first argument has
+    a '__conform__' method, it will attempt to use it, rather than simply
+    dispatching based on class information the way 'GenericFunction' does.
+
+    To use a 'SimpleGeneric', just create an instance, and then use
+    'dispatch.when()' or 'dispatch.defmethod()', passing in a class, type,
+    protocol (or list of any of the preceding).  For example::
+
+        doSomething = SimpleGeneric("Do something")
+
+        @dispatch.when([SomeClass,OtherClass])
+        def doSomething(x,y,z):
+            # do something when 'isinstance(x,(SomeClass,OtherClass))'
+
+        @dispatch.when(IFoo)
+        def doSomething(x,y,z):
+            # do something to an 'x' that has been adapted to 'IFoo'
+
+    You can actually pass in anything that supports 'ISimpleDispatchPredicate',
+    but in practice this currently amounts to classes, types, protocols, and
+    sequences thereof.
+    """
+
+    protocols.advise(
+        instancesProvide=[IExtensibleFunction]
+    )
+
+    def __init__(self,doc):
+        self.__doc__ = doc
+        self.protocol = protocols.Protocol()
+
+
+
+    def __call__(self,__disparg, *__args,**__kw):
+        what = self.protocol(__disparg,None)
+        if what is None:
+            raise NoApplicableMethods(__disparg)
+        return what[1](what[0],*__args,**__kw)
+
+
+    def addMethod(self,cond,func):
+        ISimpleDispatchPredicate(cond).declareAdapter(
+            self.protocol, lambda ob: (ob,func)
+        )
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class ClassAsSimplePredicate(protocols.Adapter):
+
+    protocols.advise(
+        instancesProvide=[ISimpleDispatchPredicate],
+        asAdapterForTypes=ClassTypes,
+    )
+
+    def declareAdapter(self,protocol,factory):
+        protocols.declareAdapter(
+            factory,provides=[protocol],forTypes=[self.subject]
+        )
+
+
+class ProtocolAsSimplePredicate(protocols.Adapter):
+
+    protocols.advise(
+        instancesProvide=[ISimpleDispatchPredicate],
+        asAdapterForProtocols=[protocols.IOpenProtocol],
+    )
+
+    def declareAdapter(self,protocol,factory):
+        protocols.declareAdapter(
+            factory,provides=[protocol],forProtocols=[self.subject]
+        )
+
+
+class ProtocolAsSimplePredicate(protocols.Adapter):
+
+    protocols.advise(
+        instancesProvide=[ISimpleDispatchPredicate],
+        asAdapterForProtocols=[protocols.sequenceOf(ISimpleDispatchPredicate)],
+    )
+
+    def declareAdapter(self,protocol,factory):
+        for pred in self.subject: pred.declareAdapter(protocol,factory)
 
 
 
@@ -327,18 +450,36 @@ class GenericFunction:
 
 
 def defmethod(gf,cond,func,local_dict=None,global_dict=None):
-    """Add a method 'func' to 'gf' using 'cond', returning a GF"""
+    """Update or create a generic function, and return it
+
+    This is roughly equivalent to calling 'gf.addMethod(cond,func)', except
+    that there are various convenient default handling options.
+
+    First, if 'gf' is 'None', and 'func' is a Python function object, a new
+    'dispatch.GenericFunction' is created, using 'func' to determine the
+    generic function's argument names.  Otherwise, 'gf' must be an existing
+    'dispatch.IExtensibleFunction' (e.g. a 'dispatch.SimpleGeneric' or
+    'dispatch.GenericFunction').
+
+    If 'cond' is a string, and 'gf' implements 'IGenericFunction', the string
+    is parsed to create a dispatch predicate.  'local_dict' and 'global_dict'
+    are used for parsing, if supplied.  If not, the 'func_globals' of 'func'
+    are used for the locals and globals.
+    """
 
     def dm_simple(gf,cond,func,local_dict=None,global_dict=None):
         """Add a method to an existing GF, using a predicate object"""
-        gf = IGenericFunction(gf)
+
+        gf = IExtensibleFunction(gf)
         gf.addMethod(cond,func)
         return gf
-    
+   
     
     def dm_string(gf,cond,func,local_dict=None,global_dict=None):
         """Add a method to an existing GF, using a string condition"""
-    
+
+        gf = IGenericFunction(gf)
+
         if global_dict is None:
             global_dict = getattr(func,'func_globals',globals())
         if local_dict is None:
@@ -347,53 +488,76 @@ def defmethod(gf,cond,func,local_dict=None,global_dict=None):
         cond = gf.parse(cond,local_dict,global_dict)
         return defmethod(gf,cond,func)
 
+
+
     def dm_func(gf,cond,func,local_dict=None,global_dict=None):
         """Create a new generic function, using function to get args info"""
         return defmethod(
            GenericFunction.from_function(func),cond,func,local_dict,global_dict
         )
-    
+
     global defmethod    
+    doc = defmethod.__doc__
     defmethod = GenericFunction.from_function(dm_simple)
-    
+    defmethod.__doc__ = doc
+
     dm_simple(defmethod,
         defmethod.parse(
             "gf in IGenericFunction and cond in IDispatchPredicate",
             locals(),globals()),
         dm_simple)
-    
+
     dm_string(defmethod, "gf in IGenericFunction and cond in str", dm_string)
     dm_string(defmethod, "gf is None and func in FunctionType", dm_func)
+    dm_string(defmethod, "gf in IExtensibleFunction", dm_simple)
     
     return defmethod(gf,cond,func,local_dict,global_dict)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def when(cond):
-    """Add the following function to a generic function, w/'cond' as guard"""
-    def callback(frm,name,value):
-        frm.f_locals[name] = defmethod(
-            frm.f_locals.get(name), cond, value, frm.f_locals, frm.f_globals
+    """Add the following function to a generic function, w/'cond' as guard
+
+    This is equivalent to calling 'defmethod(old_function,cond,new_function)',
+    where 'old_function' is the previous definition of the function (or 'None'
+    if there was no previous definition), and 'new_function' is the function
+    definition following the 'when()'.  E.g.::
+
+        @dispatch.when("x is IFoo")
+        def foo(bar):
+            pass
+
+    The above is roughly equivalent to::
+
+        def _foo(bar):
+            pass
+        foo = dispatch.defmethod(None,"x is IFoo",_foo,locals(),globals())
+        
+    """
+    def callback(frm,name,value,old_locals):
+        return defmethod(
+            old_locals.get(name), cond, value, frm.f_locals, frm.f_globals
         )
-    add_assignment_advisor(callback)
+
+    return add_assignment_advisor(callback)
     
     
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

@@ -5,6 +5,7 @@ from unittest import TestCase, makeSuite, TestSuite
 import operator, string
 from types import ClassType, InstanceType
 
+import dispatch,protocols
 from dispatch import *
 from dispatch.predicates import *
 from protocols import Interface,advise,declareImplementation
@@ -36,8 +37,6 @@ class Speedboat(GasPowered,WaterVehicle): pass
 class PaddleBoat(HumanPowered,WaterVehicle): pass
 class RiverBoat(WaterVehicle):
     advise(instancesProvide=[TwoWheeled])
-
-
 
 
 class TestTests(TestCase):
@@ -778,6 +777,88 @@ class ExpressionTests(TestCase):
         self.failIf(and_eq_None(1,0))
 
 
+class SimpleGenerics(TestCase):
+
+    def testTrivialities(self):
+        for doc in "foo bar", "baz spam":
+            g = dispatch.SimpleGeneric(doc)
+            self.assertEqual(g.__doc__, doc)
+
+            # Empty generic should raise NoApplicableMethods
+            self.assertRaises(dispatch.NoApplicableMethods, g, 1, 2, 3)
+            self.assertRaises(dispatch.NoApplicableMethods, g, "x", y="z")
+
+            # Must have at least one argument to do dispatching
+            self.assertRaises(TypeError, g)
+            self.assertRaises(TypeError, g, foo="bar")
+
+    def testSimpleDefinitions(self):
+        g = dispatch.SimpleGeneric("x")
+
+        class Classic: pass
+        class NewStyle(object): pass
+        class IFoo(protocols.Interface): pass
+        class Impl: protocols.advise(instancesProvide=[IFoo])
+
+        c=Classic()
+        n=NewStyle()
+        i=Impl()
+
+        for item in c,n,i,1,"blue",SimpleGeneric:
+            self.assertRaises(dispatch.NoApplicableMethods, g, item)
+
+        dispatch.defmethod(g,Classic,lambda *args,**kw: ("classic!",args,kw))
+        dispatch.defmethod(g,NewStyle,lambda *args,**kw: ("new!",args,kw))
+        dispatch.defmethod(g,IFoo,lambda *args,**kw: ("foo!",args,kw))
+
+        self.assertEqual(g(c,"foo"), ("classic!",(c,"foo",),{}))
+        self.assertEqual(g(n,foo="bar"), ("new!",(n,),{'foo':'bar'}))
+        self.assertEqual(g(i,"foo",x="y"), ("foo!",(i,"foo",),{"x":"y"}))
+
+        for item in 1,"blue",SimpleGeneric:
+            self.assertRaises(dispatch.NoApplicableMethods, g, item)
+
+    def testMultiDefinition(self):
+
+        class Classic: pass
+        class NewStyle(object): pass
+        class IFoo(protocols.Interface): pass
+        class Impl: protocols.advise(instancesProvide=[IFoo])
+
+        c=Classic()
+        n=NewStyle()
+        i=Impl()
+
+        g = dispatch.SimpleGeneric("x")
+
+        [dispatch.when([Classic,NewStyle,IFoo])]
+        def g(*args,**kw):
+            return ("yes!",args,kw)
+
+        self.assertEqual(g(c,"foo"), ("yes!",(c,"foo",),{}))
+        self.assertEqual(g(n,foo="bar"), ("yes!",(n,),{'foo':'bar'}))
+        self.assertEqual(g(i,"foo",x="y"), ("yes!",(i,"foo",),{"x":"y"}))
+
+        for item in 1,"blue",SimpleGeneric:
+            self.assertRaises(dispatch.NoApplicableMethods, g, item)
+        
+
+    def testAdaptedDefinition(self):
+        class Classic: pass
+        g = dispatch.SimpleGeneric("x")
+
+        [dispatch.when(dispatch.ISimpleDispatchPredicate)]
+        def g(thing, *args,**kw):
+            return thing
+
+        it = g([Classic])
+        self.assertNotEqual(it, [Classic])
+        self.failUnless(dispatch.ISimpleDispatchPredicate(it) is it)
+
+
+
+
+
 class GenericTests(TestCase):
 
     def testBasicSingleDispatch(self):
@@ -902,7 +983,7 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
 
 
 TestClasses = (
-    TestTests, ExpressionTests, GenericTests,
+    TestTests, ExpressionTests, SimpleGenerics, GenericTests,
 )
 
 def test_suite():

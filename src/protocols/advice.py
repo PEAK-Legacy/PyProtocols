@@ -29,12 +29,12 @@ def as(*decorators):
         decorators = list(decorators)
         decorators.reverse()
 
-    def callback(frame,k,v):
+    def callback(frame,k,v,old_locals):
         for d in decorators:
             v = d(v)
-        frame.f_locals[k] = v
+        return v
 
-    add_assignment_advisor(callback)
+    return add_assignment_advisor(callback)
 
 
 
@@ -245,16 +245,23 @@ def isClassAdvisor(ob):
 
 
 def add_assignment_advisor(callback,depth=2):
-    """Invoke 'callback(frame,name,value)' on the next assignment in 'frame'
+    """Invoke 'callback(frame,name,value,old_locals)' on next assign in 'frame'
 
     The frame monitored is determined by the 'depth' argument, which gets
-    passed to 'sys._getframe()'.  Note that when 'callback' is invoked, the
-    frame state will be as though the assignment hasn't happened yet, so any
-    previous value of the assigned variable will be available in the frame's
-    locals.  (Unless there's no previous value, in which case there will be
-    no such variable in the frame locals.)
-    """
+    passed to 'sys._getframe()'.  When 'callback' is invoked, 'old_locals'
+    contains a copy of the frame's local variables as they were before the
+    assignment took place, allowing the callback to access the previous value
+    of the assigned variable, if any.  The callback's return value will become
+    the new value of the variable.  'name' is the name of the variable being
+    created or modified, and 'value' is its value (the same as
+    'frame.f_locals[name]').
 
+    This function also returns a decorator function for forward-compatibility
+    with Python 2.4 '@' syntax.  Note, however, that if the returned decorator
+    is used with Python 2.4 '@' syntax, the callback 'name' argument may be
+    'None' or incorrect, if the 'value' is not the original function (e.g.
+    when multiple decorators are used).
+    """
     frame = sys._getframe(depth)
     oldtrace = [frame.f_trace]
     old_locals = frame.f_locals.copy()
@@ -272,18 +279,14 @@ def add_assignment_advisor(callback,depth=2):
             if frm is frame and event !='exception':
                 # Aha, time to check for an assignment...
                 for k,v in frm.f_locals.items():
-                    if k not in old_locals:
-                        del frm.f_locals[k]
-                        break
-                    elif old_locals[k] is not v:
-                        frm.f_locals[k] = old_locals[k]
+                    if k not in old_locals or old_locals[k] is not v:
                         break
                 else:
                     # No luck, keep tracing
                     return tracer
 
                 # Got it, fire the callback, then get the heck outta here...
-                callback(frm,k,v)
+                frm.f_locals[k] = callback(frm,k,v,old_locals)
 
         finally:
             # Give the previous tracer a chance to run before we return
@@ -291,30 +294,27 @@ def add_assignment_advisor(callback,depth=2):
                 # And allow it to replace our idea of the "previous" tracer
                 oldtrace[0] = oldtrace[0](frm,event,arg)
 
-        # Unlink ourselves from the trace chain.
-        frm.f_trace = oldtrace[0]
-        sys.settrace(oldtrace[0])
+        uninstall()
         return oldtrace[0]
 
+    def uninstall():
+        # Unlink ourselves from the trace chain.
+        frame.f_trace = oldtrace[0]
+        sys.settrace(oldtrace[0])
+        
     # Install the trace function
     frame.f_trace = tracer
     sys.settrace(tracer)
 
+    def do_decorate(f):
+        # Python 2.4 '@' compatibility; call the callback 
+        uninstall()
+        frame = sys._getframe(1)
+        return callback(
+            frame, getattr(f,'__name__',None), f, frame.f_locals
+        )
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    return do_decorate
 
 
 
