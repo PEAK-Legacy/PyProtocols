@@ -50,19 +50,66 @@ def com_binary(opname, builder,nodelist):
     items = [nodelist[i] for i in range(1,len(nodelist),2)]
     return getattr(builder,opname)(items)
 
+
 # testlist: test (',' test)* [',']
 # subscriptlist: subscript (',' subscript)* [',']
 testlist = subscriptlist = curry(com_binary, 'Tuple')
 
-'''# test: and_test ('or' and_test)* | lambdef
+
+# test: and_test ('or' and_test)* | lambdef
 test = curry(com_binary, 'Or')
 
+
 # and_test: not_test ('and' not_test)*
-and_test = curry(com_binary, 'And')'''
+and_test = curry(com_binary, 'And')
+
 
 # not_test: 'not' not_test | comparison
 def not_test(builder, nodelist):
     return builder.Not(nodelist[2])
+
+
+
+
+
+
+
+
+
+
+
+
+
+# comparison: expr (comp_op expr)*
+def comparison(builder, nodelist):
+
+    if len(nodelist)>4 and builder.simplify_comparisons:
+        # Reduce (x < y < z ...) to (x<y and y<z and ...)
+        return builder.And(
+            [nodelist[:1]+nodelist[i:i+3] for i in range(1,len(nodelist)-1,2)]
+        )
+
+    results = []
+    for i in range(3, len(nodelist), 2):
+        nl = nodelist[i-1]
+
+        # comp_op: '<' | '>' | '>=' | '<=' | '<>' | '!=' | '=='
+        #          | 'in' | 'not' 'in' | 'is' | 'is' 'not'
+        n = nl[1]
+        if n[0] == token.NAME:
+            type = n[1]
+            if len(nl) == 3:
+                if type == 'not':
+                    type = 'not in'
+                else:
+                    type = 'is not'
+        else:
+            type = n[1]
+
+        results.append((type, nodelist[i]))
+
+    return builder.Compare(nodelist[1], results)
+
 
 # expr: xor_expr ('|' xor_expr)*
 expr = curry(com_binary, 'Bitor')
@@ -73,27 +120,21 @@ xor_expr = curry(com_binary, 'Bitxor')
 # and_expr: shift_expr ('&' shift_expr)*
 and_expr = curry(com_binary, 'Bitand')
 
+
 # shift_expr: arith_expr ('<<'|'>>' arith_expr)*
 # arith_expr: term (('+'|'-') term)*
 # term: factor (('*'|'/'|'%'|'//') factor)*
 shift_expr = arith_expr = term = left_assoc
 
 
-
 unary_ops = {
     token.PLUS: 'UnaryPlus', token.MINUS: 'UnaryMinus', token.TILDE: 'Invert',
 }
 
+
 # factor: ('+'|'-'|'~') factor | power
 def factor(builder, nodelist):
     return getattr(builder,unary_ops[nodelist[1][0]])(nodelist[2])
-
-
-
-
-
-
-
 
 
 
@@ -131,10 +172,14 @@ def power(builder, nodelist):
     nodelist = nodelist[:-1]
     t = node[1][0]
 
+    # trailer: '(' [arglist] ')' | '[' subscriptlist ']' | '.' NAME
+
     if t == token.LPAR:
         return com_call_function(builder,nodelist,node[2])
+
     elif t == token.DOT:
         return builder.Getattr(nodelist, node[2][1])
+
     elif t == token.LSQB:
         item = node[2]
 
@@ -145,19 +190,15 @@ def power(builder, nodelist):
             lineno = item[2]
             return builder.Subscript(nodelist,
                 (symbol.subscript,
-                    (token.STRING,'None',lineno),item,(token.STRING,'None',lineno)
+                    (token.STRING,'None',lineno),
+                    item,
+                    (token.STRING,'None',lineno)
                 )
             )
 
         return builder.Subscript(nodelist, item)
 
     raise AssertionError("Unknown power", nodelist)
-
-
-
-
-
-
 
 
 

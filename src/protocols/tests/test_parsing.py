@@ -265,24 +265,65 @@ class EventTests(TestCase):
         self.assertEqual(pe("a[:2:3]"), "Getitem(a,Sliceobj(None,2,3))")
         self.assertEqual(pe("a[1:2:3]"),"Getitem(a,Sliceobj(1,2,3))")
 
+    def testCompare(self):
+        self.assertEqual(pe("a>b"), "Compare(a > b)")
+        self.assertEqual(pe("a>=b"), "Compare(a >= b)")
+        self.assertEqual(pe("a<b"), "Compare(a < b)")
+        self.assertEqual(pe("a<=b"), "Compare(a <= b)")
+        self.assertEqual(pe("a<>b"), "Compare(a <> b)")
+        self.assertEqual(pe("a!=b"), "Compare(a != b)")
+        self.assertEqual(pe("a==b"), "Compare(a == b)")
+        self.assertEqual(pe("a in b"), "Compare(a in b)")
+        self.assertEqual(pe("a is b"), "Compare(a is b)")
+        self.assertEqual(pe("a not in b"), "Compare(a not in b)")
+        self.assertEqual(pe("a is not b"), "Compare(a is not b)")
+        sb.simplify_comparisons = True
+        self.assertEqual(pe("1<2<3"), "And(Compare(1 < 2),Compare(2 < 3))")
+        self.assertEqual(pe("a>=b>c<d"), "And(Compare(a >= b),Compare(b > c),Compare(c < d))")
+        sb.simplify_comparisons = False
+        self.assertEqual(pe("1<2<3"), "Compare(1 < 2 < 3)")
+        self.assertEqual(pe("a>=b>c<d"), "Compare(a >= b > c < d)")
 
-    # TODO: and, or, associativity, comparisons
+
+    def testMultiOps(self):
+        self.assertEqual(pe("a and b"), "And(a,b)")
+        self.assertEqual(pe("a or b"), "Or(a,b)")
+        self.assertEqual(pe("a and b and c"), "And(a,b,c)")
+        self.assertEqual(pe("a or b or c"), "Or(a,b,c)")
+        self.assertEqual(pe("a and b and c and d"), "And(a,b,c,d)")
+        self.assertEqual(pe("a or b or c or d"), "Or(a,b,c,d)")
+
+        self.assertEqual(pe("a&b&c"), "Bitand(a,b,c)")
+        self.assertEqual(pe("a|b|c"), "Bitor(a,b,c)")
+        self.assertEqual(pe("a^b^c"), "Bitxor(a,b,c)")
+
+        self.assertEqual(pe("a&b&c&d"), "Bitand(a,b,c,d)")
+        self.assertEqual(pe("a|b|c|d"), "Bitor(a,b,c,d)")
+        self.assertEqual(pe("a^b^c^d"), "Bitxor(a,b,c,d)")
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    def testAssociativity(self):
+        # Mostly this is sanity checking, since associativity and precedence
+        # are primarily grammar-driven, but there are a few places where the
+        # ast_builder library is responsible for correct associativity.
+        self.assertEqual(pe("a+b+c"), "Add(Add(a,b),c)")
+        self.assertEqual(pe("a*b*c"), "Mul(Mul(a,b),c)")
+        self.assertEqual(pe("a/b/c"), "Div(Div(a,b),c)")
+        self.assertEqual(pe("a//b//c"), "FloorDiv(FloorDiv(a,b),c)")
+        self.assertEqual(pe("a%b%c"), "Mod(Mod(a,b),c)")
+        self.assertEqual(pe("a<<b<<c"), "LeftShift(LeftShift(a,b),c)")
+        self.assertEqual(pe("a>>b>>c"), "RightShift(RightShift(a,b),c)")
+        self.assertEqual(pe("a.b.c"),  "Getattr(Getattr(a,'b'),'c')")
+        self.assertEqual(pe("a()()"),
+            "Call(Call(a,Tuple(),{},None,None),Tuple(),{},None,None)"
+        )
+        self.assertEqual(pe("a[b][c]"), "Getitem(Getitem(a,b),c)")
+        # power is right-associative
+        self.assertEqual(pe("a**b**c"), "Power(a,Power(b,c))")
+        # sanity check on arithmetic precedence
+        self.assertEqual(pe("5*x**2 + 4*x + -1"),
+            "Add(Add(Mul(5,Power(x,2)),Mul(4,x)),Minus(1))"
+        )
 
 
 TestClasses = (
