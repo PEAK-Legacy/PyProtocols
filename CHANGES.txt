@@ -1,3 +1,8 @@
+Fixes since PyProtocols 0.9.2
+
+ - Defining an adapter from one protocol to another, when that adapter does not
+   shorten the adaptation path, would produce a spurious 'KeyError'.
+
 Fixes since PyProtocols 0.9.1
 
  - Fixed missing unit tests for 'Variation' class, and the two bugs in

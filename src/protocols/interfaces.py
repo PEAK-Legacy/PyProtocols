@@ -84,10 +84,11 @@ class Protocol:
 
         self.__lock.acquire()
         try:
+            key = mkRef(proto)
             if not updateWithSimplestAdapter(
-                self.__implies, mkRef(proto), adapter, depth
+                self.__implies, key, adapter, depth
             ):
-                return self.__implies[proto][0]
+                return self.__implies[key][0]
         finally:
             self.__lock.release()
 
@@ -105,7 +106,6 @@ class Protocol:
         return adapter
 
     addImpliedProtocol = metamethod(addImpliedProtocol)
-
 
 
 

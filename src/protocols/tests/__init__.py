@@ -1,5 +1,5 @@
 from unittest import TestSuite, TestCase, makeSuite
-from protocols import adapt, advise, Interface, Attribute
+from protocols import adapt, advise, Interface, Attribute, declareAdapter
 
 class APITests(TestCase):
 
@@ -110,10 +110,10 @@ class APITests(TestCase):
         else:
             raise AssertionError("Should've passed TypeError through")
 
-
-
-
-
+    def checkImplicationBug(self):
+        class I1(Interface): pass
+        class I2(I1): pass
+        declareAdapter(lambda o,p: o, provides=[I1],forProtocols=[I2])
 
 
 
