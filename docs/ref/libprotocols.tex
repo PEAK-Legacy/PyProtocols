@@ -1068,8 +1068,8 @@ as an \class{Interface} subclass.
 Declare that the containing class is a protocol that is implied (extended) by
 the listed protocols.  This is just like \code{protocolExtends}, but in the
 ``opposite direction''.  It allows you to declare (in effect) that some other
-interface is actually a subclass of this one.  See the examples in section
-\ref{protocols-defining} for illustration.
+interface is actually a subclass of (extends, implies) this one.  See the
+examples in section \ref{protocols-defining} for illustration.
 
 Using this keyword argument is equivalent to calling
 \code{declareAdapter(NO_ADAPTER_NEEDED, [\var{containing class}],
@@ -1500,7 +1500,7 @@ for Zope interfaces implements this method as a no-op.
 
 \note{\class{IOpenProtocol} is a subclass of \class{IAdaptingProtocol}, which
 means that implementations must therefore meet its requirements as well, such
-as having an \method{__adapt__()} method.
+as having an \method{__adapt__()} method.}
 
 \end{classdesc*}
 
@@ -1568,7 +1568,7 @@ Receive notice that an adaptation was declared from \var{srcProto} to
 implication level \var{depth}.
 
 When used as part of an \class{IOpenProvider} implementation, this method is
-usually used to recursively invoke \function{declareAdapterForObject()} with
+typically used to recursively invoke \function{declareAdapterForObject()} with
 increased depth and appropriately composed adapters from protocols already
 supported by the object.
 \end{methoddesc}
@@ -1660,8 +1660,8 @@ adapt objects when used with \function{adapt()}: i.e., that it have a
 \method{__adapt__} method that accepts the object to be adapted and returns
 either an object providing the protocol or \constant{None}.  This interface is
 not used by the \module{protocols} package except as documentation.  It is a
-subclass of \var{IProtocol}, so any implementation of this interface must
-support the requirements defined by \var{IProtocol} as well.
+subclass of \class{IProtocol}, so any implementation of this interface must
+support the requirements defined by \class{IProtocol} as well.
 \end{classdesc*}
 
 
@@ -1679,15 +1679,86 @@ support the requirements defined by \var{IProtocol} as well.
 
 
 
-\subsubsection{\module{protocols.adapters} --- ``Adapter arithmetic'' support}
+\subsubsection{\module{protocols.adapters} --- ``Adapter arithmetic'' support \label{protocol-adapters-module}}
 
-minimumAdapter
+The \module{protocols.adapters} module provides support for doing ``adapter
+arithmetic'' such as determining which of two adapter paths is shorter,
+composing a new adapter from two existing adapters, and updating an adapter
+registry with a new adapter path.  See section \ref{proto-implication} for a
+more general discussion of adapter arithmetic.
 
-composeAdapters
+\begin{funcdesc}{minimumAdapter}{a1, a2 \optional{, d1=0, d2=0}}
+Find the ``shortest'' adapter path, \var{a1} at depth \var{d1}, or \var{a2} at
+depth \var{d2}.  Assuming \var{a1} and \var{a2} are adapter factories that
+accept similar input and return similar output, this function returns the one
+which is the ``shortest path'' between its input and its output.  That is, the
+one with the smallest implication depth (\var{d1} or \var{d2}), or, if the
+depths are equal, then the adapter factory that is composed of the fewest
+chained factories (as composed by \function{composeAdapters()}) is returned.
+If neither factory is composed of multiple factories, or they are composed of
+the same number of intermediate adapter factories, then the following
+preference order is used:
 
-updateWithSimplestAdapter
+\begin{enumerate}
+\item If one of the adapters is \function{NO_ADAPTER_NEEDED}, it is returned
+\item If one of the adapters is \function{DOES_NOT_SUPPORT}, the \emph{other}
+adapter is returned.
+\item If both adapters are the exact same object (i.e. \code{a1 is a2}), either
+one is returned
+\end{enumerate}
 
-IMPLEMENTATION_ERROR
+If none of the above conditions apply, then the adapter precedence is
+considered ambiguous, and a \exception{TypeError} is raised.
+
+This function is used by \function{updateWithSimplestAdapter} to determine
+whether a new adapter declaration should result in a registry update.  Note
+that the determination of adapter composition length uses the
+\member{__adapterCount__} attribute, if present.  (It is assumed to be
+\constant{1} if not present.  See \function{composeAdapters()} for more
+details.)
+\end{funcdesc}
+
+
+
+\begin{funcdesc}{composeAdapters}{baseAdapter, baseProtocol, extendingAdapter}
+Return a new \class{IAdapterFactory} composed of the input adapter factories
+\var{baseAdapter} and \var{extendingAdapter}.  If either input adapter is
+\function{DOES_NOT_SUPPORT}, \function{DOES_NOT_SUPPORT} is returned.  If
+either input adapter is \function{NO_ADAPTER_NEEDED}, the other input adapter
+is returned.  Otherwise, a new adapter factory is created that will return
+\code{\var{extendingAdapter}(\var{baseAdapter}(object,\var{baseProtocol}),protocol)}
+when called with an \code{object, protocol} pair.  (Note: the actual
+implementation verifies that \var{baseAdapter} didn't return \constant{None}
+before it calls \var{extendingAdapter}).
+
+If this function creates a new adapter factory, the factory will have an
+\member{__adapterCount__} attribute set to the sum of the
+\member{__adapterCount__} attributes of the input adapter factories.  If an
+input factory does not have an \member{__adapterCount__} attribute, it is
+assumed to equal \constant{1}.  This is done so that the
+\function{minimumAdapter()} can compare the length of composed adapter chains.
+\end{funcdesc}
+
+
+\begin{funcdesc}{updateWithSimplestAdapter}{mapping, key, adapter, depth}
+Treat \var{mapping} as an adapter registry, replacing the entry designated by
+\var{key} with an \code{(\var{adapter},\var{depth})} tuple, if and only if
+the new entry would be a ``shorter path'' than the existing entry, if any.
+(I.e., if \code{minimumAdapter(old, \var{adapter}, oldDepth, \var{depth})}
+returns \var{adapter} and \var{adapter} is not the existing registered adapter.
+The function returns a true value if it updates the contents of \var{mapping}.
+
+This function is used to manage type-to-protocol, protocol-to-protocol, and
+object-to-protocol adapter registries, keyed by type or protocol.  The
+\var{mapping} argument must be a mapping providing \method{__setitem__()}
+and \method{get()} methods.  Values stored in the mapping will be
+\code{(\var{adapter},\var{depth})} tuples.
+\end{funcdesc}
+
+
+
+
+
 
 
 \subsubsection{\module{protocols.advice} --- Metaclasses and other ``Magic''}
@@ -1709,6 +1780,17 @@ minimalBases
 
 \subsubsection{\module{protocols.classic} --- Adapters to support built-in types
 and Zope Interfaces}
+
+
+
+
+
+
+
+
+
+
+
 
 
 
