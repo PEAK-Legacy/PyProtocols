@@ -46,7 +46,7 @@ import protocols, operator, inspect
 from types import ClassType, InstanceType
 ClassTypes = (ClassType, type)
 from sys import _getframe
-from weakref import WeakKeyDictionary, proxy
+from weakref import WeakKeyDictionary, ref
 from dispatch.interfaces import *
 from new import instancemethod
 
@@ -330,27 +330,24 @@ _guard = object()
 
 class Pointer(int):
 
-    __slots__ = 'proxy'
+    __slots__ = 'ref'
 
     def __new__(cls,ob):
         self = int.__new__(cls,id(ob))
         try:
-            self.proxy=proxy(ob,self.invalidate)
+            self.ref=ref(ob)
         except TypeError:
-            self.proxy=ob
+            self.ref=lambda ob=ob: ob
         return self
 
-    def invalidate(self,ref):
-        self.proxy = _guard
-
     def __eq__(self,other):
-        return self is other or int(self)==other and self.proxy is not _guard
+        return self is other or int(self)==other and self.ref() is not None
 
     def __repr__(self):
-        if self.proxy is _guard:
+        if self.ref() is None:
             return "Pointer(<invalid at 0x%s>)" % hex(self)
         else:
-            return "Pointer(%r)" % self.proxy
+            return "Pointer(%r)" % self.ref()
 
 
 def dispatch_by_identity(ob,table):
@@ -367,13 +364,15 @@ def dispatch_by_identity(ob,table):
 
 
 
+
+
+
 class IdentityCriterion(AbstractCriterion):
     """Criterion that is true when target object is the same"""
 
     protocols.advise(instancesProvide=[ICriterion],asAdapterForTypes=[Pointer])
 
     __slots__ = 'ptr'
-
     dispatch_function = staticmethod(dispatch_by_identity)
 
     def __init__(self,ptr):
@@ -381,6 +380,9 @@ class IdentityCriterion(AbstractCriterion):
 
     def seeds(self,table):
         return None,self.ptr
+
+    def matches(self,table):
+        return self.ptr,
 
     def implies(self,other):
         return self.ptr in ICriterion(other)
@@ -404,8 +406,6 @@ class NullCriterion(AbstractCriterion):
     def matches(self,table):    return list(table)
 
 NullCriterion = NullCriterion()
-
-
 
 
 class SubclassCriterion(AbstractCriterion):
