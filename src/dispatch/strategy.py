@@ -203,11 +203,11 @@ def make_node_type(dispatch_function):
         _memo[dispatch_function] = Node
     return _memo[dispatch_function]
 
-def validateCriterion(criterion, dispatch_function):
+def validateCriterion(criterion, node_type, seeded=True):
     """Does 'criterion' have a sane implementation?"""
 
     criterion = ICriterion(criterion)
-    assert criterion.dispatch_function is dispatch_function
+    assert criterion.node_type is node_type
 
     assert criterion==criterion, (criterion, "should equal itself")
     assert criterion!=NullCriterion,(criterion,"shouldn't equal NullCriterion")
@@ -225,23 +225,23 @@ def validateCriterion(criterion, dispatch_function):
     assert not criterion.implies(~criterion), (
         criterion,"should not imply its inverse", ~criterion
     )
+
     d = {}
-    for seed in criterion.seeds(d):
-        d[seed] = seed in criterion
-
-    matches = list(criterion.matches(d))
-    for seed in matches:
-        assert d[seed], (criterion,"should have contained",seed)
-        del d[seed]
-
-    for value in d.values():
-        assert not value, (criterion,"should've included",seed,"in matches")
-
-
     criterion.subscribe(d)
     criterion.unsubscribe(d)
 
-
+    if seeded:
+        criterion = ISeededCriterion(criterion)
+        for seed in criterion.seeds(d):
+            d[seed] = seed in criterion
+    
+        matches = list(criterion.matches(d))
+        for seed in matches:
+            assert d[seed], (criterion,"should have contained",seed)
+            del d[seed]
+    
+        for value in d.values():
+            assert not value,(criterion,"should've included",seed,"in matches")
 
 
 class TGraph:
@@ -395,9 +395,10 @@ class AbstractCriterion(object):
 
 
     def __eq__(self,other):
-        other = ICriterion(other,None)
+        other = ISeededCriterion(other,None)
         return other is not None and \
-            self.node_type is other.node_type and _seedMap(self)==_seedMap(other)
+            self.node_type is other.node_type \
+            and _seedMap(self)==_seedMap(other)
 
     def __ne__(self,other):
         return not self.__eq__(other)
@@ -407,9 +408,8 @@ class AbstractCriterion(object):
 
 
 
-
     def implies(self,other):
-        other = ICriterion(other)
+        other = ISeededCriterion(other)
         for seed in self.seeds({}):
             if seed in self and seed not in other:
                 return False
@@ -455,7 +455,7 @@ class ClassCriterion(AbstractCriterion):
     __slots__ = 'subject'
 
     protocols.advise(
-        instancesProvide=[ICriterion], asAdapterForTypes=ClassTypes
+        instancesProvide=[ISeededCriterion], asAdapterForTypes=ClassTypes
     )
 
     dispatch_function = staticmethod(dispatch_by_mro)
@@ -476,14 +476,14 @@ class ClassCriterion(AbstractCriterion):
         return False
 
     def implies(self,other):
-        return self.subject in ICriterion(other) or other is NullCriterion
+        return self.subject in ISeededCriterion(other) \
+            or other is NullCriterion
 
     def __repr__(self):
         return self.subject.__name__
 
     def __eq__(self,other):
         return type(self) is type(other) and self.subject is other.subject
-
 
 
 
@@ -534,8 +534,9 @@ def dispatch_by_identity(table,ob):
 class IdentityCriterion(AbstractCriterion):
     """Criterion that is true when target object is the same"""
 
-    protocols.advise(instancesProvide=[ICriterion],asAdapterForTypes=[Pointer])
-
+    protocols.advise(
+        instancesProvide=[ISeededCriterion],asAdapterForTypes=[Pointer]
+    )
     __slots__ = 'ptr'
     dispatch_function = staticmethod(dispatch_by_identity)
 
@@ -549,7 +550,7 @@ class IdentityCriterion(AbstractCriterion):
         return self.ptr,
 
     def implies(self,other):
-        return self.ptr in ICriterion(other)
+        return self.ptr in ISeededCriterion(other)
 
     def __contains__(self,ob):
         return ob==self.ptr
@@ -571,7 +572,6 @@ class NullCriterion(AbstractCriterion):
 
 NullCriterion = NullCriterion()
 
-
 class SubclassCriterion(AbstractCriterion):
     """Criterion that indicates expr is a subclass of a particular class"""
 
@@ -590,7 +590,7 @@ class SubclassCriterion(AbstractCriterion):
             return True
 
     def implies(self,other):
-        return self.klass in ICriterion(other)
+        return self.klass in ISeededCriterion(other)
 
     def __repr__(self):
         return "SubclassCriterion(%s)" % (self.klass.__name__,)
@@ -679,15 +679,15 @@ try:
 except ImportError:
     pass
 
+class InequalityIndex(SeededIndex):
+    dispatch_function = dispatch_by_inequalities
 
+    def __init__(self):
+        self.clear()
 
-
-
-
-
-
-
-
+class InequalityNode(DispatchNode):
+    make_index = InequalityIndex
+    
 
 
 
@@ -699,7 +699,7 @@ class Inequality(AbstractCriterion):
     """Criterion that indicates target matches specified const. inequalities"""
 
     __slots__ = 'val','ranges','op'
-    dispatch_function = staticmethod(dispatch_by_inequalities)
+    node_type = InequalityNode #dispatch_function = staticmethod(dispatch_by_inequalities)
 
     def __init__(self,op,val):
         self.val = val
@@ -738,7 +738,7 @@ class Inequality(AbstractCriterion):
 
     def implies(self,other):
         for r in self.ranges:
-            if not r in ICriterion(other):
+            if not r in ISeededCriterion(other):
                 return False
         return True
 
@@ -823,11 +823,11 @@ class ProtocolCriterion(StickyAdapter,AbstractCriterion):
     """Criterion that indicates instances of expr's class provide a protocol"""
 
     protocols.advise(
-        instancesProvide=[ICriterion],
+        instancesProvide=[ISeededCriterion],
         asAdapterForTypes=[Protocol]
     )
 
-    attachForProtocols = (ICriterion,)
+    attachForProtocols = (ICriterion,ISeededCriterion)
     dispatch_function  = staticmethod(dispatch_by_mro)
 
     def __init__(self,ob):
@@ -861,7 +861,7 @@ class ProtocolCriterion(StickyAdapter,AbstractCriterion):
 
     def implies(self,other):
 
-        other = ICriterion(other)
+        other = ISeededCriterion(other)
 
         if other is NullCriterion:
             return True

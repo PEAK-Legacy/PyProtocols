@@ -84,7 +84,7 @@ class CriteriaTests(TestCase):
 
     def testClassCriteriaMembership(self):
 
-        hp = ICriterion(HumanPowered)
+        hp = ISeededCriterion(HumanPowered)
 
         self.failUnless(PaddleBoat in hp)
         self.failUnless(Bicycle in hp)
@@ -94,8 +94,8 @@ class CriteriaTests(TestCase):
         self.failIf(Hummer in hp)
         self.failIf(object in hp)
 
-        it = ICriterion(InstanceType)
-        ob = ICriterion(object)
+        it = ISeededCriterion(InstanceType)
+        ob = ISeededCriterion(object)
 
         for klass in (GasPowered,HumanPowered):
             self.failUnless(klass in it)
@@ -138,28 +138,28 @@ class CriteriaTests(TestCase):
 
     def testClassCriteriaSeedsAndDispatchFunctions(self):
         for klass in (Vehicle,LandVehicle,WaterVehicle,HumanPowered,GasPowered):
-            seeds = list(ICriterion(klass).seeds({}))
+            seeds = list(ISeededCriterion(klass).seeds({}))
             self.failUnless(klass in seeds)
             self.failUnless(object in seeds)
             self.failIf(len(seeds)<>2)
-            validateCriterion(klass,strategy.dispatch_by_mro)
+            validateCriterion(klass,
+                strategy.make_node_type(strategy.dispatch_by_mro))
 
     def testCriterionAdaptation(self):
-        self.failUnless(Hummer in ICriterion(Wheeled))
+        self.failUnless(Hummer in ISeededCriterion(Wheeled))
         self.failIf(ICriterion(Hummer).implies(Speedboat))
         self.failUnless(ICriterion(Speedboat).implies(WaterVehicle))
-        self.failUnless(object in list(ICriterion(InstanceType).seeds({})))
+        self.failUnless(object in list(ISeededCriterion(InstanceType).seeds({})))
 
     def testProtocolCriterion(self):
-        self.failUnless(Bicycle in ICriterion(Wheeled))
-        seeds = list(ICriterion(Wheeled).seeds({}))
+        self.failUnless(Bicycle in ISeededCriterion(Wheeled))
+        seeds = list(ISeededCriterion(Wheeled).seeds({}))
         self.failUnless(Hummer in seeds)
         self.failUnless(Bicycle in seeds)
         self.failUnless(object in seeds)
         self.failUnless(len(seeds)==4)
         class BrokenBike(Bicycle): advise(instancesDoNotProvide=[Wheeled])
-        self.failIf(BrokenBike in ICriterion(Wheeled))
-
+        self.failIf(BrokenBike in ISeededCriterion(Wheeled))
 
 
     def testSignatures(self):
@@ -246,8 +246,8 @@ class CriteriaTests(TestCase):
 
     def testTruth(self):
         for t in True,False:
-            validateCriterion(TruthCriterion(t),strategy.dispatch_by_truth)
-
+            validateCriterion(TruthCriterion(t),
+                strategy.make_node_type(strategy.dispatch_by_truth))
 
     def testPointers(self):
         anOb = object()
@@ -269,8 +269,9 @@ class CriteriaTests(TestCase):
     def testIdentityCriterion(self):
         ob = object()
         i = Pointer(ob)
-        validateCriterion(i,strategy.dispatch_by_identity)
-        i = ICriterion(i)
+        validateCriterion(i,
+            strategy.make_node_type(strategy.dispatch_by_identity))
+        i = ISeededCriterion(i)
         self.assertEqual(list(i.seeds({})),[None,id(ob)])
 
     def testSeededIndex(self):
@@ -284,10 +285,10 @@ class CriteriaTests(TestCase):
 
 
 
-
     def testSubclassCriterion(self):
         s = SubclassCriterion(Vehicle)
-        validateCriterion(s,strategy.dispatch_by_subclass)
+        validateCriterion(s,
+            strategy.make_node_type(strategy.dispatch_by_subclass))
 
         # seeds()
         self.assertEqual( s.seeds({}), [Vehicle,None])
@@ -350,7 +351,7 @@ class CriteriaTests(TestCase):
         self.failUnless(("a","a") in t4); self.failIf(("b","b") in t4)
 
         for t in t1,t2,t3,t4:
-            validateCriterion(t,strategy.dispatch_by_inequalities)
+            validateCriterion(t,strategy.InequalityNode)
 
 
 
@@ -1151,7 +1152,7 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
         g = GenericFunction(lambda x,y:None)
         self.assertEqual(g.constraints.items(),[])
 
-        df = strategy.make_node_type(Inequality.dispatch_function)
+        df = strategy.InequalityNode
         yx = Call(operator.div, Argument(name='y'), Argument(name='x'))
         yxid = g.getExpressionId(yx), df
         xid = g.getExpressionId(Argument(name='x')), df

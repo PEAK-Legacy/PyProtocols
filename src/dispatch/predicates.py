@@ -415,7 +415,7 @@ class MultiCriterion(AbstractCriterion):
     __slots__ = 'node_type','criteria'
 
     def __new__(klass,*criteria):
-        criteria, all = map(ICriterion,criteria), []
+        criteria, all = map(ISeededCriterion,criteria), []
         nt = criteria[0].node_type
         for c in criteria:
             if c.node_type is not nt:
@@ -475,7 +475,7 @@ class NotCriterion(MultiCriterion):
     __slots__ = ()
 
     def __init__(self, criterion):
-        criterion = ICriterion(criterion)
+        criterion = ISeededCriterion(criterion)
         self.criteria = criterion,
         self.node_type = criterion.node_type
 
@@ -507,7 +507,7 @@ class TruthCriterion(AbstractCriterion):
         return key==self.truth
 
     def implies(self,other):
-        return self.truth in ICriterion(other)
+        return self.truth in ISeededCriterion(other)
 
     def __eq__(self,other):
         return isinstance(other,TruthCriterion) and self.truth==other.truth
