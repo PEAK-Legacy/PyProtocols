@@ -324,11 +324,78 @@ its most common applications.
 
 \subsection{Defining Interfaces and Protocols \label{protocols-defining}}
 
+\subsubsection{Defining and Subclassing Interfaces \label{interfaces-defining}}
+
+The easiest way to define an interface with the protocols package is to subclass
+\class{protocols.Interface}.  \class{Interface} does not supply any data or
+methods of its own, so you are free to define whatever you need.  There are two
+common styles of defining interfaces, illustrated below:
+
+\begin{verbatim%
+}from protocols import Interface
+
+# "Pure" interface style
+
+class ISimpleMapping(Interface):
+    """A getitem-only mapping"""
+
+    def __getitem__(key):
+        """Return value for key"""
+
+
+# Abstract Base Class (ABC) style
+
+class AbstractMapping(Interface):
+    """A getitem-only mapping"""
+
+    def __getitem__(self,key):
+        """Return value for key"""
+        raise NotImplementedError
+\end{verbatim}
+
+The ``pure" style emphasizes the interface to the caller, and is not intended to
+be subclassed for implementation.  Notice that the \code{self} parameter is not
+included in its method definitions, and its method bodies are empty.  The ``ABC"
+style, however, emphasizes implementation, as it is intended to be subclassed
+for that purpose.  Therefore, it includes method bodies, even for abstract
+methods.  Each style has different uses: ``ABC" is a popular rapid development
+style, while the ``pure" approach has some distinct documentation advantages.
+
+\class{protocols.Interface} may be used as a base class for either style.  You
+should be aware, however, that Interface objects use an explicit metaclass,
+\class{protocols.InterfaceClass}.  This means that if you want to subclass an
+interface for implementation using another metaclass, you may need to create a
+third metaclass that combines \class{InterfaceClass} with your desired
+metaclass.
+
+Subclassing a subclass of \class{Interface} creates another \class{Interface},
+that implies the first interface.  This means that any object that is considered
+to provide the second interface, is considered to implicitly provide the base
+interface.  For example:
+
+\begin{verbatim%
+}class ISimpleWriteMapping(ISimpleMapping):
+    """Mapping with getitem and setitem only"""
+
+    def __setitem__(key,value):
+        """Store value for key, return None"""
+
+\end{verbatim}
+
+The \code{ISimpleWriteMapping} interface implies the \code{ISimpleMapping}
+interface.  Therefore, any object that provides \code{ISimpleWriteMapping} is
+understood to also provide the \code{ISimpleMapping} interface.  The reverse,
+however, is not true.
+
+Inheritance is only one way to declare that one interface implies another.  In
+later sections, we will discuss various other ways to do this, such as
+declaring an adapter that adapts objects from one protocol to another.
+
+\subsubsection{Using Protocol Objects}
+
 Protocol
 
 InterfaceClass
-
-Interface
 
 IAdaptingProtocol
 
