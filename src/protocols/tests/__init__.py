@@ -156,8 +156,49 @@ class APITests(TestCase):
         assert a2.subject is n
         assert a2.protocol is I
         assert adapt(n, I) is a2
-        
 
+
+
+
+
+
+from protocols.generate import protocolForType, protocolForURI
+from protocols import declareImplementation
+from UserDict import UserDict
+
+IGetSetMapping  = protocolForType(dict,['__getitem__','__setitem__'])
+IGetMapping     = protocolForType(dict,['__getitem__'])
+
+ISimpleReadFile = protocolForType(file,['read'])
+IImplicitRead   = protocolForType(file,['read'], implicit=True)
+
+IProtocol1 = protocolForURI("http://peak.telecommunity.com/PyProtocols")
+
+declareImplementation(UserDict,[IGetSetMapping])
+
+class GenerationTests(TestCase):
+
+    def checkTypeSubset(self):
+        d = {}
+        assert adapt(d,IGetSetMapping,None) is d
+        assert adapt(d,IGetMapping,None) is d
+
+    def checkImplications(self):
+        d = UserDict()
+        assert adapt(d,IGetMapping,None) is d
+        assert adapt(d,IImplicitRead,None) is None
+
+    def checkWeak(self):
+        from cStringIO import StringIO
+        s = StringIO("foo")
+        assert adapt(s,ISimpleReadFile,None) is None
+        assert adapt(s,IImplicitRead,None) is s
+
+    def checkURI(self):
+        p = protocolForURI("http://www.python.org/")
+        assert p is not IProtocol1
+        p = protocolForURI("http://peak.telecommunity.com/PyProtocols")
+        assert p is IProtocol1
 
 
 
@@ -171,6 +212,7 @@ def test_suite():
         test_classes.test_suite(),
         test_direct.test_suite(),
         makeSuite(APITests,'check'),
+        makeSuite(GenerationTests,'check'),
     ]
 
     try:
@@ -192,7 +234,6 @@ def test_suite():
     return TestSuite(
         tests
     )
-
 
 
 

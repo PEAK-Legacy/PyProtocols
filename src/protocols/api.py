@@ -198,10 +198,15 @@ def advise(**kw):
     protocolExtends = kw.setdefault('protocolExtends',())
     protocolIsSubsetOf = kw.setdefault('protocolIsSubsetOf',())
     factoryMethod = kw.setdefault('factoryMethod',None)
+    equivalentProtocols = kw.setdefault('equivalentProtocols',())
+
+
+
 
     map(kw.__delitem__,"classProvides classDoesNotProvide instancesProvide"
         " instancesDoNotProvide asAdapterForTypes asAdapterForProtocols"
-        " protocolExtends protocolIsSubsetOf factoryMethod".split())
+        " protocolExtends protocolIsSubsetOf factoryMethod equivalentProtocols"
+        .split())
 
     for k in kw:
         raise TypeError(
@@ -249,22 +254,17 @@ def advise(**kw):
                 forProtocols=protocolIsSubsetOf
             )
 
+        if equivalentProtocols:
+            declareAdapter(
+                NO_ADAPTER_NEEDED, equivalentProtocols, forProtocols=[klass]
+            )
+            declareAdapter(
+                NO_ADAPTER_NEEDED, [klass], forProtocols=equivalentProtocols
+            )
+
         return klass
 
     addClassAdvisor(callback)
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

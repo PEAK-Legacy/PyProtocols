@@ -1346,10 +1346,10 @@ an object that provides \class{IAdapterFactory}; i.e., its constructor should
 accept being called with two arguments: the object to be adapted, and the
 target protocol.)
 
-
-
-
-
+\item[factoryMethod = \var{methodName}] \hfill \\
+When using \code{asAdapterForTypes} or \code{asAdapterForProtocols}, you can
+also supply a factory method name, using this keyword.  The method named must be
+a \emph{class} method, and it will be used in place the class' normal constructor.
 
 \item[protocolExtends = \var{protocols}] \hfill \\
 Declare that the containing class is a protocol that extends (i.e., implies)
@@ -1403,6 +1403,15 @@ Using this keyword argument is equivalent to calling
 \code{declareAdapter(NO_ADAPTER_NEEDED, [\var{containing class}],
 forProtocols=\var{protocols})}.
 
+\item[equivalentProtocols = \var{protocols}] \hfill \\
+Declare that the containing class is a protocol that is equivalent to the
+listed protocols.  That is, the containing protocol both implies, and is implied
+by, the listed protocols.  This is a convenience feature intended mainly to
+support the use of generated protocols.
+
+Using this keyword is equivalent to using both the \code{protocolExtends} and
+\code{protocolIsSubsetOf} keywords, with the supplied protocols.
+
 \item[classProvides = \var{protocols}] \hfill \\
 Declare that the containing class \emph{itself} provides the specified
 protocols.  Supplying this argument is equivalent to calling
@@ -1422,11 +1431,43 @@ calling \code{adviseObject(\var{containing class},
 doesNotProvide=\var{protocols})}, and the \class{IOpenProvider} requirements
 mentioned above for \code{classProvides} apply here as well.
 
+
+
 \item[moduleProvides = \var{protocols}] (module context only) \hfill \\
 A sequence of protocols that the enclosing module provides.  Equivalent to
 \code{adviseObject(\var{containing module}, \var{protocols})}.
 
 \end{description}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

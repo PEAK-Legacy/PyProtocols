@@ -1,0 +1,43 @@
+Fixes and Enhancements since PyProtocols 0.9
+
+ - Added the 'factoryMethod' and 'equivalentProtocols' keywords to 'advise()'.
+
+ - (NEEDS DOC) Added 'protocolForType()' and 'protocolForURI()', that allow you
+   to link interfaces by intended semantics, not just by having identical
+   instances.  For example, you can use 'protocolForType(file,["read"])' to
+   symbolize a file-like object with a 'read()' method, or
+   'protocolForURI("some UUID")' to symbolize some documented interface.
+
+   In addition to compact declarations, this also allows a module to refer to
+   an interface without importing a specific definition of it.  Then, when that
+   module is used in a larger program, the linkage between the symbolic and
+   actual forms of the interface can be accomplished semi-automatically.
+
+ - (NEEDS DOC) Enhanced Zope 3 support: Now, adapters can be registered between
+   Zope interfaces, and any types or instances.  Note, however, that
+   interface-to-interface adaptation may not work if a class only declares what
+   it implements using the Zope interface API.  This limitation might be able
+   to be removed later.  Zope interfaces can now pass a much larger segment of
+   the test suite than before.
+
+ - (NEEDS DOC) Added 'protocols.Variation(baseProtocol,context=None)'; this
+   implements the 'LocalProtocol' example in the documentation.
+
+ - (NEEDS DOC) Added 'Adapter' and 'StickyAdapter' convenience base classes.
+   'Adapter' offers a ready-made '__init__()' method suitable for most adapter
+   classes, while 'StickyAdapter' instances automatically declare themselves as
+   an instance-specific adapter for any object they're used on.  Thus, a
+   'StickyAdapter' can maintain its state across 'adapt()' calls for the same
+   object, so long as the object can have instance-specific adapters declared.
+   (See "Protocol Declarations for Individual Objects" in the reference manual
+   for more information on this.)
+
+ - Added experimental support for 'ExtensionClass'; previously, PyProtocols
+   could raise bizarre errors and/or behave strangely when 'adapt()' was called
+   on 'ExtensionClass' instances.
+
+ - Fixed a memory leak in the C "speedups" module that leaked unbound
+   '__conform__' and '__adapt__' methods, as well as '__class__' and '__mro__'
+   references.  Also, fixed the C code potentially reraising invalid error
+   tracebacks under certain circumstances.
+
