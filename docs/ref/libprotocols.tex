@@ -454,7 +454,7 @@ accepting adapter declarations, and managing its implication relationships
 with other protocols.  Open protocols can be used with this package's
 protocol declaration API, as long as they implement (or can be adapted to)
 the \class{IOpenProtocol} interface, as will be described in section
-\ref{open-protocols}.
+\ref{protocols-declaration-interfaces}.
 
 Notice that the concepts of protocol objects, adapting protocols, and open
 protocols are themselves ``protocols''.  The \module{protocols} package supplies
@@ -982,7 +982,7 @@ objects supplied as parameters to the declaration API.
 
 
 
-\subsection{Interfaces Used by the Declaration API}
+\subsection{Interfaces Used by the Declaration API\label{protocols-declaration-interfaces}}
 
 Like any other API, the \module{protocols} declaration API has certain
 expectations regarding its parameters.  These expectations are documented and
@@ -1055,8 +1055,8 @@ are classes supplied by \module{protocols}, or built-in types that are
 automatically adapted to the interface.
 
 We will not, however, go into details here about the methods and behavior
-required by each interface, as those details can be found in section
-\ref{protocols-interfaces-module}.
+required by each interface.  (Those details can be found in section
+\ref{protocols-interfaces-module}.)
 
 
 
@@ -1820,28 +1820,28 @@ items listed in the respective keyword arguments.
 \end{funcdesc}
 
 
-XXX Attribute
+\begin{classdesc}{Attribute}{doc\optional{,name=\constant{None}, value=\constant{None}}}
+This class is used to document attributes required by an interface.  An example
+usage:
 
+\begin{verbatim%
+}from protocols import Interface, Attribute
 
+class IFoo(Interface):
 
+    Bar = Attribute("""All IFoos must have a Bar attribute""")
+\end{verbatim}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+If you are using the ``Abstract Base Class'' or ABC style of interface
+documentation, you may wish to also use the \var{name} and \var{value}
+attributes.  If supplied, the \class{Attribute} object will act as a data
+descriptor, supplying \var{value} as a default value, and storing any newly set
+value in the objects' instance dictionary.  This is useful if you will be
+subclassing the abstract base and creating instances of it, but still want to
+have documentation appear in the interface.  When the interface is displayed
+with tools like \program{pydoc} or \function{help()}, the attribute
+documentation will be shown.
+\end{classdesc}
 
 \subsubsection{Classes and Functions typically used for Customization/Extension}
 
@@ -1966,7 +1966,7 @@ calling its \function{addImpliedProtocol} method.
 
 
 
-\subsubsection{\module{protocols.interfaces} --- Package Interfaces\label{protocol-interfaces-module}}
+\subsubsection{\module{protocols.interfaces} --- Package Interfaces\label{protocols-interfaces-module}}
 \declaremodule{protocols-interfaces}{protocols.interfaces}
 
 \note{All of the interfaces listed here can also be imported directly from the
@@ -2301,36 +2301,118 @@ This module provides a variety of utility functions and classes used by the
 \module{protocols} package.  None of them are really specific to the package,
 and so may be useful to other libraries or applications.
 
-XXX
+\begin{funcdesc}{addClassAdvisor}{callback \optional{, depth=\constant{2}}}
+Set up \var{callback} to be called with the containing class, once it is
+created.  This function is designed to be called by an ``advising'' function
+(such as \function{protocols.advise()}) executed in the body of a class suite.
+The ``advising'' function supplies a callback that it wishes to have executed
+when the containing class is created.  The callback will be given one argument:
+the newly created containing class.  The return value of the callback will be
+used in \emph{place} of the class, so the callback should return the input if
+it does not wish to replace the class.
 
-addClassAdvisor
+The optional \var{depth} argument determines the number of frames between this
+function and the targeted class suite.  \var{depth} defaults to 2, since this
+skips this function's frame and one calling function frame.  If you use this
+function from a function called directly in the class suite, the default will
+be correct, otherwise you will need to determine the correct depth yourself.
 
-isClassAdvisor
+This function works by installing a special class factory function in
+place of the \member{__metaclass__} of the containing class.  Therefore, only
+callbacks \emph{after} the last \member{__metaclass__} assignment in the
+containing class will be executed.  Be sure that classes using ``advising''
+functions declare any \member{__metaclass__} \emph{first}, to ensure all
+callbacks are run.
+\end{funcdesc}
 
-getFrameInfo
-
-getMRO
-
-classicMRO
-
-determineMetaclass
-
-minimalBases
-
-mkRef
-
-StrongRef
-
-
-
-
-
-
-
+\begin{funcdesc}{isClassAdvisor}{ob}
+Returns truth if \var{ob} is a class advisor function.  This is used to
+determine if a \member{__metaclass__} value is a ``magic'' metaclass installed
+by \function{addClassAdvisor()}.  If so, then \var{ob} will have a
+\member{previousMetaclass} attribute pointing to the previous metaclass,
+if any, and a \member{callback} attribute containing the callback that was
+given to \function{addClassAdvisor()}.
+\end{funcdesc}
 
 
+\begin{funcdesc}{getFrameInfo}{frame}
+Return a \code{(\var{kind},\var{module},\var{locals},\var{globals})} tuple for
+the supplied frame object.  The returned \var{kind} is a string: either
+``exec'', ``module'', ``class'', ``function call'', or ``unknown''.
+\var{module} is the module object the frame is/was executed in, or
+\constant{None} if the frame's globals could not be correlated with a module in
+\code{sys.modules}.  \var{locals} and \var{globals} are the frame's local
+and global dictionaries, respectively.  Note that they can be the same
+dictionary, and that modifications to locals may not have any effect on the
+execution of the frame.
+
+This function is used by functions like \function{addClassAdvisor()} and
+\function{advise()} to verify where they're being called from, and to work
+their respective magics.
+\end{funcdesc}
 
 
+\begin{funcdesc}{getMRO}{ob \optional{, extendedClassic=\constant{False}}}
+Return an iterable over the ``method resolution order'' of \var{ob}.  If
+\var{ob} is a ``new-style'' class or type, this returns its \member{__mro__}
+attribute.  If \var{ob} is a ``classic'' class, this returns
+\code{classicMRO(\var{ob},\var{extendedClassic})}.  If \var{ob} is not a class
+or type of any kind, a one-element sequence containing just \var{ob} is
+returned.
+\end{funcdesc}
+
+
+\begin{funcdesc}{classicMRO}{ob \optional{, extendedClassic=\constant{False}}}
+Return an iterator over the ``method resolution order'' of classic class
+\var{ob}, following the ``classic'' method resolution algorithm of recursively
+traversing \member{__bases__} from left to right.  (Note that this may return
+the same class more than once, for some inheritance graphs.)  If
+var{extendedClassic} is a true value, \class{InstanceType} and \class{object}
+are added at the end of the iteration.  This is used by \class{Protocol}
+objects to allow generic adapters for \class{InstanceType} and \class{object}
+to be used with ``classic'' class instances.
+\end{funcdesc}
+
+
+
+
+\begin{funcdesc}{determineMetaclass}{bases \optional{, explicit_mc=\constant{None}}}
+Determine the metaclass that would be used by Python, given a non-empty
+sequence of base classes, and an optional explicitly supplied
+\member{__metaclass__}.  Returns \class{ClassType} if all bases are ``classic''
+and there is no \var{explicit_mc}.  Raises \exception{TypeError} if the bases'
+metaclasses are incompatible, just like Python would.
+\end{funcdesc}
+
+
+\begin{funcdesc}{minimalBases}{classes}
+Return the shortest ordered subset of the input sequence \var{classes} that
+still contains the ``most specific'' classes.  That is, the result sequence
+contains only classes that are not subclasses of each other.  This function is
+used by \function{determineMetaclass()} to narrow down its list of candidate
+metaclasses, but is also useful for dynamically generating metaclasses.
+\end{funcdesc}
+
+
+
+\begin{funcdesc}{mkRef}{ob \optional{, callable}}
+If \var{ob} is weak-referenceable, returns
+\code{weakref.ref(\var{ob},\var{callable})}.  Otherwise, returns a
+\code{StrongRef(\var{ob})}, emulating the interface of \code{weakref.ref()}.
+This is used by code that wants to use weak references, but may be given
+objects that are not weak-referenceable.  Note that \var{callable}, if
+supplied, will \emph{not} be called if \var{ob} is not weak-referenceable.
+\end{funcdesc}
+
+\begin{classdesc}{StrongRef}{ob}
+An object that emulates the interface of \class{weakref.ref()}.  When called,
+an instance of \class{StrongRef} will return the \var{ob} it was created for.
+Also, it will hash the same as \var{ob} and compare equal to it.  Thus, it
+can be used as a dictionary key, as long as the underlying object can.  Of
+course, since it is not really a weak reference, it does not contribute to the
+garbage collection of the underlying object, and may in fact hinder it, since
+it holds a live reference to the object.
+\end{classdesc}
 
 
 
