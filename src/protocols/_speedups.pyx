@@ -57,20 +57,20 @@ cdef extern from "Python.h":
     void Py_DECREF(PyObject *p)
     object __Pyx_GetExcValue()
 
-cdef object _marker, __conform, __adapt, __mro
+cdef object _marker, __conform, __adapt, __mro, __ECType
 from sys import exc_info
+
+try:
+    from ExtensionClass import ExtensionClass
+    __ECType = ExtensionClass
+except ImportError:
+    __ECType = type
 
 _marker    = object()
 __conform  = PyString_InternFromString("__conform__")
 __adapt    = PyString_InternFromString("__adapt__")
 __class    = PyString_InternFromString("__class__")
 __mro      = PyString_InternFromString("__mro__")
-
-
-
-
-
-
 
 
 
@@ -230,6 +230,36 @@ def classicMRO(ob, extendedClassic=False):
     raise TypeError("Not a classic class", ob)
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+cdef buildECMRO(object cls, PyListObject *list):
+    PyList_Append(list, cls)
+    for i in cls.__bases__:
+        buildECMRO(i, list)
+
+
+def extClassMRO(ob, extendedClassic=False):
+    mro = []
+    buildECMRO(ob, <PyListObject *>mro)
+    if extendedClassic:
+        PyList_Append(<PyListObject *>mro, <object> &PyInstance_Type)
+        PyList_Append(<PyListObject *>mro, <object> &PyBaseObject_Type)
+    return mro
+
+
+
 def getMRO(ob, extendedClassic=False):
 
     if PyClass_Check(ob):
@@ -238,50 +268,104 @@ def getMRO(ob, extendedClassic=False):
     elif PyType_Check(ob):
         return ob.__mro__
 
+    elif PyObject_TypeCheck(ob,__ECType):
+        return extClassMRO(ob, extendedClassic)
+
     return ob,
 
 
 
 
 
+
+
+
+
+
+
+
+
 def Protocol__adapt__(self, obj):
+
     cdef void *tmp
     cdef int i
 
     if PyInstance_Check(obj):
         cls = <object> ((<PyInstanceObject *>obj).in_class)
     else:
+        # We use __class__ instead of type to support proxies
         tmp = PyObject_GetAttr(obj, __class)
+
         if tmp:
             cls = <object> tmp
             Py_DECREF(<PyObject *>tmp)
+
         elif PyErr_ExceptionMatches(PyExc_AttributeError):
+            # Some object have no __class__; use their type
             PyErr_Clear()
             cls = <object> (<PyObject *>obj).ob_type
+
         else:
+            # Some other error, pass it on up the line
             err = __Pyx_GetExcValue()
             raise
 
     tmp = <void *>0
+
     if PyType_Check(cls):
+        # It's a type, we can use its mro directly
         tmp = <void *> ((<PyTypeObject *>cls).tp_mro)
+
+
+
+
+
+
+
+
+
+
 
     if tmp:
         mro = <object> tmp
+
     elif PyClass_Check(cls):
+        # It's a classic class, build up its MRO
         mro = []
         buildClassicMRO(<PyClassObject *>cls, <PyListObject *>mro)
         PyList_Append(<PyListObject *>mro, <object> &PyInstance_Type)
         PyList_Append(<PyListObject *>mro, <object> &PyBaseObject_Type)
+
     else:
-        # Fallback to getting __mro__ (for e.g. security proxies)
+        # Fallback to getting __mro__ (for e.g. security proxies/ExtensionClass)
         tmp = PyObject_GetAttr(cls, __mro)
         if tmp:
             mro = <object> tmp
             Py_DECREF(<PyObject *>tmp)
+
+        # No __mro__?  Is it an ExtensionClass?
+        elif PyObject_TypeCheck(cls,__ECType):
+            # Yep, toss out the error and compute a reasonable MRO
+            PyErr_Clear()
+            mro = extClassMRO(ob, 1)
+
+        # Okay, we give up...  reraise the error so somebody smarter than us
+        # can figure it out.  :(
         else:
             err = __Pyx_GetExcValue()
             raise
+
+
+
+
+
+
+
+
+
+
+
+
 
     get = self._Protocol__adapters.get
 
@@ -308,8 +392,6 @@ def Protocol__adapt__(self, obj):
             factory=get(cls)
             if factory is not None:
                 return factory[0](obj,self)
-
-
 
 
 

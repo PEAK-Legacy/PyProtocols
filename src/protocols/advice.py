@@ -9,9 +9,35 @@ __all__ = [
     'classicMRO', 'mkRef', 'StrongRef'
 ]
 
+
 def metamethod(func):
     """Wrapper for metaclass method that might be confused w/instance method"""
     return property(lambda ob: func.__get__(ob,ob.__class__))
+
+
+try:
+    from ExtensionClass import ExtensionClass
+except ImportError:
+    ClassicTypes = ClassType
+else:
+    ClassicTypes = ClassType, ExtensionClass
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def classicMRO(ob, extendedClassic=False):
     stack = []
@@ -27,17 +53,32 @@ def classicMRO(ob, extendedClassic=False):
         yield InstanceType
         yield object
 
+
 def getMRO(ob, extendedClassic=False):
-    if isinstance(ob,ClassType):
+
+    if isinstance(ob,ClassicTypes):
         return classicMRO(ob,extendedClassic)
+
     elif isinstance(ob,type):
         return ob.__mro__
+
     return ob,
 
 try:
     from _speedups import metamethod, getMRO, classicMRO
 except ImportError:
     pass
+
+
+
+
+
+
+
+
+
+
+
 
 # property-safe 'super()' for Python 2.2; 2.3 can use super() instead
 
