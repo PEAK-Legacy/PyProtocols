@@ -246,9 +246,6 @@ class IExtensibleFunction(Interface):
 
 class IGenericFunction(IExtensibleFunction):
 
-    def __setitem__(signature,method):
-        """Call 'method' when input matches 'ISignature(signature)'"""
-
     def argByName(name):
         """Return 'asFuncAndIds()' for argument 'name'"""
 
@@ -278,6 +275,9 @@ class IGenericFunction(IExtensibleFunction):
         """Empty all signatures, methods, tests, expressions, etc."""
 
     # copy() ?
+
+
+
 
 
 

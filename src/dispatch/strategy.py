@@ -121,8 +121,6 @@ class TGraph:
 
 
 
-
-
 def dispatch_by_mro(ob,table):
 
     """Lookup '__class__' of 'ob' in 'table' using its MRO order"""

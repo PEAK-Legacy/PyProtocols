@@ -915,7 +915,7 @@ class SimpleGenerics(TestCase):
         def m(v):
             return "water"
 
-        self.failUnless(isinstance(m,GenericFunction))
+        self.failUnless(isinstance(m,types.FunctionType))
         self.assertEqual(m(LandVehicle()),"land")
         self.assertEqual(m(WaterVehicle()),"water")
 
@@ -970,16 +970,16 @@ class SimpleGenerics(TestCase):
             [s.when(WaterVehicle)]
             def s(x,v):
                 return "water"
-        
+
+        class Y:
+            s = X.s.clone()
+            [s.when(WaterVehicle)]
+            def s(x,v):
+                return "splash!"
+            
         self.assertEqual(X().s(v=LandVehicle()),"land")
         self.assertEqual(X().s(WaterVehicle()),"water")
-
-
-
-
-
-
-
+        self.assertEqual(Y().s(WaterVehicle()),"splash!")
 
 
 class GenericTests(TestCase):
@@ -1142,6 +1142,47 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
         self.assertEqual( w(C(),C(),C()),     "m3")
         self.assertEqual( w(C(),A(),A()),     "m4")
         self.assertEqual( g(T(),None,None,None,None), "m5")
+
+
+
+
+    def testInstanceMethods(self):
+        class X:
+            [dispatch.generic()]
+            def s(self,v):
+                """X"""
+
+            [s.when("v in LandVehicle")]
+            def bar(self,v):
+                return "land"
+
+            [s.when("v in WaterVehicle")]
+            def s(self,v):
+                return "water"
+
+        class Y(X):
+            s = X.s
+
+            [s.when("v in WaterVehicle")]
+            def s(self,v):
+                return "splash!"
+
+        self.assertEqual(Y().s(WaterVehicle()),"splash!")
+        self.assertEqual(X().s(v=LandVehicle()),"land")
+        self.assertEqual(X().s(WaterVehicle()),"water")
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

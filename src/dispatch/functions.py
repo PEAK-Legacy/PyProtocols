@@ -4,7 +4,7 @@ from __future__ import generators
 from dispatch.interfaces import *
 
 import protocols, inspect, sys
-from protocols.advice import add_assignment_advisor
+from protocols.advice import add_assignment_advisor,getFrameInfo,addClassAdvisor
 from protocols.interfaces import allocate_lock
 from new import instancemethod
 from types import FunctionType, ClassType, InstanceType
@@ -122,14 +122,44 @@ def setup(__gfProtocol, __gfDefaults):
 
 
     def addMethod(cond,func):
+        """Use 'func' when dispatch argument matches 'cond'"""
         declarePredicate(cond, protocol, lambda ob: (ob,func))
+
+    def clone():
+        """Return a simple generic function that "inherits" from this one"""
+        f = _mkGeneric(oldfunc,argname)
+        protocols.declareAdapter(
+            protocols.NO_ADAPTER_NEEDED,[f.protocol],forProtocols=[protocol]
+        )
+        return f
 
     func.addMethod = addMethod
     func.when      = when
+    func.clone     = clone
     func.protocol  = protocol
     func.__doc__   = oldfunc.__doc__
     protocols.adviseObject(func,provides=[IExtensibleFunction])
     return func
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # Bootstrap SimpleGeneric declaration helper function -- itself a SimpleGeneric
@@ -158,6 +188,17 @@ declareForProto(protocols.IOpenProtocol,proto,
 
 declareForProto(protocols.IBasicSequence,proto,
     lambda ob:(ob,declareForSequence))
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -210,8 +251,15 @@ class GenericFunction:
     delegate = None
 
     def __init__(self,func,method_combiner=None):
-        self.__call__, self.args = _mkNormalizer(func, self)
-        self.__doc__ = func.__doc__; self.__name__ = func.__name__
+        self.delegate, self.args = _mkNormalizer(func, self)
+        self.delegate.__dict__ = dict(
+            [(k,getattr(self,k))
+                for k in dir(self.__class__) if not k.startswith('_')]
+        )
+        self.delegate.__doc__ = self.__doc__ = func.__doc__
+        protocols.adviseObject(self.delegate,[IGenericFunction])
+        self.__name__ = func.__name__; self.__call__ = self.delegate
+
         if method_combiner is None:
             from strategy import single_best_method as method_combiner
         self.method_combiner = method_combiner
@@ -236,13 +284,6 @@ class GenericFunction:
         self._setupArgs()
 
 
-    def addMethod(self,predicate,function):
-        for signature in IDispatchPredicate(predicate):
-            self[signature] = function
-
-    def testChanged(self):
-        self.dirty = True
-        self._dispatcher = None
 
     def _build_dispatcher(self, state=None):
         if state is None:
@@ -319,8 +360,8 @@ class GenericFunction:
         raise NoApplicableMethods
 
 
-
-
+    # We can't be used as a method, but make pydoc think we're a callable
+    __get__ = None  
 
 
 
@@ -348,6 +389,25 @@ class GenericFunction:
             map(self._addCase, cases)
 
 
+    def addMethod(self,predicate,function):
+        for signature in IDispatchPredicate(predicate):
+            self[signature] = function
+
+
+    def testChanged(self):
+        self.dirty = True
+        self._dispatcher = None
+
+
+
+
+
+
+
+
+
+
+
     def when(self,cond):
         """Add following function to this GF, w/'cond' as a guard"""
 
@@ -355,12 +415,34 @@ class GenericFunction:
             frm = sys._getframe(1)
             cond = self.parse(cond, frm.f_locals, frm.f_globals)
 
-        def callback(frm,name,value,old_locals):
-            self.addMethod(cond,value)
-            if old_locals.get(name) is self:  # XXX might be delegate in future
-                return self
+        def registerMethod(frm,name,value,old_locals):
+
+            kind,module,locals_,globals_ = getFrameInfo(frm)
+
+            if kind=='class':
+
+                # 'when()' in class body; defer adding the method
+                def registerClassSpecificMethod(cls):
+                    import strategy
+                    req = strategy.Signature(
+                        [(strategy.Argument(0),ITest(cls))]
+                    )
+                    self.addMethod(cond & req, value)
+                    return cls
+
+                addClassAdvisor(registerClassSpecificMethod,frame=frm)
+
+            else:
+                self.addMethod(cond,value)
+
+            if old_locals.get(name) in (self,self.delegate):
+                return self.delegate
+
             return value
-        return add_assignment_advisor(callback)
+
+        return add_assignment_advisor(registerMethod)
+
+
 
 
 
@@ -534,17 +616,17 @@ class GenericFunction:
 def generic(combiner=None):
     """Use the following function as the skeleton for a generic function
 
-    This is equivalent to doing 'func=dispatch.GenericFunction(func,combiner)'
-    after the function definition.
+    This is roughly equivalent to doing 'func = GenericFunction(func,combiner)'
+    after the function definition, but instead of returning a 'GenericFunction'
+    instance, it returns a generated Python function object that wraps the
+    generic function in a way that speeds up its execution relative to a "bare"
+    'GenericFunction'.  Also, the function that this creates can be used
+    as a method in a class, while a plain 'GenericFunction' instance cannot.
     """
     def callback(frm,name,value,old_locals):
-        return GenericFunction(value,combiner)
+        return GenericFunction(value,combiner).delegate
 
     return add_assignment_advisor(callback)
-
-
-
-
 
 
 
