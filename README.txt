@@ -1,4 +1,4 @@
-PyProtocols Release 0.8
+PyProtocols Release 0.9
 
  Copyright (C) 2003 by Phillip J. Eby.  All rights reserved.  This software may
  be used under the same terms as Zope or Python.  THERE ARE ABSOLUTELY NO
@@ -6,33 +6,74 @@ PyProtocols Release 0.8
 
  Package Description
 
-    PyProtocols is the reference implementation for a future PEP on interfaces
-    and adaptation for the Python language.  It implements an enhanced version
-    of the PEP 246 "adaptation protocol" and 'adapt()' function.  Then, to
-    make adaptation both easy and useful, it adds an assortment of classes for
-    creating interfaces and protocols, and a declaration API to declare
-    implementations of protocols, adapters between protocols, etc.
+    Do you hate having to write lots of if-then logic to test what type
+    something is?  Wouldn't it be nice if you could just declare "I want this
+    object to have this behavior" and magically convert whatever value you
+    have, to the type you need?  PyProtocols lets you do just that, cleanly,
+    quickly, and robustly -- even with built-in types or other people's 
+    classes. 
 
-    If you're familiar with 'Interface' objects in Zope, Twisted, or PEAK,
-    the 'Interface' objects in PyProtocol are very similar.  But, they can
-    do many things that no other Python interface types do.  For example,
-    PyProtocols supports "subsetting" of interfaces, where you can declare
-    that one interface is implied by another.  This is like declaring that
-    somebody else's existing interface is actually a subclass of a new
-    interface you created.
+    PyProtocols extends the PEP 246 adapt() function with a new "declaration
+    API" that lets you easily define your own interfaces and adapters, and
+    declare what adapters should be used to adapt what types, objects, or
+    interfaces.  In addition to its own Interface type, PyProtocols can also
+    use Twisted and Zope's Interface types.  (Of course, since Twisted and 
+    Zope interfaces aren't as flexible, only a subset of the PyProtocols API
+    works with them.  Specific limitations are listed in the documentation.) 
 
-    Unlike Zope and Twisted, PyProtocols doesn't force a particular interface
-    implementation on you.  You can use its built-in interface type, or create
-    your own.  You can even adapt third-party interface types to work with
-    PyProtocols' API.  (PyProtocols includes an example adapter that wraps
-    Zope interfaces to work like PyProtocols interfaces, at least for the
-    subset of PyProtocols' abilities that Zope interfaces have.)
+    If you're familiar with Interface objects in Zope, Twisted, or PEAK, the
+    Interface objects in PyProtocols are very similar.  But, they can also do 
+    many things that no other Python interface types can do.  For example, 
+    PyProtocols supports "subsetting" of interfaces, where you can declare that
+    one interface is a subset of another existing interface.  This is like
+    declaring that somebody else's existing interface is actually a subclass
+    of the new interface.  Twisted and Zope don't allow this, which
+    makes them very hard to use if you're trying to define interfaces like
+    "Read-only Mapping" as a subset of "Mapping Object". 
 
-    PyProtocols also supports transitive adaptation (i.e. if you have adapters
-    from interface A to interface B, and from B to C, an adapter from A
-    to C is automatically created).  Entire types (even built-in types), or
-    individual instances (of compatible types), can have adapters declared for
-    converting them to a given protocol.
+    Unlike Zope and Twisted, PyProtocols also doesn't force you to use a 
+    particular interface coding style or even a specific interface type.  You
+    can use its built-in interface types, or define your own.  If there's 
+    another Python package out there with interface types that you'd like to
+    use (CORBA? COM?), you can even create your own adapters to make them 
+    work with the PyProtocols API. 
+
+
+    PyProtocols is also the only interface package that supports automatic
+    "transitive adaptation".  That is, if you define an adapter from interface
+    A to interface B, and another from B to C, PyProtocols automatically 
+    creates and registers a new adapter from A to C for you.  If you later
+    declare an explicit adapter from A to C, it silently replaces the 
+    automatically created one.
+
+    PyProtocols may be used, modified, and distributed under the same terms
+    and conditions as Python or Zope. 
+
+
+ Version 0.9 Release Notes
+
+    This version is a complete, working release, so you can download it and
+    try it out.  But, the exact spellings of the API and other interfaces
+    may be subject to change.  We would like feedback from the community on
+    the current API, as some API names may not be clear or obvious yet.
+    Please contact the author with your input.
+
+    If you'd like to use Zope interfaces with PyProtocols, you must
+    use the current CVS version of Zope X3, as PyProtocols' Zope support uses
+    the latest Zope interface declaration API.
+
+    If you'd like to use Twisted interfaces with PyProtocols, you must use
+    Twisted 1.0.5 or later.
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -59,11 +100,23 @@ PyProtocols Release 0.8
 
   which will verify the correct installation and functioning of the package.
 
+  PyProtocols includes an optional speed-enhancing module written in Pyrex and
+  C.  If you do not have a C compiler available, you can disable installation
+  of the C module by editing the 'setup.py' file and changing this line::
 
+    include_speedups  = True   # edit this to avoid building C speedups module
 
+  to read::
 
+    include_speedups  = False  # edit this to avoid building C speedups module
 
+  instead.  You do not need to do this if you are using the Win32 binary
+  installer, since it includes a pre-compiled speedups module.
 
+  Note: if you have installed Pyrex on your Python path, be sure it is Pyrex
+  version 0.7.2.  You do *not* have to have Pyrex installed, even to build the
+  C extension, but if you do have it installed, make sure it's up to date before
+  building the C extension.
 
 
 

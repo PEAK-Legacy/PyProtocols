@@ -10,7 +10,7 @@ execfile('src/setup/prologue.py')
 
 # Metadata
 PACKAGE_NAME = "PyProtocols"
-PACKAGE_VERSION = "0.8"
+PACKAGE_VERSION = "0.9"
 HAPPYDOC_IGNORE = ['-i', 'tests', '-i', 'setup']
 
 
@@ -48,8 +48,7 @@ setup(
     author_email="transwarp@eby-sarna.com",
     license="PSF or ZPL",
 
-    url="http://peak.telecommunity.com/",   # XXX
-    # XXX platforms=['UNIX','Windows'],
+    url="http://peak.telecommunity.com/PyProtocols.html",
 
     package_dir = {'':'src'},
     packages    = packages,
@@ -58,6 +57,7 @@ setup(
     ext_modules = extensions,
     scripts = scripts,
 )
+
 
 
 
