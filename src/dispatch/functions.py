@@ -244,6 +244,47 @@ declareForProto(protocols.IBasicSequence,proto,
 
 
 
+class ExprCache(object):
+    __slots__ = 'cache','argtuple','expr_defs'
+
+    def __init__(self,argtuple,expr_defs):
+        self.argtuple = argtuple
+        self.expr_defs = expr_defs
+        self.cache = {}
+
+    def __getitem__(self,item):
+        if item==EXPR_GETTER_ID:
+            return self.__getitem__
+        try:
+            return self.argtuple[item]
+        except IndexError:
+            pass
+        try:
+            return self.cache[item]
+        except KeyError:
+            pass
+
+        f,args = self.expr_defs[item]
+        f = self.cache[item] = f(*map(self.__getitem__,args))
+        return f
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class Dispatcher:
     """Extensible multi-dispatch mapping object"""
 
@@ -255,17 +296,17 @@ class Dispatcher:
         from dispatch.strategy import Argument
         self.argMap = dict([(name,Argument(name=name)) for name in args])
         lock = allocate_lock()
-        self.__acquire = lock.acquire
-        self.__release = lock.release
+        self._acquire = lock.acquire
+        self._release = lock.release
         self.clear()
 
 
     def clear(self):
-        self.__acquire()
+        self._acquire()
         try:
             self._clear()
         finally:
-            self.__release()
+            self._release()
 
 
     def _clear(self):
@@ -309,7 +350,7 @@ class Dispatcher:
                     for key,subcases in case_map.items():
                         yield key,build((subcases,remaining_ids,memo))
                 def reseed(key):
-                    self.__acquire()
+                    self._acquire()
                     try:
                         self.disp_indexes[best_id].addSeed(key)
                         case_map[key] = [
@@ -320,7 +361,7 @@ class Dispatcher:
                         )
                         return retval
                     finally:
-                        self.__release()
+                        self._release()
                 node = DispatchNode(best_id, dispatch_table, reseed)
 
         memo[key] = node
@@ -338,27 +379,19 @@ class Dispatcher:
             while type(node) is DispatchNode:
                 (expr, dispatch_function) = node.expr_id
                 if node.contents:
-                    self.__acquire()
+                    self._acquire()
                     try:
                         if node.contents:
                             node.build()
                     finally:
-                        self.__release()
+                        self._release()
 
                 if expr<argct:
                     node = dispatch_function(argtuple[expr], node)
                 else:
                     if cache is None:
-                        def get(expr_id):
-                            if expr_id in cache:
-                                return cache[expr_id]
-                            elif expr_id<argct:
-                                return argtuple[expr_id]
-                            f,args = self.expr_defs[expr_id]
-                            f = cache[expr_id] = f(*map(get,args))
-                            return f
-                        cache = {EXPR_GETTER_ID: get}
-                    node = dispatch_function(get(expr), node)
+                        cache = ExprCache(argtuple,self.expr_defs)
+                    node = dispatch_function(cache[expr], node)
         finally:
             cache = get = None    # allow GC of values computed during dispatch
 
@@ -366,6 +399,14 @@ class Dispatcher:
             return node
 
         raise NoApplicableMethods
+
+
+
+
+
+
+
+
 
     def _rebuild_indexes(self):
         if self.dirty:
@@ -376,12 +417,12 @@ class Dispatcher:
 
 
     def criterionChanged(self):
-        self.__acquire()    # XXX could deadlock if called during dispatch
+        self._acquire()    # XXX could deadlock if called during dispatch
         try:
             self.dirty = True
             self._dispatcher = None
         finally:
-            self.__release()
+            self._release()
 
 
     def _setupArgs(self):
@@ -394,13 +435,13 @@ class Dispatcher:
 
 
     def _startNode(self):
-        self.__acquire()
+        self._acquire()
         try:
             if self._dispatcher is None:
                 self._dispatcher = self._build_dispatcher()
             return self._dispatcher
         finally:
-            self.__release()
+            self._release()
 
 
 
@@ -417,7 +458,7 @@ class Dispatcher:
             return
 
         from dispatch.strategy import Signature, NullCriterion
-        self.__acquire()
+        self._acquire()
         try:
             signature = Signature(
                 [(self._dispatch_id(expr,criterion),criterion)
@@ -428,7 +469,7 @@ class Dispatcher:
             self._addCase((signature, method))
             self._addConstraints(signature)
         finally:
-            self.__release()
+            self._release()
 
 
     [dispatch.on('rule')]
