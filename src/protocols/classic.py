@@ -7,8 +7,8 @@ __all__ = []
 from types import FunctionType, ModuleType, InstanceType
 
 from adapters import NO_ADAPTER_NEEDED, DOES_NOT_SUPPORT
-from api import adapterForTypes, instancesImplement
-
+from api import adapterForTypes, instancesProvide
+from interfaces import IAdaptingProtocol, IOpenProvider, IOpenProtocol
 
 class conformsRegistry(dict):
 
@@ -112,7 +112,7 @@ if ZopeInterface is not None:
     ZopeInterface.__class__._doSetImplements = staticmethod(ZopeImplements)
     ZopeInterfaceTypes = [ZopeInterface.__class__]
 
-    instancesImplement(ZopeInterface.__class__, IAdaptingProtocol)
+    instancesProvide(ZopeInterface.__class__, IAdaptingProtocol)
 
 else:
     ZopeInterfaceTypes = []

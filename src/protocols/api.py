@@ -2,7 +2,10 @@
 
 __all__ = [
     'adapt', 'declareAdapterForType', 'declareAdapterForProtocol',
-    'declareAdapterForObject', 'instancesProvide', 'instancesDoNotProvide',
+    'declareAdapterForObject', 'advise', 'declareImplementation',
+    'declareAdapter', 'adviseObject',
+
+    'instancesProvide', 'instancesDoNotProvide',
     'protocolImplies', 'directlyProvides', 'implements', 'doesNotImplement',
     'implyProtocols', 'adapterForTypes', 'adapterForProtocols',
     'classProvides', 'moduleProvides',
@@ -15,12 +18,9 @@ from types import ClassType
 ClassTypes = ClassType, type
 
 from adapters import NO_ADAPTER_NEEDED, DOES_NOT_SUPPORT, IMPLEMENTATION_ERROR
-from advice import addClassAdvisor
+from advice import addClassAdvisor, getFrameInfo
 from interfaces import IOpenProtocol, IOpenProvider, IOpenImplementor
-
-
-
-
+from interfaces import Protocol, InterfaceClass
 
 
 
@@ -108,20 +108,141 @@ def declareAdapterForObject(protocol, adapter, ob, depth=1):
     adapt(protocol,IOpenProtocol).registerObject(ob,adapter,depth)
 
 
+# Bootstrap APIs to work with Protocol and InterfaceClass, without needing to
+# give Protocol a '__conform__' method that's hardwired to IOpenProtocol.
+# Note that InterfaceClass has to be registered first, so that when the
+# registration propagates to IAdaptingProtocol and IProtocol, InterfaceClass
+# will already be recognized as an IOpenProtocol, preventing infinite regress.
 
+IOpenProtocol.registerImplementation(InterfaceClass)    # VERY BAD!!
+IOpenProtocol.registerImplementation(Protocol)          # NEVER DO THIS!!
 
-
-
-
-
-
-
-
-
+# From this line forward, the declaration APIs can work.  Use them instead!
 
 
 
 # Interface and adapter declarations - convenience forms, explicit targets
+
+def declareAdapter(factory, provides,
+    forTypes=(),
+    forProtocols=(),
+    forObjects=()
+):
+    """'factory' is an IAdapterFactory providing 'provides' protocols"""
+
+    for protocol in provides:
+
+        for typ in forTypes:
+            declareAdapterForType(protocol, factory, typ)
+
+        for proto in forProtocols:
+            declareAdapterForProtocol(protocol, factory, proto)
+
+        for ob in forObjects:
+            declareAdapterForObject(protocol, factory, ob)
+
+
+def declareImplementation(typ, instancesProvide=(), instancesDoNotProvide=()):
+    """Declare information about a class, type, or 'IOpenImplementor'"""
+
+    for proto in instancesProvide:
+        declareAdapterForType(proto, NO_ADAPTER_NEEDED, typ)
+
+    for proto in instancesDoNotProvide:
+        declareAdapterForType(proto, DOES_NOT_SUPPORT, typ)
+
+
+def adviseObject(ob, provides=(), doesNotProvide=()):
+    """Tell an object what it does or doesn't provide"""
+
+    for proto in provides:
+        declareAdapterForObject(proto, NO_ADAPTER_NEEDED, ob)
+
+    for proto in doesNotProvide:
+        declareAdapterForObject(proto, DOES_NOT_SUPPORT, ob)
+
+
+# And now for the magic function...
+
+def advise(**kw):
+    kw = kw.copy()
+    frame = _getframe(1)
+    kind, module, caller_locals, caller_globals = getFrameInfo(frame)
+
+    if kind=="module":
+        moduleProvides = kw.setdefault('moduleProvides',())
+        moduleDoesNotProvide = kw.setdefault('moduleDoesNotProvide',())
+        del kw['moduleProvides'], kw['moduleDoesNotProvide']
+
+        for k in kw:
+            raise TypeError(
+                "Invalid keyword argument for advising modules: %s" % k
+            )
+
+        adviseObject(module,
+            provides=moduleProvides, doesNotProvide=moduleDoesNotProvide
+        )
+        return
+
+    elif kind!="class":
+        raise SyntaxError(
+            "protocols.advise() must be called directly in a class or"
+            " module body, not in a function or exec."
+        )
+
+    classProvides = kw.setdefault('classProvides',())
+    classDoesNotProvide = kw.setdefault('classDoesNotProvide',())
+    instancesProvide = kw.setdefault('instancesProvide',())
+    instancesDoNotProvide = kw.setdefault('instancesDoNotProvide',())
+    asAdapterForTypes = kw.setdefault('asAdapterForTypes',())
+    asAdapterForProtocols = kw.setdefault('asAdapterForProtocols',())
+    protocolExtends = kw.setdefault('protocolExtends',())
+    protocolIsSubsetOf = kw.setdefault('protocolIsSubsetOf',())
+
+    map(kw.__delitem__,"classProvides classDoesNotProvide instancesProvide"
+        " instancesDoNotProvide asAdapterForTypes asAdapterForProtocols"
+        " protocolExtends protocolIsSubsetOf".split())
+
+    for k in kw:
+        raise TypeError(
+            "Invalid keyword argument for advising classes: %s" % k
+        )
+
+    def callback(klass):
+        if classProvides or classDoesNotProvide:
+            adviseObject(klass,
+                provides=classProvides, doesNotProvide=classDoesNotProvide
+            )
+
+        if instancesProvide or instancesDoNotProvide:
+            declareImplementation(klass,
+                instancesProvide=instancesProvide,
+                instancesDoNotProvide=instancesDoNotProvide
+            )
+
+        if asAdapterForTypes or asAdapterForProtocols:
+            if not instancesProvide:
+                raise TypeError(
+                    "When declaring an adapter, you must specify what"
+                    " its instances will provide."
+                )
+            declareAdapter(klass, instancesProvide,
+                forTypes=asAdapterForTypes, forProtocols=asAdapterForProtocols
+            )
+
+        if protocolExtends:
+            declareAdapter(NO_ADAPTER_NEEDED, protocolExtends,
+                forProtocols=[klass]
+            )
+
+        if protocolIsSubsetOf:
+            declareAdapter(NO_ADAPTER_NEEDED, [klass],
+                forProtocols=protocolIsSubsetOf
+            )
+
+        return klass
+
+    addClassAdvisor(callback)
 
 def instancesProvide(klass, *protocols):
     """Declare that instances of 'klass' directly provide 'protocols'"""
@@ -145,6 +266,8 @@ def directlyProvides(ob, *protocols):
     """Declare that 'ob' directly provides 'protocols'"""
     for p in protocols:
         declareAdapterForObject(p, NO_ADAPTER_NEEDED, ob)
+
+
 
 
 

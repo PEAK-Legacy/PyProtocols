@@ -3,8 +3,8 @@ from types import ClassType, FunctionType
 import sys
 
 __all__ = [
-    'advice', 'addClassAdvisor', 'isClassAdvisor', 'metamethod', 'supermeta',
-    'minimalBases', 'determineMetaclass'
+    'addClassAdvisor', 'isClassAdvisor', 'metamethod', 'supermeta',
+    'minimalBases', 'determineMetaclass', 'getFrameInfo',
 ]
 
 
@@ -39,82 +39,41 @@ def supermeta(typ,ob):
     return theSuper()
 
 
-class advice(object):
+def getFrameInfo(frame):
+    """Return (kind,module,locals,globals) for a frame
 
-    """advice(func) -- "around advice" wrapper base class
+    'kind' is one of "exec", "module", "class", "function call", or "unknown".
+    """
 
-        This wrapper is a base class for "around" advice on a method.  Just
-        redefine the '__call__' method to have the desired semantics.  E.g.::
+    f_locals = frame.f_locals
+    f_globals = frame.f_globals
 
-            class loggedMethod(advice):
+    sameNamespace = f_locals is f_globals
+    hasModule = '__module__' in f_locals
+    hasName = '__name__' in f_globals
 
-                __slots__ = ()
+    sameName = hasModule and hasName
+    sameName = sameName and f_globals['__name__']==f_locals['__module__']
 
-                def __call__(self,*__args,**__kw):
-                    print "Entering", self._func, __args, __kw
-                    self._func(*__args,**__kw)
-                    print "Leaving",self._func
+    module = hasName and sys.modules.get(f_globals['__name__']) or None
 
-            class someObject(object):
+    namespaceIsModule = module and module.__dict__ is f_globals
 
-                def aMethod(self,foobly):
-                    print foobly
+    if not namespaceIsModule:
+        # some kind of funky exec
+        kind = "exec"
+    elif sameNamespace and not hasModule:
+        kind = "module"
+    elif sameName and not sameNamespace:
+        kind = "class"
+    elif not sameNamespace:
+        kind = "function call"
+    else:
+        # How can you have f_locals is f_globals, and have '__module__' set?
+        # This is probably module-level code, but with a '__module__' variable.
+        kind = "unknown"
 
-                aMethod = loggedMethod(aMethod)
-
-        If your advice needs parameters, you'll probably want to override
-        '__init__()' as well, and add some slots as appropriate.  Note that
-        the 'self' parameter to '__call__' is the *advice object*, not the
-        'self' that will be passed through to the underlying function (which
-        is the first item in '__args'.
-
-        The 'advice' class tries to transparently emulate a normal Python
-        method, and to be indistinguishable from such a method to inspectors
-        like 'help()' and ZPublisher's 'mapply()'.  Because of this, if
-        callers of a method need to know that it is being "advised", you
-        should document this in your method's docstring.  There isn't any
-        other way someone can tell, apart from reading your source or checking
-        the 'type()' or '__class__' of the retrieved method's 'im_func'.
-
-        Advice objects can be transparently stacked, so you can do things like
-        'aMethod = loggedMethod( lockedMethod(aMethod) )' safely."""
-
-
-    __slots__ = '_func'
-
-
-    def __init__(self, func):
-        self._func = func
-
-
-    def __get__(self,ob,typ):
-        if typ is None: typ = ob.__class__
-        return instancemethod(self, ob, typ)
-
-
-    def __call__(self,*__args,**__kw):
-        self._func(*__args,**__kw)
-
-
-    def __repr__(self):
-        return `self._func`
-
-
-    # Pass through any attribute requests to the wrapped object;
-    # this will make us "smell right" to ZPublisher's 'mapply()' function.
-
-    def __getattr__(self, attr):
-        return getattr(self._func,attr)
-
-
-    # __doc__ is a special case; our class wants to supply it, and so won't
-    # let __getattr__ near it.
-
-    __doc__ = property(lambda s: s._func.__doc__)
-
-
-
-
+    return kind,module,f_locals,f_globals
 
 
 
@@ -147,19 +106,19 @@ def addClassAdvisor(callback, depth=2):
     declare any '__metaclass__' *first*, to ensure all callbacks are run."""
 
     frame = sys._getframe(depth)
-    caller_locals = frame.f_locals
-    caller_globals = frame.f_globals
+    kind, module, caller_locals, caller_globals = getFrameInfo(frame)
 
-    if (caller_locals is caller_globals
-        or '__module__' not in caller_locals
-        or '__name__' not in caller_globals
-        or caller_locals['__module__']<>caller_globals['__name__']):
-            raise SyntaxError(
-                "Advice must be in the body of a class statement"
-            )
+    if kind != "class":
+        raise SyntaxError(
+            "Advice must be in the body of a class statement"
+        )
 
     previousMetaclass = caller_locals.get('__metaclass__')
     defaultMetaclass  = caller_globals.get('__metaclass__', ClassType)
+
+
+
+
 
 
     def advise(name,bases,cdict):

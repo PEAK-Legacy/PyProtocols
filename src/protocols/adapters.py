@@ -95,13 +95,30 @@ def composeAdapters(baseAdapter, baseProtocol, extendingAdapter):
         return baseAdapter
 
     def newAdapter(ob,proto):
-        return extendingAdapter(baseAdapter(ob,baseProtocol),proto)
+        ob = baseAdapter(ob,baseProtocol)
+        if ob is not None:
+            return extendingAdapter(ob,proto)
 
     newAdapter.__adapterCount__ = (
         getattr(extendingAdapter,'__adapterCount__',1)+
         getattr(baseAdapter,'__adapterCount__',1)
     )
+
     return newAdapter
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def updateWithSimplestAdapter(mapping, key, adapter, depth):
@@ -119,5 +136,29 @@ def updateWithSimplestAdapter(mapping, key, adapter, depth):
 
     mapping[key] = new, depth
     return True
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

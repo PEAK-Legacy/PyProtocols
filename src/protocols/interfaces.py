@@ -7,11 +7,10 @@ __all__ = [
     'IOpenImplementor', 'Attribute',
 ]
 
-
+import api
 from advice import metamethod
-from api import declareAdapterForType, declareAdapterForObject
-from adapters import composeAdapter, updateWithSimplestAdapter
-from adapters import NO_ADAPTER_NEEDED, DOES_NOT_SUPPORT, #XXX Infinity
+from adapters import composeAdapters, updateWithSimplestAdapter
+from adapters import NO_ADAPTER_NEEDED, DOES_NOT_SUPPORT
 
 from types import InstanceType
 
@@ -30,6 +29,7 @@ except ImportError:
             __slots__ = ()
             def acquire(*args): pass
             def release(*args): pass
+
 
 
 
@@ -69,7 +69,7 @@ class Protocol:
         # know if we break the implication link between two protocols
 
         for klass,(baseAdapter,d) in self.__adapters.items():
-            declareAdapterForType(
+            api.declareAdapterForType(
                 proto,composeAdapters(baseAdapter,self,adapter),klass,depth+d
             )
 
@@ -99,7 +99,7 @@ class Protocol:
             return adapter
 
         for proto, (extender,d) in self.getImpliedProtocols():
-            declareAdapterForType(
+            api.declareAdapterForType(
                 proto, composeAdapters(adapter,self,extender), klass, depth+d
             )
 
@@ -114,7 +114,7 @@ class Protocol:
         # Just handle implied protocols
 
         for proto, (extender,d) in self.getImpliedProtocols():
-            declareAdapterForObject(
+            api.declareAdapterForObject(
                 proto, composeAdapters(adapter,self,extender), ob, depth+d
             )
 
@@ -316,54 +316,4 @@ class IOpenProtocol(IAdaptingProtocol):
 
     def registerObject(ob, adapter=NO_ADAPTER_NEEDED, depth=1):
         """'adapter' provides protocol for 'ob' directly"""
-
-
-
-
-
-
-
-
-
-
-# Bootstrap APIs to work with Protocol and InterfaceClass, without needing to
-# give Protocol a '__conform__' method that's hardwired to IOpenProtocol.
-# Note that InterfaceClass has to be registered first, so that when the
-# registration propagates to IAdaptingProtocol and IProtocol, InterfaceClass
-# will already be recognized as an IOpenProtocol, preventing infinite regress.
-
-IOpenProtocol.registerImplementation(InterfaceClass)    # VERY BAD!!
-IOpenProtocol.registerImplementation(Protocol)          # NEVER DO THIS!!
-
-# From this line forward, the declaration APIs can work.  Use them instead!
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
