@@ -121,7 +121,7 @@ adaptation protocol used by this package.}
 
 
 
-\subsection{Protocols and Interfaces}
+\subsection{Protocols and Interfaces \label{protocol-concepts}}
 
 Many languages and systems provide ways of defining \strong{interfaces} that
 components provide or require.  Some mechanisms are purely for documentation,
@@ -144,7 +144,7 @@ documentation for human readers is still required!
 In the Python language, the primary uses for objects representing protocols
 or interfaces are at runtime, rather than at compile time.  Typically, such
 objects are used to ask for an implementation of the interface, or supplied
-by an object to claim that it supports that interface.
+by an object to claim that it provides an implementation of that interface.
 
 In principle, any Python object may be used as a \strong{protocol object}.
 However, for a variety of practical reasons, it is best that protocol objects
@@ -218,10 +218,10 @@ the English phrases represent the concepts in this text, the interface objects
 represent these concepts at runtime.
 
 Whether a protocol object is as simple as a string, or as complex as an
-open protocol, it can be used to request that a component support
-(or adapt to) the protocol that it symbolizes.  In the next section, we'll
-look at how to make such a request, and how the different kinds of protocol
-objects participate (or not) in fulfilling such requests.
+\class{IOpenProtocol}, it can be used to request that a component provide
+(or be adaptable to) the protocol that it symbolizes.  In the next section,
+we'll look at how to make such a request, and how the different kinds of
+protocol objects participate (or not) in fulfilling such requests.
 
 
 
@@ -304,6 +304,71 @@ constructed (or altered) so that it has the appropriate \function{__conform__}
 or \function{__adapt__} method, then much more meaningful results can be
 achieved.
 
+Throughout the rest of this document, we will say that a component
+\strong{supports} a protocol, if calling \code{adapt(component,protocol)} does
+not raise an error.  That is, a component supports a protocol if its
+\function{__conform__} method or the protocol's \function{__adapt__} method
+return a non-\constant{None} value.
+
+This is different from saying that an object \strong{provides} a protocol.  An
+object provides a protocol if \code{adapt(ob,protocol) is ob}.  Thus,
+if an object \emph{provides} a protocol, it \emph{supports} the protocol, but
+an object can also support a protocol by having an adapter that provides the
+protocol on its behalf.
+
+Now that you know how \function{adapt()} works, you can actually make use of it
+without any of the other tools in the \module{protocols} package.  Just define
+your own \function{__conform__} and \function{__adapt__} methods, and off
+you go!
+
+
+
+
+
+
+In practice, however, this is like creating a new kind of Python ``number''
+type.  That is, it's certainly possible, but can be rather tedious and is
+perhaps best left to a specialist.  For that reason, the \module{protocols}
+package supplies some useful basic protocol types, and a ``declaration API''
+that lets you declare how protocols, types, and objects should be adapted to
+one another.  The rest of this document deals with how to use those types and
+APIs.
+
+You don't need to know about those types and APIs to create your own kinds of
+protocols or components, just as you don't need to have studied Python's
+numeric types or math libraries to create a numeric type of your own.  But,
+if you'd like your new types to interoperate well with existing types, and
+conform to users' expectations of how such a type behaves, it would be a good
+idea to be familiar with existing implementations, such as the ones described
+here.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\subsubsection{Replacing Introspection with Adaptation}
+
 Component adaptation is intended to completely replace all non-cooperative
 introspection techniques, such as \function{type()}, \function{isinstance()},
 \function{hasattr()}, and even interface checks.  Such introspection
@@ -342,6 +407,7 @@ the availability of a standard mechanism for adaptation means that the
 extension mechanism need only be documented once: right here in this
 document.
 
+
 In section \ref{introspect-elim}, we will present examples of how to
 refactor all three kinds of introspection code to purely adaptation-driven
 code, showing how the flexibility and readability of the code improves in the
@@ -349,23 +415,39 @@ process.  But first, we will need to cover how protocols and interfaces can
 be defined, declared, and adapted, using the API provided by the
 \module{protocols} package.
 
-Now that you know how \function{adapt()} works, you can actually make use of it
-without any of the other tools in the \module{protocols} package.  Just define
-your own \function{__conform__} and \function{__adapt__} functions, and off
-you go!
 
-In practice, however, this is like creating a new kind of number type for
-Python: doable, but tedious and perhaps best left to a specialist.  For that
-reason, the \module{protocols} package supplies some useful basic protocol
-types, and a ``declaration API'' that lets you declare how protocols, types, and
-objects should be adapted to one another.  The rest of this document deals
-with how to use those types and APIs.
 
-Note, however, that you can still create your own kinds of protocol objects,
-or metaclasses that manage their own adapters, and many other things, using
-only the information supplied so far.  But, if you'd like to use your creations
-with the \module{protocols} declaration API, you'll need to read section
-\ref{customizing-adaptation}, ``Customizing and Extending the Declaration API''.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 \subsubsection{Differences Between \function{protocols.adapt()} and \pep{246}}
 
@@ -457,8 +539,8 @@ third metaclass that combines \class{InterfaceClass} with your desired
 metaclass.
 
 Subclassing a subclass of \class{Interface} creates a new \class{Interface}
-that implies the first interface.  This means that any object that is considered
-to provide the second interface, is considered to implicitly provide the first
+that implies the first interface.  This means that any object that supports
+the second interface, is considered to implicitly support the first
 interface.  For example:
 
 \begin{verbatim%
@@ -472,8 +554,8 @@ interface.  For example:
 \end{verbatim}
 
 The \code{IReadWriteMapping} interface implies the \code{IReadMapping}
-interface.  Therefore, any object that provides \code{IReadWriteMapping} is
-understood to also provide the \code{IReadMapping} interface.  The reverse,
+interface.  Therefore, any object that supports \code{IReadWriteMapping} is
+understood to also support the \code{IReadMapping} interface.  The reverse,
 however, is not true.
 
 Inheritance is only one way to declare that one interface implies another,
@@ -483,9 +565,9 @@ however, and its uses are limited.  Let's say for example, that some package
 declared its own interface, neither inheriting from the other.
 
 As developers reading the documentation of these interfaces, it is obvious to
-us that \code{IReadWriteMapping} implies \code{IReadMapping}.  But there is no
-way for Python to know this, unless we explicitly declare it to be so, like
-this:
+us that \code{IReadWriteMapping} implies \code{IReadMapping}, because we
+understand what they do.  But there is no way for Python to know this, unless
+we explicitly state it, like this:
 
 
 
@@ -503,19 +585,19 @@ protocols.declareAdapter(
 \end{verbatim}
 
 In the above example, we use the \module{protocols} declaration API to say that
-no adapter is needed to provide the \code{B.IReadMapping} interface for
-objects that already provide the \code{A.IReadWriteMapping} interface.
+no adapter is needed to support the \code{B.IReadMapping} interface for
+objects that already support the \code{A.IReadWriteMapping} interface.
 
-At this point, if we supply an object that implements (or can be adapted
-to) \code{IReadWriteMapping}, to a function that expects an
-\code{IReadMapping}, things should work out quite well for us, as long as
-we either call \code{adapt(ob,IReadMapping)} first, or if the code we're
-calling does it for us.
+At this point, if we supply an object that supports \code{IReadWriteMapping},
+to a function that expects an \code{IReadMapping}, it should work, as long as
+we either call \code{adapt(ob,IReadMapping)} first, or the code we're
+calling does so.
 
 There are still other ways to declare that one interface implies another.  For
 example, if the author of our example package \code{B} knew about package {A}
 and its \code{IReadWriteMapping} interface, he or she might have defined
 \code{IReadMapping} this way:
+
 
 
 
@@ -553,7 +635,7 @@ class IReadMapping(Interface):
 This is syntax sugar for creating the interface first, and then using
 \code{protocols.declareAdapter(NO_ADAPTER_NEEDED)}.  Of course, you can only use
 this approach if you are the author of the interface!  Otherwise, you must use
-\function{declareAdapter()} after the fact.
+\function{declareAdapter()} after the fact, as in the previous example.
 
 In later sections, we will begin looking at the \module{protocols} declaration
 APIs -- like \function{declareAdapter()} and \function{advise()} -- in more
@@ -577,29 +659,152 @@ objects supplied as parameters to the declaration API.
 Like any other API, the \module{protocols} declaration API has certain
 expectations regarding its parameters.  These expectations are documented and
 referenced in code using interfaces defined in the \module{protocols.interfaces}
-module.
+module.  (The interfaces are also exported directly from the top level of the
+\module{protocols} package.)
 
 You will rarely use or subclass any of these interface objects, unless you are
-customizing or extending the system.  They exist primarily for documentation
-purposes, and to facilitate the operation of the package's declaration APIs.
+customizing or extending the system.  Three of the interfaces exist exclusively
+for documentation purposes, while the rest are used in \function{adapt()} calls
+made by the API.
 
-%But, because the
+First, let's look at the documentation-only interfaces.  It is not necessary
+for you to declare that an object supports these interfaces, and the
+\module{protocols} package never tries to \function{adapt()} objects to them.
 
-IAdapterFactory
+\begin{description}
 
-IProtocol
+\item[IAdapterFactory] \hfill \\
+Up until this point, we've been talking about ``adapters'' rather loosely.  The
+\class{IAdapterFactory} interface formalizes the concept.  An \strong{adapter
+factory} is a callable object that takes two arguments (an object and a
+protocol, in that order) and returns an object that provides the protocol on
+behalf of the passed-in object.
 
-IAdaptingProtocol
+You'll notice that this is the same signature required of the optional
+\var{factory} argument to \function{adapt()}.  It is also the signature required
+of objects supplied as ``adapter'' or ``factory'' arguments to the declaration
+API functions.
 
-IOpenProtocol
+The \module{protocols} package supplies two functions that provide
+this interface: \function{NO_ADAPTER_NEEDED} and \function{DOES_NOT_SUPPORT}.
+\function{NO_ADAPTER_NEEDED} is used to declare that an object provides a
+protocol directly, and thus it returns the object passed into it, rather than
+some kind of adapter.  \function{DOES_NOT_SUPPORT} is used to declare that an
+object does not support a protocol, even with an adapter.  (Since this is the
+default case, \function{DOES_NOT_SUPPORT} is rarely used, except to indicate
+that a subclass does not support an interface that one of its superclasses
+does.)
 
-IOpenProvider
+\item[IProtocol] \hfill \\
+This interface formalizes the idea of a ``protocol object''.  As you will
+recall from section \ref{protocol-concepts}, a protocol object is any object
+that can be used as a Python dictionary key.  The second argument to
+\function{adapt()} must be a protocol object according to this definition.
 
-IOpenImplementor
+
+\item[IAdaptingProtocol] \hfill \\
+This interface formalizes the idea of an ``adapting protocol'', specifically
+that it is a protocol object (i.e., it provides \class{IProtocol}) that also
+has an \function{__adapt__} method as described in section \ref{adapt-protocol}.
+\class{IAdaptingProtocol} is a subclass of \class{IProtocol}, so of course
+\function{adapt()} accepts such objects as protocols.
+
+\end{description}
+
+The other three interfaces are critical to the operation of the declaration API,
+and thus must be supported by objects supplied to it.  The \module{protocols}
+package supplies and registers various adapter classes that provide these
+interfaces on behalf of many commonly used Python object types.  So, for each
+interface, we will list ``known supporters'' of that interface, whether they
+are classes supplied by \module{protocols}, or built-in types that are
+automatically adapted to the interface.
+
+We will not, however, go into details here about the methods and behavior
+required by each interface.  We will leave such detailed discussions to
+section \ref{customizing-adaptation}, ``Customizing and Extending the
+Declaration API'', since customization and extension are all that the
+details are useful for.
+
+\begin{description}
 
 
 
 
+
+
+
+
+
+
+\item[IOpenProtocol] \hfill \\
+This interface formalizes the idea of an ``open protocol'', that was introduced
+in section \ref{protocol-concepts}.  An \class{IOpenProtocol} is an
+\class{IAdaptingProtocol} that can also accept declarations made by the
+\module{protocols} declaration API.
+
+The \module{protocols} package supplies two implementations of this interface:
+\class{Protocol} and \class{InterfaceClass}.  Thus, any \class{Interface}
+subclass or \class{Protocol} instance is automatically considered to provide
+\class{IOpenProtocol}.  \note{\class{Interface} is an instance of
+\class{InterfaceClass}, and thus provides \class{IOpenProtocol}.  But if you
+create an instance of an \class{Interface}, that object does not provide
+\class{IOpenProtocol}, because the interfaces provided by an object and its
+class (or its instances) can be different.}
+
+In addition to its built-in implementations, the \module{protocols} package
+also supplies and declares an adapter factory that adapts Zope's
+\class{Interface} objects to the \class{IOpenProtocol} interface, thus allowing
+you to use Zope interfaces in calls to the declaration API.  Similar adapters
+for other frameworks' interfaces may be added, if there is sufficient demand
+and/or contributed code, and the frameworks' authors will not add the adapters
+to their frameworks.
+
+
+\item[IOpenImplementor] \hfill \\
+An \class{IOpenImplementor} is a class or type that can be told (via the
+declaration API) what protocols its instances provide (or support via an
+\class{IAdapterFactory}).  (Note that this implies that the instances have
+a \class{__conform__} method).
+
+Support for this interface is optional, since types that don't support it
+can still have their instances be adapted by \class{IOpenProtocol} objects.
+The \module{protocols} package does not supply any implementations or adapters
+for this interface, either.  It is intended primarily as a hook for metaclasses
+to receive notification about protocol declarations for their instances (i.e.
+classes), as we will discuss later.
+
+
+
+
+
+\item[IOpenProvider] \hfill \\
+Because objects' behavior usually comes from a class definition, it's not that
+often that you will declare that a specific object provides or supports an
+interface.  But objects like functions and modules do not have a class
+definition, and classes themselves sometimes provide an interface.  (For
+example, one could define an \class{IClass} interface that class objects
+provide.)  So, the declaration API needs to also be able to declare what
+protocols an individual object (such as a function, module, or class) supports
+or provides.
+
+That's what the \class{IOpenProvider} interface is for.  An
+\class{IOpenProvider} is an object with a \class{__conform__} method, that can
+be told (via the declaration API) what protocols it provides (or supports via
+an \class{IAdapterFactory}).
+
+(Notice that this is different from \class{IOpenImplementor}, which deals with
+an class or type's instances.  \class{IOpenProvider} deals with the object
+itself.  A single object can potentially be both an \class{IOpenProvider} and an
+\class{IOpenImplementor}, if it is a class or type.)
+
+The \module{protocols} package supplies and declares an adapter factory that
+adapts Python functions, modules, and ``classic class'' instances to support
+this interface.  (XXX should we also supply a mixin for new-style classes?)
+Thus, it is acceptable to pass a Python function, module, or instance of a
+``classic'' class to any declaration API that expects an \class{IOpenProvider}
+argument.
+
+\end{description}
 
 
 
@@ -736,7 +941,7 @@ subsetting, extending...
 
 
 
-\subsection{Module Contents\label{protocols-contents}}
+\subsection{Package Contents and Contained Modules\label{protocols-contents}}
 
 \begin{funcdesc}{adapt}{component, protocol,
 \optional{, default \optional{, factory}}}
