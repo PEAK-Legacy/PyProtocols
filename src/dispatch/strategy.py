@@ -80,6 +80,49 @@ __all__ = [
 
 
 
+class TGraph:
+    """Simple transitive dependency graph"""
+
+    def __init__(self):
+        self.data = {}
+        
+    def add(self,s,e):
+        self.data.setdefault(s,{})
+        for old_s,old_es in self.data.items():
+            if s in old_es or s is old_s:
+                g = self.data.setdefault(old_s,{})
+                g[e] = 1
+                for ee in self.data.get(e,()):
+                    g[ee] = 1
+
+    def items(self):
+        """List of current edges"""
+        return [(s,e) for s in self.data for e in self.data[s]]
+
+    def successors(self,items):
+        """Return a truth map of the acyclic sucessors of 'items'"""
+        d = {}
+        get = self.data.get
+        for s in items:
+            for e in get(s,()):
+                if s not in get(e,()):
+                    d[e] = 1
+        return d
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def dispatch_by_mro(ob,table):
 
     """Lookup '__class__' of 'ob' in 'table' using its MRO order"""
@@ -663,11 +706,11 @@ class Signature(object):
 
     protocols.advise(instancesProvide=[ISignature])
 
-    __slots__ = 'data'
+    __slots__ = 'data','keys'
 
     def __init__(self, __id_to_test=(), **kw):
         items = list(__id_to_test)+[(Argument(name=k),v) for k,v in kw.items()]
-        self.data = data = {}
+        self.data = data = {}; self.keys = keys = []
         for k,v in items:
             v = ITest(v)
             k = k,v.dispatch_function
@@ -675,7 +718,7 @@ class Signature(object):
                 from predicates import AndTest
                 data[k] = AndTest(data[k],v)
             else:
-                data[k] = v
+                data[k] = v; keys.append(k)
 
     def implies(self,otherSig):
         otherSig = ISignature(otherSig)
@@ -685,7 +728,7 @@ class Signature(object):
         return True
 
     def items(self):
-        return self.data.items()
+        return [(k,self.data[k]) for k in self.keys]
 
     def get(self,expr_id):
         return self.data.get(expr_id,NullTest)

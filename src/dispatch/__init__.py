@@ -13,16 +13,9 @@
 
  TODO
 
-    * Expression/test ordering constraints
-
     * Support before/after/around methods, and result combination ala CLOS
 
     * Argument enhancements: variadic args, kw args, etc.
-
-    * Support costs on expressions
-
-    * Misc. optimizations (sets of cases instead of lists, fewer tuples, etc.,
-      truth table by test)
 
     * Add C speedups
 

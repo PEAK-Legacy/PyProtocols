@@ -164,7 +164,10 @@ class ISignature(Interface):
 
 class IDispatchPredicate(Interface):
 
-    """Sequence of signatures"""
+    """Sequence of "or"-ed signatures"""
+
+    def __iter__():
+        """Iterate over "or"-ed signatures"""
 
     def __eq__(other):
         """Return true if equal"""
@@ -188,9 +191,6 @@ class IDispatchableExpression(Interface):
 
     def __hash__():
         """Return hashcode"""
-
-
-
 
 
 

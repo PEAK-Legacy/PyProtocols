@@ -173,9 +173,7 @@ class GenericFunction:
         if method_combiner is None:
             from strategy import single_best_method as method_combiner
         self.method_combiner = method_combiner
-        self.args_by_name = abn = {}; self.args = args
-        for n,p in zip(args,range(len(args))):
-            abn[n] = self.__argByNameAndPos(n,p)
+        self.args = args
         self.__lock = allocate_lock()
         self.clear()
 
@@ -193,7 +191,8 @@ class GenericFunction:
         self.expr_map = {}
         self.expr_defs = [None,None,None]    # get,args,kw
         self._dispatcher = None
-
+        from dispatch.strategy import TGraph; self.constraints=TGraph()
+        self._setupArgs()
 
     def addMethod(self,predicate,function):
         for signature in IDispatchPredicate(predicate):
@@ -202,6 +201,7 @@ class GenericFunction:
     def testChanged(self):
         self.dirty = True
         self._dispatcher = None
+
 
     def _build_dispatcher(self, state=None):
         if state is None:
@@ -231,10 +231,10 @@ class GenericFunction:
                         yield key,build((subcases,remaining_ids,memo))
                 def reseed(key):
                     self.disp_indexes[best_id][key] = [
-                        (s,m) for s,m in self.cases if key in s.get(best_id)
+                        sm for sm in self.cases if key in sm[0].get(best_id)
                     ]
                     case_map[key] = [
-                        (s,m) for s,m in cases if key in s.get(best_id)
+                        sm for sm in cases if key in sm[0].get(best_id)
                     ]
                     node[key] = retval = self._build_dispatcher(
                         (case_map[key], remaining_ids, memo)
@@ -260,7 +260,8 @@ class GenericFunction:
                 if expr_id in cache:
                     return cache[expr_id]
                 f,args = self.expr_defs[expr_id]
-                return f(*map(get,args))
+                f = cache[expr_id] = f(*map(get,args))
+                return f
 
             cache = {
                 EXPR_GETTER_ID: get, RAW_VARARGS_ID:__args, RAW_KWDARGS_ID:__kw
@@ -282,7 +283,6 @@ class GenericFunction:
             return node(*__args,**__kw)
         else:
             raise NoApplicableMethods
-
 
 
     def __argByNameAndPos(self,name,pos):
@@ -339,13 +339,13 @@ class GenericFunction:
                 ]
             )
             self._addCase((signature, method))
+            self._addConstraints(signature)
         finally:
             self.__lock.release()
 
 
     def _addCase(self,case):
         (signature,method) = case
-
         for disp_id, caselists in self.disp_indexes.items():
 
             test = signature.get(disp_id)
@@ -354,8 +354,8 @@ class GenericFunction:
                 if key not in caselists:
                     # Add in cases that didn't test this key  :(
                     caselists[key] = [
-                        (s2,m2) for s2,m2 in self.cases
-                            if key in s2.get(disp_id)
+                        sm for sm in self.cases
+                            if key in sm[0].get(disp_id)
                     ]
 
             for key,lst in caselists.items():
@@ -368,7 +368,6 @@ class GenericFunction:
 
 
     def _best_split(self, cases, disp_ids):
-
         """Return best (disp_id,method_map,remaining_ids) for current subtree"""
 
         best_id = None
@@ -378,10 +377,11 @@ class GenericFunction:
         cases = dict([(case,1) for case in cases])
         is_active = cases.has_key
         active_cases = len(cases)
+        disabled = self.constraints.successors(disp_ids)
 
         for disp_id in disp_ids:
-            # XXX may need filtering for required ordering between exprs
-            # XXX analyze cost to compute expression?
+            if disp_id in disabled:
+                continue    # Skip tests that have unchecked prerequisites
 
             casemap = {}
             total_cases = 0
@@ -447,6 +447,47 @@ class GenericFunction:
             return parse_expr(expr_string,builder)
         finally:
             self.__lock.release()
+
+
+    def _addConstraints(self, signature):
+        pre = []
+        for key,test in signature.items():
+            if key[0] not in self.argids:
+                for item in pre: self.constraints.add(item,key)
+            pre.append(key)
+
+
+    def _setupArgs(self):
+        self.args_by_name = abn = {}
+        self.argids = argids = {}
+        from dispatch.strategy import Argument
+        for n,p in zip(self.args,range(len(self.args))):
+            abn[n] = arg = self.__argByNameAndPos(n,p)
+            argids[self.getExpressionId(Argument(name=n))] = True
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def defmethod(gf,cond,func,local_dict=None,global_dict=None):

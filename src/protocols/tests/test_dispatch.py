@@ -39,6 +39,47 @@ class RiverBoat(WaterVehicle):
     advise(instancesProvide=[TwoWheeled])
 
 
+class TestGraph(TestCase):
+
+    def testItems(self):
+        g = strategy.TGraph()
+        self.assertEqual(g.items(),[])
+        g.add(2,3)
+        self.assertEqual(g.items(),[(2,3)])
+        g.add(1,2)
+        items = g.items(); items.sort()
+        self.assertEqual(items,[(1,2),(1,3),(2,3)])
+
+        g = strategy.TGraph()
+        self.assertEqual(g.items(),[])
+        g.add(1,2)
+        self.assertEqual(g.items(),[(1,2)])
+        g.add(2,3)
+        items = g.items(); items.sort()
+        self.assertEqual(items,[(1,2),(1,3),(2,3)])
+
+        g.add(1,5); g.add(2,6)
+        items = g.items(); items.sort()
+        self.assertEqual(items,[(1,2),(1,3),(1,5),(1,6),(2,3),(2,6)])
+
+    def testSuccessors(self):
+        g = strategy.TGraph()
+        g.add(1,2)
+        self.assertEqual(g.successors([1]),{2:1})
+        self.assertEqual(g.successors([2]),{})
+        self.assertEqual(g.successors([3]),{})
+        g.add(2,3)
+        self.assertEqual(g.successors([1]),{2:1, 3:1})
+        self.assertEqual(g.successors([2]),{3:1})
+        self.assertEqual(g.successors([1,2]),{2:1, 3:1})
+        self.assertEqual(g.successors([3]),{})
+        g.add(3,1)
+        self.assertEqual(g.successors([1,2,3]),{})
+        items = g.items(); items.sort()
+        self.assertEqual(items,
+            [(1,1),(1,2),(1,3),(2,1),(2,2),(2,3),(3,1),(3,2),(3,3)])
+
+
 class TestTests(TestCase):
 
     def testClassTestMembership(self):
@@ -460,17 +501,17 @@ class TestTests(TestCase):
         )
 
 
+    def testSignatureOrdering(self):
 
+        gt_10 = Argument(0),Inequality('>',10)
+        lt_20 = Argument(1),Inequality('<',20)
 
-
-
-
-
-
-
-
-
-
+        for data in [gt_10,lt_20], [lt_20,gt_10]:
+            # Verify both the raw signature, and an 'and'-ed version
+            for s in Signature(data), Signature(data[:1])&Signature(data[1:]):
+                self.assertEqual(s.items(),
+                    [((k,v.dispatch_function),v) for k,v in data]
+                )
 
 
 
@@ -840,7 +881,7 @@ class SimpleGenerics(TestCase):
 
         for item in 1,"blue",SimpleGeneric:
             self.assertRaises(dispatch.NoApplicableMethods, g, item)
-        
+
 
     def testAdaptedDefinition(self):
         class Classic: pass
@@ -877,7 +918,7 @@ class SimpleGenerics(TestCase):
         self.failUnless(isinstance(m,GenericFunction))
         self.assertEqual(m(LandVehicle()),"land")
         self.assertEqual(m(WaterVehicle()),"water")
-        
+
         s = dispatch.SimpleGeneric("x")
         s.when(LandVehicle)
         def bar(v):
@@ -982,6 +1023,47 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
 One vehicle is a land vehicle, the other is a sea vehicle.")
 
 
+    def testSubexpressionOrderingConstraints(self):
+
+        g = GenericFunction(args=['x','y'])
+        self.assertEqual(g.constraints.items(),[])
+
+        df = Inequality.dispatch_function
+        yx = Call(operator.div, Argument(name='y'), Argument(name='x'))
+        yxid = g.getExpressionId(yx), df
+        xid = g.getExpressionId(Argument(name='x')), df
+        yid = g.getExpressionId(Argument(name='y')), df
+
+        [g.when('x>0 and y>10')]
+        def x(x,y):
+            return "foo"
+
+        self.assertEqual(g.constraints.items(),[])
+
+        [g.when('x>0 and y/x>10')]
+        def x(x,y):
+            return "bar"
+
+        self.assertEqual(g.constraints.items(),[(xid,yxid)])
+
+        [g.when('x>0 and y>0 and y/x>10')]
+        def x(x,y):
+            return "bar"
+
+        items = g.constraints.items(); items.sort()
+        expected = [(xid,yxid),(yid,yxid)]; expected.sort()
+        self.assertEqual(items,expected)
+        self.assertEqual(g.constraints.successors([yid,yxid]),{yxid:1})
+        self.assertEqual(g.constraints.successors([xid,yxid]),{yxid:1})
+
+        best_id, best_map, remaining_ids = g._best_split(g.cases, [yxid,yid])
+        self.assertEqual(best_id, yid)
+
+        best_id, best_map, remaining_ids = g._best_split(g.cases, [yxid,xid])
+        self.assertEqual(best_id, xid)
+
+
+
     def testSimpleMultiDispatch(self):
         class A: pass
         class B(A): pass
@@ -1024,7 +1106,7 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
 
 
 TestClasses = (
-    TestTests, ExpressionTests, SimpleGenerics, GenericTests,
+    TestGraph, TestTests, ExpressionTests, SimpleGenerics, GenericTests,
 )
 
 def test_suite():
