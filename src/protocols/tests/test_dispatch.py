@@ -181,7 +181,7 @@ class TestTests(TestCase):
 
     def testInequalities(self):
         self.assertRaises(ValueError, Inequality, '', 1)
-        self.assertRaises(ValueError, Inequality, '!=', 2)
+        self.assertRaises(ValueError, Inequality, 'xyz', 2)
         t1 = Inequality('>',55); t2 = Inequality('>=',100)
 
         self.failIf( (55,55) in t1 )

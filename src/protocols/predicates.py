@@ -749,10 +749,16 @@ class TestBuilder:
         if isinstance(left,Const) and op in self._mirror_ops:
             left,right,op = right,left,self._mirror_ops[op]
         if isinstance(right,Const):
-            return Signature([(left, Inequality(op,right.value))])
+            if op[0].isalpha():
+                right = Inequality(op,right.value)  # XXX put in/is stuff here
+            else:
+                right = Inequality(op,right.value)
+            return Signature([(left, right)])
         else:
-            return Signature(
-                [(Call(self._cmp_ops[op], left, right), TruthTest(True))]
+            return Signature([
+                (self.expr_builder.Compare(initExpr,((op,other),)),
+                    TruthTest(True))
+                ]
             )
 
 
@@ -768,12 +774,6 @@ class TestBuilder:
         for expr in items[1:]:
             sig |= build(self,expr)
         return sig
-
-
-
-
-
-
 
 
 

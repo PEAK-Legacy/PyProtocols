@@ -3,6 +3,7 @@
 from unittest import TestCase, makeSuite, TestSuite
 from protocols.predicates import *
 from protocols.ast_builder import *
+from protocols.dispatch import *
 from protocols import predicates
 import operator,sys
 MAXINT = `sys.maxint`
@@ -36,7 +37,6 @@ class StringBuilder:
         return 'Sliceobj(%s,%s,%s)' % (
             build(self,start),build(self,stop),build(self,stride)
         )
-
 
 
     def mkBinOp(op):
@@ -697,9 +697,46 @@ class ExprBuilderTests(TestCase):
 
 class PredicateTests(TestCase):
 
-    def testSimplePreds(self):
+    def testParseInequalities(self):
 
-        from protocols.dispatch import GenericFunction,Min,Max,defmethod
+        parse = GenericFunction(['x','y','z']).parse
+        pe = lambda e: parse(e,locals(),globals())
+
+        x_cmp_y = lambda n: Signature([
+            (Call(getattr(operator,n),x,y),TruthTest())
+        ])
+
+        x,y = Argument(name='x'),Argument(name='y')
+
+        for op, mirror_op, not_op, name, not_name in [
+            ('>', '<', '<=','gt','le'),
+            ('<', '>', '>=','lt','ge'),
+            ('==','==','!=','eq','ne'),
+            ('<>','<>','==','ne','eq'),
+        ]:
+            fwd_sig = Signature(x=Inequality(op,1))
+            self.assertEqual(pe('x %s 1' % op), fwd_sig)
+            self.assertEqual(pe('1 %s x' % mirror_op), fwd_sig)
+
+            rev_sig = Signature(x=Inequality(mirror_op,1))
+            self.assertEqual(pe('x %s 1' % mirror_op), rev_sig)
+            self.assertEqual(pe('1 %s x' % op), rev_sig)
+
+            not_sig = Signature(x=Inequality(not_op,1))
+            self.assertEqual(pe('not x %s 1' % op), not_sig)
+            self.assertEqual(pe('not x %s 1' % not_op), fwd_sig)
+
+            self.assertEqual(pe('x %s y' % op), x_cmp_y(name))
+            self.assertEqual(pe('x %s y' % not_op), x_cmp_y(not_name))
+
+            self.assertEqual(pe('not x %s y' % op), x_cmp_y(not_name))
+            self.assertEqual(pe('not x %s y' % not_op), x_cmp_y(name))
+
+
+
+
+
+    def testSimplePreds(self):
 
         classify = defmethod(None, 'not not age<2', lambda age:"infant")
         defmethod(classify,'age<13', lambda age:"preteen")
@@ -723,6 +760,10 @@ class PredicateTests(TestCase):
         self.assertEqual(classify(99),"senior")
         self.assertEqual(classify(Min),"infant")
         self.assertEqual(classify(Max),"senior")
+
+
+
+
 
 
 

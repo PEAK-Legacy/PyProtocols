@@ -419,6 +419,8 @@ class Inequality(object):
     def __init__(self,op,val):
         self.val = val
         self.ranges = ranges = []
+        if op=='!=':
+            op = '<>'   # easier to process this way
         self.op = op
         if '<' in op:  ranges.append((Min,val))
         if '=' in op:  ranges.append((val,val))
@@ -445,8 +447,6 @@ class Inequality(object):
             elif ob[0]>=r[0] and ob[1]<=r[1]:   # for range, overlap allowed
                 return True
         return False
-
-
 
 
     def implies(self,otherTest):

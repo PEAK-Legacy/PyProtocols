@@ -9,16 +9,13 @@ __all__ = [
 
 _name   = lambda builder,nodelist: builder.Name(nodelist[1])
 _const  = lambda builder,nodelist: builder.Const(eval(nodelist[1]))
-_simple = lambda builder,nodelist: nodelist[1]
+
 
 production = {
     NAME:   _name,
     NUMBER: _const,
     STRING: _const,
 }
-
-for tok in tok_name:
-    production.setdefault(tok,_simple)
 
 
 ops = {
@@ -34,6 +31,9 @@ ops = {
 
 def left_assoc(builder, nodelist):
     return getattr(builder,ops[nodelist[-2][0]])(nodelist[:-2],nodelist[-1])
+
+
+
 
 
 
