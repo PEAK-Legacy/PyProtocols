@@ -7,7 +7,7 @@ __all__ = []
 from types import FunctionType, ModuleType, InstanceType
 
 from adapters import NO_ADAPTER_NEEDED, DOES_NOT_SUPPORT
-from api import adapterForTypes, instancesProvide
+from api import declareImplementation, advise
 from interfaces import IAdaptingProtocol, IOpenProvider, IOpenProtocol
 
 class conformsRegistry(dict):
@@ -43,7 +43,10 @@ class MiscObjectsAsOpenProvider(object):
 
     """Supply __conform__ registry for funcs, modules, & classic instances"""
 
-    adapterForTypes(IOpenProvider, [FunctionType,ModuleType,InstanceType])
+    advise(
+        instancesProvide=[IOpenProvider],
+        asAdapterForTypes=[FunctionType,ModuleType,InstanceType]
+    )
 
     def __init__(self,ob,proto):
 
@@ -69,9 +72,6 @@ class MiscObjectsAsOpenProvider(object):
 
     def declareProvides(self, protocol, adapter=NO_ADAPTER_NEEDED, depth=1):
         self.reg[protocol] = adapter
-
-
-
 
 
 
@@ -112,22 +112,24 @@ if ZopeInterface is not None:
     ZopeInterface.__class__._doSetImplements = staticmethod(ZopeImplements)
     ZopeInterfaceTypes = [ZopeInterface.__class__]
 
-    instancesProvide(ZopeInterface.__class__, IAdaptingProtocol)
+    declareImplementation(
+        ZopeInterface.__class__, instancesProvide=[IAdaptingProtocol]
+    )
 
 else:
     ZopeInterfaceTypes = []
 
-
 del ZopeInterface, __adapt__
-
 
 # Adapter for Zope X3 Interfaces
 
 class ZopeInterfaceAsProtocol(object):
-
     __slots__ = 'iface'
 
-    adapterForTypes(IOpenProtocol, ZopeInterfaceTypes)
+    advise(
+        instancesProvide=[IOpenProtocol],
+        asAdapterForTypes=ZopeInterfaceTypes,
+    )
 
     def __init__(self, iface, proto):
         self.iface = iface
@@ -159,6 +161,4 @@ class ZopeInterfaceAsProtocol(object):
 
     def registerObject(ob,adapter=NO_ADAPTER_NEEDED):
         pass    # Zope interfaces handle implied protocols directly
-
-
 

@@ -5,10 +5,10 @@ __all__ = [
     'declareAdapterForObject', 'advise', 'declareImplementation',
     'declareAdapter', 'adviseObject',
 
-    'instancesProvide', 'instancesDoNotProvide',
-    'protocolImplies', 'directlyProvides', 'implements', 'doesNotImplement',
-    'implyProtocols', 'adapterForTypes', 'adapterForProtocols',
-    'classProvides', 'moduleProvides',
+    #'instancesProvide', 'instancesDoNotProvide',
+    #'protocolImplies', 'directlyProvides', 'implements', 'doesNotImplement',
+    #'implyProtocols', 'adapterForTypes', 'adapterForProtocols',
+    #'classProvides', 'moduleProvides',
 ]
 
 _marker = object()
@@ -244,7 +244,7 @@ def advise(**kw):
 
     addClassAdvisor(callback)
 
-def instancesProvide(klass, *protocols):
+'''def instancesProvide(klass, *protocols):
     """Declare that instances of 'klass' directly provide 'protocols'"""
     for p in protocols:
         declareAdapterForType(p, NO_ADAPTER_NEEDED, klass)
@@ -366,4 +366,4 @@ def moduleProvides(*protocols):
 
 
 
-
+'''
