@@ -56,6 +56,7 @@ __all__ = [
     'most_specific_signatures', 'ordered_signatures', 'separate_qualifiers',
     'method_chain', 'method_list', 'all_methods', 'safe_methods', 'Pointer',
     'default', 'IdentityCriterion', 'NullCriterion', 'validateCriterion',
+    'DispatchNode', 'CriterionIndex',
 ]
 
 rev_ops = {
@@ -70,6 +71,128 @@ rev_ops = {
 
 
 
+
+
+
+
+
+
+
+
+
+class DispatchNode(dict):
+
+    """A mapping w/lazily population and supporting 'reseed()' operations"""
+
+    protocols.advise(instancesProvide=[IDispatchTable])
+
+    __slots__ = 'index','cases','build','lock'
+
+    def __init__(self, index, cases, build, lock):
+        self.index = index
+        self.cases = cases
+        self.build = build
+        self.lock = lock
+        dict.__init__(
+            self,
+            [(key,build(subcases))
+                for key,subcases in index.casemap_for(cases).items()]
+        )
+
+    def reseed(self,key):
+        self.lock.acquire()
+        try:
+            self.index.addSeed(key)
+            self[key] = retval = self.build(
+                self.index.casemap_for(self.cases)[key]
+            )
+            return retval
+        finally:
+            self.lock.release()
+
+
+
+
+
+
+
+
+
+
+
+
+class CriterionIndex:
+    """Index connecting seeds and results"""
+
+    def __init__(self,dispatch_function):
+        self.dispatch_function = dispatch_function
+        self.clear()
+
+    def clear(self):
+        """Reset index to empty"""
+        self.allSeeds = {}          # set of all seeds
+        self.matchingSeeds = {}     # applicable seeds for each case
+        self.criteria = {}          # criterion each value was saved under
+
+
+    def __setitem__(self,criterion,case):
+        """Register 'value' under each of the criterion's seeds"""
+
+        seeds = self.allSeeds
+        caseItems = self.matchingSeeds.setdefault(case,[])
+
+        for key in list(criterion.seeds(seeds)):    # avoid iter corruption
+            if key not in seeds:
+                self.addSeed(key)
+
+        caseItems.extend(criterion.matches(seeds))
+        self.criteria[case] = criterion
+
+
+    def __iter__(self):
+        return iter(self.allSeeds)
+
+    def __len__(self):
+        return len(self.allSeeds)
+
+
+    def count_for(self,cases):
+        """Get the total count of outgoing branches, given incoming cases"""
+        get = self.matchingSeeds.get
+        dflt = self.allSeeds
+        return sum([len(get(case,dflt)) for case in cases])
+
+    def casemap_for(self,cases):
+        """Return a mapping from seeds->caselists for the given cases"""
+        get = self.matchingSeeds.get
+        dflt = self.allSeeds
+        casemap = dict([(key,[]) for key in dflt])
+
+        for case in cases:
+            for key in get(case,dflt):
+                casemap[key].append(case)
+
+        return casemap
+
+
+    def addSeed(self,seed):
+        """Add a previously-missing seed"""
+
+        if seed in self.allSeeds:
+            return  # avoid duping entries if this is a reseed via dispatcher
+
+        criteria = self.criteria
+
+        for case,itsSeeds in self.matchingSeeds.items():
+            if case in criteria and seed in criteria[case]:
+                itsSeeds.append(seed)
+
+        self.allSeeds[seed] = None
+
+
+    def mkNode(self,*args):
+        node = DispatchNode(*args)
+        return lambda expr: self.dispatch_function(expr,node)
 
 
 

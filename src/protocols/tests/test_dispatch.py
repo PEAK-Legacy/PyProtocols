@@ -274,7 +274,7 @@ class CriteriaTests(TestCase):
         self.assertEqual(list(i.seeds({})),[None,id(ob)])
 
     def testCriterionIndex(self):
-        i = functions.CriterionIndex(None)  # XXX
+        i = CriterionIndex(None)  # XXX
         i[SubclassCriterion(int)] = 42
         self.assertEqual(i.casemap_for([42]), {int:[42],None:[]})
         i.addSeed(int)  # make sure seed isn't duplicated
