@@ -4,6 +4,82 @@ from unittest import TestCase, makeSuite, TestSuite
 from protocols.advice import *
 import sys
 
+
+class SuperTest(TestCase):
+
+    def checkMetaSuper(self):
+
+        class Meta(type):
+            def foo(self,arg):
+                return arg
+            foo = metamethod(foo)
+
+        class Class(object):
+            __metaclass__ = Meta
+
+            def foo(self,arg):
+                return arg*2
+
+        # Verify that ob.foo() and ob.__class__.foo() are different
+        assert Class.foo(1)==1
+        assert Class().foo(1)==2
+
+
+        # Verify that supermeta() works for such methods
+
+        class SubMeta(Meta):
+            def foo(self,arg):
+                return -supermeta(SubMeta,self).foo(arg)
+            foo = metamethod(foo)
+
+        class ClassOfSubMeta(Class):
+            __metaclass__ = SubMeta
+
+        assert ClassOfSubMeta.foo(1)==-1
+        assert ClassOfSubMeta().foo(1)==2
+
+
+    def checkPropSuper(self):
+
+        class Base(object):
+            __slots__ = 'foo'
+
+        class Sub(Base):
+
+            def getFoo(self):
+                return supermeta(Sub,self).foo * 2
+
+            def setFoo(self,val):
+                Base.foo.__set__(self,val)
+
+            foo = property(getFoo, setFoo)
+
+        ob = Sub()
+        ob.foo = 1
+        assert ob.foo == 2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def ping(log, value):
 
     def pong(klass):
@@ -11,6 +87,12 @@ def ping(log, value):
         return [klass]
 
     addClassAdvisor(pong)
+
+
+
+
+
+
 
 
 
@@ -133,7 +215,7 @@ class AdviceTests(TestCase):
 
 
 TestClasses = (
-    AdviceTests,
+    SuperTest, AdviceTests,
 )
 
 def test_suite():

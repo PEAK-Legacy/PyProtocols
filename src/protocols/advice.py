@@ -13,30 +13,71 @@ def metamethod(func):
     return property(lambda ob: func.__get__(ob,ob.__class__))
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # property-safe 'super()' for Python 2.2; 2.3 can use super() instead
 
 def supermeta(typ,ob):
 
-    mro = iter(ob.__class__.__mro__)
+    starttype = type(ob)
+    mro = starttype.__mro__
+    if typ not in mro:
+        starttype = ob
+        mro = starttype.__mro__
+        
+    mro = iter(mro)
     for cls in mro:
         if cls is typ:
-            cls = mro.next()
+            mro = [cls.__dict__ for cls in mro]
             break
     else:
-        raise TypeError("Not sub/supertypes:", supertype, subtype)
+        raise TypeError("Not sub/supertypes:", starttype, typ)
 
-    typ = ob.__class__
+    typ = type(ob)
 
     class theSuper(object):
-        def __getattr__(self,name):
-            descr = getattr(cls,name)
-            try:
-                descr = descr.__get__
-            except AttributeError:
-                return descr
-            return descr(ob,typ)
+        def __getattribute__(self,name):
+            for d in mro:
+                if name in d:
+                    descr = d[name]
+                    try:
+                        descr = descr.__get__
+                    except AttributeError:
+                        return descr
+                    else:
+                        return descr(ob,typ)
 
     return theSuper()
+
+
+
+
+
+
 
 
 def getFrameInfo(frame):
