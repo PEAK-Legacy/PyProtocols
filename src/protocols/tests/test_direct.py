@@ -8,19 +8,7 @@
 
 from unittest import TestCase, makeSuite, TestSuite
 from protocols import *
-from checks import TestBase
-
-class ProviderChecks(TestBase):
-
-    """Non-adapter instance tests"""
-
-    def checkSimpleRegister(self):
-        adviseObject(self.ob, provides=[self.IA])
-        self.assertObProvidesOnlyA()
-
-    def checkImpliedRegister(self):
-        adviseObject(self.ob, provides=[self.IB])
-        self.assertObProvidesAandB()
+from checks import TestBase, ProviderChecks, AdaptiveChecks
 
 
 
@@ -33,80 +21,27 @@ class ProviderChecks(TestBase):
 
 
 
-class BasicChecks(ProviderChecks):
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class BasicChecks(AdaptiveChecks, ProviderChecks):
 
     """Checks to be done on every object"""
-
-    def checkDelayedImplication(self):
-        adviseObject(self.ob, provides=[self.IA])
-        self.assertObProvidesSubsetOfA()
-
-    def checkAmbiguity(self):
-        declareAdapter(self.a1,provides=[self.IA],forObjects=[self.ob])
-        self.assertAmbiguous(self.a1,self.a2,1,1,provides=[self.IA],forObjects=[self.ob])
-
-
-    def checkOverrideDepth(self):
-
-        declareAdapter(self.a1,provides=[self.IB],forObjects=[self.ob])
-        assert adapt(self.ob,self.IA,None) == ('a1',self.ob)
-
-        declareAdapter(self.a2,provides=[self.IA],forObjects=[self.ob])
-        assert adapt(self.ob,self.IA,None) == ('a2',self.ob)
-
-
-    def checkComposed(self):
-        class IC(self.Interface): pass
-        declareAdapter(self.a2,provides=[IC],forProtocols=[self.IA])
-        declareAdapter(self.a1,provides=[self.IA],forObjects=[self.ob])
-        assert adapt(self.ob,IC,None) == ('a2',('a1',self.ob))
-
-
-    def checkIndirectImplication(self):
-        # IB->IA + ID->IC + IC->IB = ID->IA
-
-        class IC(self.Interface):
-            pass
-        class ID(IC):
-            pass
-
-        adviseObject(self.ob, provides=[ID])
-        self.assertObProvidesCandDnotAorB(IC,ID)
-
-        declareAdapter(NO_ADAPTER_NEEDED, provides=[self.IB], forProtocols=[IC]
-        )
-
-        self.assertObProvidesABCD(IC,ID)
-
-    def assertObProvidesABCD(self,IC,ID):
-        assert adapt(self.ob, self.IA, None) is self.ob
-        assert adapt(self.ob, self.IB, None) is self.ob
-        assert adapt(self.ob, IC, None) is self.ob
-        assert adapt(self.ob, ID, None) is self.ob
-
-    def assertObProvidesCandDnotAorB(self,IC,ID):
-        assert adapt(self.ob, self.IA, None) is None
-        assert adapt(self.ob, self.IB, None) is None
-        assert adapt(self.ob, IC, None) is self.ob
-        assert adapt(self.ob, ID, None) is self.ob
-
-
-
-
-    def checkLateDefinition(self):
-
-        adviseObject(self.ob, doesNotProvide=[self.IA])
-        assert adapt(self.ob,self.IA,None) is None
-
-        adviseObject(self.ob, provides=[self.IA])
-        assert adapt(self.ob,self.IA,None) is self.ob
-
-        # NO_ADAPTER_NEEDED at same depth should override DOES_NOT_SUPPORT
-        adviseObject(self.ob, doesNotProvide=[self.IA])
-        assert adapt(self.ob,self.IA,None) is self.ob
-
-
-
 
 
 class ClassChecks(BasicChecks):
@@ -145,11 +80,6 @@ class ClassChecks(BasicChecks):
 
 
 
-
-
-
-
-
     def checkChangingBases(self):
 
         # Zope and Twisted fail this because they rely on the first-found
@@ -160,6 +90,11 @@ class ClassChecks(BasicChecks):
         adviseObject(M2, provides=[self.IB])
         self.assertM1ProvidesOnlyAandM2ProvidesB(M1,M2)
         self.assertChangingBasesChangesInterface(M1,M2,M1,M2)
+
+
+
+
+
 
 
 

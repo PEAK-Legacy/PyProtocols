@@ -103,9 +103,9 @@ def test_suite():
         import twisted.python.components
     except ImportError:
         pass
-    #else:
-    #    from protocols.tests import test_twisted
-    #    tests.append( test_twisted.test_suite() )
+    else:
+        from protocols.tests import test_twisted
+        tests.append( test_twisted.test_suite() )
 
     return TestSuite(
         tests

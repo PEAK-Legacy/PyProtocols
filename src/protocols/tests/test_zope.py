@@ -15,7 +15,7 @@ class IA(Interface):
 class IB(IA):
     pass
 
-from test_classes import ImplementationChecks
+from checks import ImplementationChecks
 
 class BasicChecks(ImplementationChecks):
     IA = IA
