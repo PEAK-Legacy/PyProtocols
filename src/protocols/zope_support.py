@@ -49,7 +49,7 @@ class ZopeInterfaceAsProtocol(StickyAdapter, Protocol):
     )
 
     attachToProtocols = IOpenProtocol,
-    
+
 
     def __init__(self, ob, proto):
         StickyAdapter.__init__(self,ob, proto)
@@ -68,7 +68,7 @@ class ZopeInterfaceAsProtocol(StickyAdapter, Protocol):
             zi.classImplements(klass, self.subject)
 
         elif adapter is DOES_NOT_SUPPORT:
-            ifaces = zi.InterfaceSpecification(
+            ifaces = zi.Declaration(
                 [i.__iro__ for i in zi.implementedBy(klass)]
             ) - self.subject
             zi.classImplementsOnly(klass, ifaces)
@@ -102,7 +102,7 @@ class ZopeInterfaceAsProtocol(StickyAdapter, Protocol):
                 if i is not zi.Interface
         ]
 
-        
+
     def __getstate__(self):
         state = self.__dict__.copy()
         del state['_Protocol__lock']        # locks can't be pickled
