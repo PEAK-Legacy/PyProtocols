@@ -26,10 +26,10 @@
 
     * Add C speedups
 
-    * Thread-safety
-
     * Support DAG-walking for visualization, debugging, and ambiguity detection
 """
+
+
 
 
 
@@ -43,6 +43,7 @@ from __future__ import generators
 from UserDict import UserDict
 from protocols import Interface, Attribute, Protocol, Adapter, StickyAdapter
 from protocols.advice import getMRO, add_assignment_advisor
+from protocols.interfaces import allocate_lock
 import protocols, operator, inspect
 from types import ClassType, InstanceType, FunctionType, NoneType
 ClassTypes = (ClassType, type)
@@ -71,7 +72,6 @@ class NoApplicableMethods(Exception):
 EXPR_GETTER_ID = 0
 RAW_VARARGS_ID = 1
 RAW_KWDARGS_ID = 2
-
 
 
 
@@ -831,9 +831,17 @@ class GenericFunction:
         self.args_by_name = abn = {}; self.args = args
         for n,p in zip(args,range(len(args))):
             abn[n] = self.__argByNameAndPos(n,p)
+        self.__lock = allocate_lock()
         self.clear()
 
     def clear(self):
+        self.__lock.acquire()
+        try:
+            self._clear()
+        finally:
+            self.__lock.release()
+
+    def _clear(self):
         self.dirty = False
         self.cases = []
         self.disp_indexes = {}
@@ -846,17 +854,9 @@ class GenericFunction:
         for signature in IDispatchPredicate(predicate):
             self[signature] = function
 
-
     def testChanged(self):
         self.dirty = True
         self._dispatcher = None
-
-
-    def _rebuild_indexes(self):
-        if self.dirty:
-            cases = self.cases
-            self.clear()
-            map(self._addCase, cases)
 
 
     def _build_dispatcher(self, state=None):
@@ -902,24 +902,26 @@ class GenericFunction:
 
     def __call__(self,*__args,**__kw):
 
-        node = self._dispatcher
-
-        if node is None:
-            node = self._dispatcher = self._build_dispatcher()
-            if node is None:
-                raise NoApplicableMethods
-
-        def get(expr_id):
-            if expr_id in cache:
-                return cache[expr_id]
-            f,args = self.expr_defs[expr_id]
-            return f(*map(get,args))
-
-        cache = {
-            EXPR_GETTER_ID: get, RAW_VARARGS_ID:__args, RAW_KWDARGS_ID:__kw
-        }
+        self.__lock.acquire()
 
         try:
+            node = self._dispatcher
+
+            if node is None:
+                node = self._dispatcher = self._build_dispatcher()
+                if node is None:
+                    raise NoApplicableMethods
+
+            def get(expr_id):
+                if expr_id in cache:
+                    return cache[expr_id]
+                f,args = self.expr_defs[expr_id]
+                return f(*map(get,args))
+
+            cache = {
+                EXPR_GETTER_ID: get, RAW_VARARGS_ID:__args, RAW_KWDARGS_ID:__kw
+            }
+
             while node is not None and type(node) is DispatchNode:
 
                 (expr, dispatch_function) = node.expr_id
@@ -927,17 +929,15 @@ class GenericFunction:
                 if node.contents:
                     node.build()
 
-                node = dispatch_function(get(expr), node)         # XXX
+                node = dispatch_function(get(expr), node)
         finally:
             cache = None    # allow GC of values computed during dispatch
+            self.__lock.release()
 
         if node is not None:
             return node(*__args,**__kw)
         else:
             raise NoApplicableMethods
-
-
-
 
 
 
@@ -959,18 +959,18 @@ class GenericFunction:
         return self.args_by_name[self.args[pos]]
 
 
+    def _rebuild_indexes(self):
+        if self.dirty:
+            cases = self.cases
+            self._clear()
+            map(self._addCase, cases)
 
 
+    def from_function(klass,func):
+        # XXX nested args, var, kw, docstring...
+        return klass(inspect.getargspec(func)[0])
 
-
-
-
-
-
-
-
-
-
+    from_function = classmethod(from_function)
 
 
 
@@ -985,13 +985,18 @@ class GenericFunction:
     def __setitem__(self,signature,method):
         """Update indexes to include 'signature'->'method'"""
         from predicates import Signature
-        signature = Signature(
-            [(self._dispatch_id(expr,test),test)
-                for expr,test in ISignature(signature).items()
-                    if test is not NullTest
-            ]
-        )
-        self._addCase((signature, method))
+
+        self.__lock.acquire()
+        try:
+            signature = Signature(
+                [(self._dispatch_id(expr,test),test)
+                    for expr,test in ISignature(signature).items()
+                        if test is not NullTest
+                ]
+            )
+            self._addCase((signature, method))
+        finally:
+            self.__lock.release()
 
 
     def _addCase(self,case):
@@ -1015,11 +1020,6 @@ class GenericFunction:
 
         self.cases.append(case)
         self._dispatcher = None
-
-
-
-
-
 
 
 
@@ -1073,14 +1073,16 @@ class GenericFunction:
         self.disp_indexes.setdefault(disp,{})
         return expr
 
+
     def getExpressionId(self,expr):
         """Replace 'expr' with a local expression ID number"""
+
+        # XXX this isn't threadsafe if not called from 'asFuncAndIds'
 
         try:
             return self.expr_map[expr]
 
         except KeyError:
-
             expr_def = IDispatchableExpression(expr).asFuncAndIds(self)
 
             try:
@@ -1093,16 +1095,14 @@ class GenericFunction:
 
 
     def parse(self,expr_string,local_dict,global_dict):
-        from predicates import TestBuilder
-        from ast_builder import parse_expr
-        builder = TestBuilder(self.args,local_dict,global_dict,__builtins__)
-        return parse_expr(expr_string,builder)
-
-    def from_function(klass,func):
-        # XXX nested args, var, kw, docstring...
-        return klass(inspect.getargspec(func)[0])
-
-    from_function = classmethod(from_function)
+        self.__lock.acquire()
+        try:
+            from predicates import TestBuilder
+            from ast_builder import parse_expr
+            builder=TestBuilder(self.args,local_dict,global_dict,__builtins__)
+            return parse_expr(expr_string,builder)
+        finally:
+            self.__lock.release()
 
 
 def dm_simple(gf,cond,func,local_dict=None,global_dict=None):
