@@ -6,12 +6,12 @@ from dispatch.interfaces import *
 import protocols, inspect
 from protocols.advice import add_assignment_advisor
 from protocols.interfaces import allocate_lock
-
+from new import instancemethod
 from types import FunctionType, ClassType, InstanceType
 ClassTypes = (ClassType, type)
 
 __all__ = [
-    'SimpleGeneric', 'GenericFunction', 'defmethod', 'when', 'NullTest', 'as',
+    'GenericFunction', 'defmethod', 'when', 'NullTest', 'as', 'on',
 ]
 
 
@@ -80,66 +80,65 @@ def as(*decorators):
 
 
 
-class SimpleGeneric:
-    """Single-dispatch generic function using adaptation
+def _mkGeneric(oldfunc,argname):
+    funcname = oldfunc.__name__
+    args, varargs, kwargs, defaults = spec = inspect.getargspec(oldfunc)
+    if defaults:
+        tmpd = ["=__gfDefaults[%s]" % i for i in range(len(defaults))]
+    else:
+        tmpd = None
 
-    This class may have a slight speed advantage over 'GenericFunction' when
-    you only need to dispatch based on the first argument's type or protocol,
-    and do not need arbitrary predicates.
+    argspec = inspect.formatargspec(
+        args, varargs, kwargs, tmpd, formatvalue=lambda x:x)
+    outargs = inspect.formatargspec(args,varargs,kwargs)
 
-    Also, this class does not require you to adapt the first argument when
-    dispatching based on protocol or interface, and if the first argument has
-    a '__conform__' method, it will attempt to use it, rather than simply
-    dispatching based on class information the way 'GenericFunction' does.
+    protocol = protocols.Protocol()
+    d={}
+    s= """
+def setup(__gfProtocol, __gfDefaults):
 
-    To use a 'SimpleGeneric', just create an instance, and then use
-    'dispatch.when()' or 'dispatch.defmethod()', passing in a class, type,
-    protocol (or list of any of the preceding).  For example::
+    def %(funcname)s%(argspec)s:
+         __gfWhat = __gfProtocol(%(argname)s,None)
+         if __gfWhat is None:
+             raise NoApplicableMethods(%(argname)s)
+         else:
+             %(argname)s = __gfWhat[0]
+             return __gfWhat[1]%(outargs)s
 
-        doSomething = SimpleGeneric("Do something")
 
-        @dispatch.when([SomeClass,OtherClass])
-        def doSomething(x,y,z):
-            # do something when 'isinstance(x,(SomeClass,OtherClass))'
+    return %(funcname)s
+""" % locals()
+    exec s in globals(),d; func = d['setup'](protocol,defaults)
 
-        @dispatch.when(IFoo)
-        def doSomething(x,y,z):
-            # do something to an 'x' that has been adapted to 'IFoo'
-    """
-
-    protocols.advise(
-        instancesProvide=[IExtensibleFunction]
-    )
-
-    def __init__(self,doc):
-        self.__doc__ = doc
-        self.protocol = protocols.Protocol()
-
-    def __call__(self,__disparg, *__args,**__kw):
-        what = self.protocol(__disparg,None)
-        if what is None:
-            raise NoApplicableMethods(__disparg)
-        return what[1](what[0],*__args,**__kw)
-
-    def addMethod(self,cond,func):
-        declarePredicate(cond, self.protocol, lambda ob: (ob,func))
-        
-
-    def when(self,cond):
+    def when(cond):
         """Add following function to this GF, using 'cond' as a guard"""
-
         def callback(frm,name,value,old_locals):
-            self.addMethod(cond, value)
-            if old_locals.get(name) is self:
-                return self
+            declarePredicate(cond, protocol, lambda ob: (ob,value))
+            if old_locals.get(name) is func:
+                return func
             return value
-
         return add_assignment_advisor(callback)
-        
+
+
+
+    def addMethod(cond,func):
+        declarePredicate(cond, protocol, lambda ob: (ob,func))
+
+    func.addMethod = addMethod
+    func.when      = when
+    func.protocol  = protocol
+    func.__doc__   = oldfunc.__doc__
+    protocols.adviseObject(func,provides=[IExtensibleFunction])
+    return func
+
 
 # Bootstrap SimpleGeneric declaration helper function -- itself a SimpleGeneric
 
-declarePredicate = SimpleGeneric("Declare a SimpleGeneric dispatch predicate")
+def declarePredicate(ob,proto,factory):
+    """Declare a SimpleGeneric dispatch predicate"""
+    
+declarePredicate = _mkGeneric(declarePredicate,'ob')
+
 proto = declarePredicate.protocol
 
 def declareForType(typ,proto,factory):
@@ -159,6 +158,7 @@ declareForProto(protocols.IOpenProtocol,proto,
 
 declareForProto(protocols.IBasicSequence,proto,
     lambda ob:(ob,declareForSequence))
+
 
 
 
@@ -598,16 +598,57 @@ def when(cond):
 
     return add_assignment_advisor(callback)
     
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def on(argument_name):
+    """Use the following function as a skeleton for a single-dispatch function
+
+    Single-dispatch functions may have a slight speed advantage over
+    predicate-dispatch generic functions when you only need to dispatch based
+    on the first argument's type or protocol, and do not need arbitrary
+    predicates.
+
+    Also, single-dispatch functions do not require you to adapt the first
+    argument when dispatching based on protocol or interface, and if the
+    dispatch argument has a '__conform__' method, it will attempt to use it,
+    rather than simply dispatching based on class information the way
+    predicate dispatch functions do.
     
+    The created generic function will use the documentation from the supplied
+    function as its docstring.  And, it will dispatch methods based on the
+    argument named by 'argument_name'.  For example::
 
+        @dispatch.on('y')
+        def doSomething(x,y,z):
+            '''Doc for 'doSomething()' generic function goes here'''
 
+        @doSomething.when([SomeClass,OtherClass])
+        def doSomething(x,y,z):
+            # do something when 'isinstance(y,(SomeClass,OtherClass))'
 
+        @doSomething.when(IFoo)
+        def doSomething(x,y,z):
+            # do something to a 'y' that has been adapted to 'IFoo'
+    """
 
+    def callback(frm,name,value,old_locals):
+        return _mkGeneric(value,argument_name)
 
-
-
-
-
+    return add_assignment_advisor(callback)
+    
 
 
 

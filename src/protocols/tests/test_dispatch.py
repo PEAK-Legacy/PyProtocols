@@ -821,42 +821,42 @@ class ExpressionTests(TestCase):
 class SimpleGenerics(TestCase):
 
     def testTrivialities(self):
-        for doc in "foo bar", "baz spam":
-            g = dispatch.SimpleGeneric(doc)
-            self.assertEqual(g.__doc__, doc)
+        [dispatch.on('x')]
+        def f1(x,*y,**z): "foo bar"
+        [dispatch.on('x')]
+        def f2(x,*y,**z): "baz spam"
+
+        for f,doc in (f1,"foo bar"),(f2,"baz spam"):
+            self.assertEqual(f.__doc__, doc)
 
             # Empty generic should raise NoApplicableMethods
-            self.assertRaises(dispatch.NoApplicableMethods, g, 1, 2, 3)
-            self.assertRaises(dispatch.NoApplicableMethods, g, "x", y="z")
+            self.assertRaises(dispatch.NoApplicableMethods, f, 1, 2, 3)
+            self.assertRaises(dispatch.NoApplicableMethods, f, "x", y="z")
 
             # Must have at least one argument to do dispatching
-            self.assertRaises(TypeError, g)
-            self.assertRaises(TypeError, g, foo="bar")
+            self.assertRaises(TypeError, f)
+            self.assertRaises(TypeError, f, foo="bar")
 
     def testSimpleDefinitions(self):
-        g = dispatch.SimpleGeneric("x")
+        [dispatch.on('xx')]
+        def g(xx,*y,**z): pass
 
         class Classic: pass
         class NewStyle(object): pass
         class IFoo(protocols.Interface): pass
         class Impl: protocols.advise(instancesProvide=[IFoo])
-
         c=Classic()
         n=NewStyle()
         i=Impl()
-
-        for item in c,n,i,1,"blue",SimpleGeneric:
+        for item in c,n,i,1,"blue",TestCase:
             self.assertRaises(dispatch.NoApplicableMethods, g, item)
-
-        dispatch.defmethod(g,Classic,lambda *args,**kw: ("classic!",args,kw))
-        dispatch.defmethod(g,NewStyle,lambda *args,**kw: ("new!",args,kw))
-        dispatch.defmethod(g,IFoo,lambda *args,**kw: ("foo!",args,kw))
-
+        g.addMethod(Classic,lambda *args,**kw: ("classic!",args,kw))
+        g.addMethod(NewStyle,lambda *args,**kw: ("new!",args,kw))
+        g.addMethod(IFoo,lambda *args,**kw: ("foo!",args,kw))
         self.assertEqual(g(c,"foo"), ("classic!",(c,"foo",),{}))
         self.assertEqual(g(n,foo="bar"), ("new!",(n,),{'foo':'bar'}))
         self.assertEqual(g(i,"foo",x="y"), ("foo!",(i,"foo",),{"x":"y"}))
-
-        for item in 1,"blue",SimpleGeneric:
+        for item in 1,"blue",TestCase:
             self.assertRaises(dispatch.NoApplicableMethods, g, item)
 
     def testMultiDefinition(self):
@@ -869,19 +869,18 @@ class SimpleGenerics(TestCase):
         n=NewStyle()
         i=Impl()
 
-        g = dispatch.SimpleGeneric("x")
+        [dispatch.on('xx')]
+        def g(xx,q=27,*y,**z): pass
 
-        [dispatch.when([Classic,NewStyle,IFoo])]
+        [g.when([Classic,NewStyle,IFoo])]
         def g(*args,**kw):
             return ("yes!",args,kw)
 
         self.assertEqual(g(c,"foo"), ("yes!",(c,"foo",),{}))
-        self.assertEqual(g(n,foo="bar"), ("yes!",(n,),{'foo':'bar'}))
+        self.assertEqual(g(n,foo="bar"), ("yes!",(n,27),{'foo':'bar'}))
         self.assertEqual(g(i,"foo",x="y"), ("yes!",(i,"foo",),{"x":"y"}))
-
-        for item in 1,"blue",SimpleGeneric:
+        for item in 1,"blue",TestCase:
             self.assertRaises(dispatch.NoApplicableMethods, g, item)
-
 
     def testAdaptedDefinition(self):
         class Classic: pass
@@ -890,11 +889,12 @@ class SimpleGenerics(TestCase):
             protocols.advise(
                 instancesProvide=[IFoo],asAdapterForTypes=[Classic]
             )
-        g = dispatch.SimpleGeneric("x")
-        [dispatch.when(IFoo)]
+        [dispatch.on('xx')]
+        def g(xx,*y,**z): pass
+
+        [g.when(IFoo)]
         def g(thing, *args,**kw):
             return thing
-
         c=Classic(); it = g(c)
         self.assertNotEqual(it, c)
         self.failUnless(IFoo(it) is it)
@@ -919,21 +919,62 @@ class SimpleGenerics(TestCase):
         self.assertEqual(m(LandVehicle()),"land")
         self.assertEqual(m(WaterVehicle()),"water")
 
-        s = dispatch.SimpleGeneric("x")
-        s.when(LandVehicle)
+        [dispatch.on('v')]
+        def s(v):
+            """Blah"""
+
+        [s.when(LandVehicle)]
         def bar(v):
             return "land"
 
-        self.failUnless(isinstance(s,SimpleGeneric))
+        self.failUnless(hasattr(s,'when'))
         self.failUnless(isinstance(bar,types.FunctionType))
 
-        s.when(WaterVehicle)
+        [s.when(WaterVehicle)]
         def s(v):
             return "water"
 
-        self.failUnless(isinstance(s,SimpleGeneric))
+        self.failUnless(hasattr(s,'when'))
         self.assertEqual(s(LandVehicle()),"land")
         self.assertEqual(s(WaterVehicle()),"water")
+
+
+
+
+    def testAltArg(self):
+        [dispatch.on('v')]
+        def s(x,v):
+            """X"""
+
+        [s.when(LandVehicle)]
+        def bar(x,v):
+            return "land"
+
+        [s.when(WaterVehicle)]
+        def s(x,v):
+            return "water"
+
+        self.assertEqual(s(None,LandVehicle()),"land")
+        self.assertEqual(s(None,v=WaterVehicle()),"water")
+
+    def testInstanceMethod(self):
+        class X:
+            [dispatch.on('v')]
+            def s(x,v):
+                """X"""
+
+            [s.when(LandVehicle)]
+            def bar(x,v):
+                return "land"
+
+            [s.when(WaterVehicle)]
+            def s(x,v):
+                return "water"
+        
+        self.assertEqual(X().s(v=LandVehicle()),"land")
+        self.assertEqual(X().s(WaterVehicle()),"water")
+
+
 
 
 
