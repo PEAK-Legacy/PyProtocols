@@ -171,8 +171,7 @@ def advise(**kw):
 
     if kind=="module":
         moduleProvides = kw.setdefault('moduleProvides',())
-        moduleDoesNotProvide = kw.setdefault('moduleDoesNotProvide',())
-        del kw['moduleProvides'], kw['moduleDoesNotProvide']
+        del kw['moduleProvides']
 
         for k in kw:
             raise TypeError(
@@ -180,7 +179,7 @@ def advise(**kw):
             )
 
         adviseObject(module,
-            provides=moduleProvides, doesNotProvide=moduleDoesNotProvide
+            provides=moduleProvides
         )
         return
 
@@ -202,6 +201,7 @@ def advise(**kw):
     map(kw.__delitem__,"classProvides classDoesNotProvide instancesProvide"
         " instancesDoNotProvide asAdapterForTypes asAdapterForProtocols"
         " protocolExtends protocolIsSubsetOf".split())
+
 
     for k in kw:
         raise TypeError(
