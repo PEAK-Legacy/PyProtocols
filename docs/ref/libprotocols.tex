@@ -1346,7 +1346,7 @@ an object that provides \class{IAdapterFactory}; i.e., its constructor should
 accept being called with two arguments: the object to be adapted, and the
 target protocol.)
 
-\item[factoryMethod = \var{methodName}] \hfill \\ \versionadded{1.0}
+\item[factoryMethod = \var{methodName}] \hfill \\ \versionadded{0.9.1}
 When using \code{asAdapterForTypes} or \code{asAdapterForProtocols}, you can
 also supply a factory method name, using this keyword.  The method named must be
 a \emph{class} method, and it will be used in place the class' normal constructor.
@@ -1404,7 +1404,7 @@ Using this keyword argument is equivalent to calling
 forProtocols=\var{protocols})}.
 
 \item[equivalentProtocols = \var{protocols}] \hfill \\
-\versionadded{1.0}
+\versionadded{0.9.1}
 Declare that the containing class is a protocol that is equivalent to the
 listed protocols.  That is, the containing protocol both implies, and is implied
 by, the listed protocols.  This is a convenience feature intended mainly to
@@ -1720,12 +1720,12 @@ for more details on these and other functions that relate to adapter paths.
 
 
 \newpage
-\subsection{Dynamic Protocols (NEW in 1.0)\label{protocols-generated}}
+\subsection{Dynamic Protocols (NEW in 0.9.1)\label{protocols-generated}}
 
 For many common uses of protocols, it may be inconvenient to subclass
 \class{protocols.Interface} or to manually create a \class{Protocol} instance.
-So, the \module{protocols} package includes a number of utility methods to make
-these uses more convenient.
+So, the \module{protocols} package includes a number of utility functions to
+make these uses more convenient.
 
 
 
@@ -1761,7 +1761,7 @@ these uses more convenient.
 
 
 
-\subsubsection{Defining a protocol based on a URI or UUID}
+\subsubsection{Defining a protocol based on a URI or UUID}\label{protocols-generated-uri}
 \begin{funcdesc}{protocolForURI}{uri}
 Return a protocol object that represents the supplied URI or UUID string.  It
 is guaranteed that you will receive the same protocol object if you call this
@@ -1802,7 +1802,7 @@ error occurs.
 \end{funcdesc}
 
 
-\subsubsection{Defining a protocol as a subset of an existing type}
+\subsubsection{Defining a protocol as a subset of an existing type}\label{protocols-generated-type}
 \begin{funcdesc}{protocolForType}{baseType,
 \optional{methods=(), implicit=False}}
 Return a protocol object that represents the subset of \var{baseType} denoted
@@ -1859,14 +1859,55 @@ requested for different base types, regardless of any subclass/superclass
 relationship between the base types.
 \end{funcdesc}
 
+\subsubsection{Defining a protocol for a sequence}\label{protocols-generated-sequence}
+\begin{funcdesc}{sequenceOf}{protocol} \versionadded{0.9.1}
+Return a protocol object that represents a sequence of objects adapted to
+\var{protocol}.  Thus, \code{protocols.sequenceOf(IFoo)} is a protocol that
+represents a \class{protocols.IBasicSequence} of objects supporting the
+\class{IFoo} protocol.  It is guaranteed that you will receive the same protocol
+object if you call this routine more than once with the same protocol, even
+across pickling and unpickling of the returned protocol object.
 
-\subsubsection{Defining a protocol for a sequence}
+When this function creates a new sequence protocol, it automatically declares
+an adapter function from \class{protocols.IBasicSequence} to the new protocol.
+The adapter function returns the equivalent of \code{[adapt(x,protocol) for x
+in sequence]}, unless one of the adaptations fails, in which case it returns
+\code{None}, causing the adaptation to fail.
 
-XXX sequenceOf()
+The built-in \class{list} and \class{tuple} types are declared as
+implementations of \class{protocols.IBasicSequence}, so protocols returned by
+\function{sequenceOf()} can be used immediately to convert lists or tuples into
+lists of objects supporting \var{protocol}.  If you need to adapt other kinds
+of sequences using your \function{sequenceProtocol()}, you will need to declare
+that those sequences implement \class{protocols.IBasicSequence} unless they
+subclass \class{tuple}, \class{list}, or some other type that implements
+\class{protocols.IBasicSequence}.
+\end{funcdesc}
 
-\subsubsection{Defining a protocol as a local variation of another protocol}
+\subsubsection{Defining a protocol as a local variation of another protocol}\label{protocols-generated-local}
 
-XXX Variation
+\begin{classdesc}{Variation}{baseProtocol \optional{, context=None}}
+\versionadded{0.9.1}
+A \class{Variation} is a \class{Protocol} that "inherits" adapter declarations
+from an existing protocol.  When you create a \class{Variation}, it declares
+that it is implied by its \var{baseProtocol}, and so any adpater suitable for
+adapting to the base protocol is therefore suitable for the \class{Variation}.
+This allows you to then declare adapters to the variation protocol, without
+affecting those declared for the base protocol.  In this way, you can have a
+protocol object that represents the use of the base protocol in a particular
+context.  You can optionally specify that context via the \var{context}
+argument, which will then serve as the \member{context} attribute of the
+protocol.  For more background on how this works and what it might be used for,
+see section \ref{protocols-context}.
+\end{classdesc}
+
+
+
+
+
+
+
+
 
 
 
@@ -1887,8 +1928,7 @@ XXX Variation
 \subsection{Package Contents and Contained Modules\label{protocols-contents}}
 
 The following functions, classes, and interfaces are available from the
-top-level \module{protocols} package.  They are arranged roughly in order of
-their expected frequency of use, with more frequently-used items listed first.
+top-level \module{protocols} package.
 
 \begin{funcdesc}{adapt}{component, protocol,
 \optional{, default \optional{, factory}}}
@@ -1909,21 +1949,29 @@ A detailed description of this function's operations and purpose may be found in
 section \ref{adapt-protocol}.
 \end{funcdesc}
 
-\begin{classdesc*}{Interface}
-Subclass this to create an interface.  See section \ref{protocols-defining}
-for more details.
-\end{classdesc*}
+\begin{classdesc}{Adapter}{ob, proto}
+\versionadded{0.9.1}
+This base class provides a convenient \method{__init__} method for adapter
+classes.  To use it, just subclass \class{protocols.Adapter} and add methods
+to implement the desired interface(s).  (And of course, declare what interfaces
+the adapter provides, for what types, and so on.)  Your subclass' methods can
+use the following attributes, which will have been set by the \method{__init__}
+method:
+
+\begin{memberdesc}{subject}
+The \member{subject} attribute of an \class{Adapter} instance is
+the \var{ob} supplied to its constructor.  That is, it is the object being
+adapted.
+\end{memberdesc}
 
 
 
-
-
-
-
-
-
-
-
+\begin{memberdesc}{protocol}
+The \member{subject} attribute of an \class{Adapter} instance is
+the \var{proto} supplied to its constructor.  That is, it is the protocol to
+which the \member{subject} is being adapted.
+\end{memberdesc}
+\end{classdesc}
 
 \begin{funcdesc}{advise}{**kw}
 Declare protocol relationships for the containing class or module.  All
@@ -1944,69 +1992,6 @@ the \code{__metaclass__} of the class.  If your class sets an explicit
 called, or the protocol declarations will not occur!}
 \end{funcdesc}
 
-\begin{classdesc}{Adapter}{ob, proto}
-\versionadded{1.0}
-This base class provides a convenient \method{__init__} method for adapter
-classes.  To use it, just subclass \class{protocols.Adapter} and add methods
-to implement the desired interface(s).  (And of course, declare what interfaces
-the adapter provides, for what types, and so on.)  Your subclass' methods can
-use the following attributes, which will have been set by the \method{__init__}
-method:
-
-\begin{memberdesc}{subject}
-The \member{subject} attribute of an \class{Adapter} instance is
-the \var{ob} supplied to its constructor.  That is, it is the object being
-adapted.
-\end{memberdesc}
-
-\begin{memberdesc}{protocol}
-The \member{subject} attribute of an \class{Adapter} instance is
-the \var{proto} supplied to its constructor.  That is, it is the protocol to
-which the \member{subject} is being adapted.
-\end{memberdesc}
-\end{classdesc}
-
-\begin{funcdesc}{NO_ADAPTER_NEEDED}{component, protocol}
-This function simply returns \var{component}.  It is a placeholder used whenever
-an object, type, or protocol directly implements or implies another protocol.
-Whenever an adapter is not required, but the \module{protocols} API function
-you are calling requires an adapter, you should supply this function as the
-adapter.  Some protocol implementations, such as the one for Zope interfaces,
-are unable to handle adapters other than \function{NO_ADAPTER_NEEDED} and
-\function{DOES_NOT_SUPPORT}.
-\end{funcdesc}
-
-
-\begin{funcdesc}{DOES_NOT_SUPPORT}{component, protocol}
-This function simply returns \constant{None}.  It is a placeholder used whenever
-an object, type, or protocol does not implement or imply another protocol.
-Whenever adaptation is not possible, but the \module{protocols} API function
-you are calling requires an adapter, you should supply this function as the
-adapter.  Some protocol implementations, such as the one for Zope interfaces,
-are unable to handle adapters other than \function{NO_ADAPTER_NEEDED} and
-\function{DOES_NOT_SUPPORT}.
-\end{funcdesc}
-
-\begin{funcdesc}{declareImplementation}{typ
-\optional{, instancesProvide=[ ]} \optional{, instancesDoNotProvide=[ ]}}
-
-Declare that instances of class or type \var{typ} do or do not provide
-implementations of the specified protocols.  \var{instancesProvide} and
-\var{instancesDoNotProvide} must be sequences of protocol objects that
-provide (or are adaptable to) the \class{IOpenProtocol} interface,
-such as \class{protocols.Interface} subclasses, or \class{Interface} objects
-from Zope or Twisted.
-
-This function is shorthand for calling \function{declareAdapterForType()}
-with \function{NO_ADAPTER_NEEDED} and \function{DOES_NOT_SUPPORT} as adapters
-from the type to each of the specified protocols.  Note, therefore, that the
-listed protocols must be adaptable to \class{IOpenProtocol}.
-\end{funcdesc}
-
-
-
-
-
 \begin{funcdesc}{adviseObject}{ob
 \optional{, provides=[ ]} \optional{, doesNotProvide=[ ]}}
 Declare that \var{ob} provides (or does not provide) the specified protocols.
@@ -2018,6 +2003,32 @@ must be adaptable to \class{IOpenProtocol}.  See section
 \ref{protocols-instances}, ``Protocol Declarations for Individual Objects'',
 for more information on using \function{adviseObject}.
 \end{funcdesc}
+
+
+
+
+\begin{classdesc}{Attribute}{doc\optional{,name=\constant{None}, value=\constant{None}}}
+This class is used to document attributes required by an interface.  An example
+usage:
+
+\begin{verbatim%
+}from protocols import Interface, Attribute
+
+class IFoo(Interface):
+
+    Bar = Attribute("""All IFoos must have a Bar attribute""")
+\end{verbatim}
+
+If you are using the ``Abstract Base Class'' or ABC style of interface
+documentation, you may wish to also use the \var{name} and \var{value}
+attributes.  If supplied, the \class{Attribute} object will act as a data
+descriptor, supplying \var{value} as a default value, and storing any newly set
+value in the object's instance dictionary.  This is useful if you will be
+subclassing the abstract base and creating instances of it, but still want to
+have documentation appear in the interface.  When the interface is displayed
+with tools like \program{pydoc} or \function{help()}, the attribute
+documentation will be shown.
+\end{classdesc}
 
 
 \begin{funcdesc}{declareAdapter}{factory, provides
@@ -2037,11 +2048,123 @@ for each of the protocols listed in \var{provides} and each of the
 items listed in the respective keyword arguments.
 \end{funcdesc}
 
+\begin{funcdesc}{declareImplementation}{typ
+\optional{, instancesProvide=[ ]} \optional{, instancesDoNotProvide=[ ]}}
+
+Declare that instances of class or type \var{typ} do or do not provide
+implementations of the specified protocols.  \var{instancesProvide} and
+\var{instancesDoNotProvide} must be sequences of protocol objects that
+provide (or are adaptable to) the \class{IOpenProtocol} interface,
+such as \class{protocols.Interface} subclasses, or \class{Interface} objects
+from Zope or Twisted.
+
+This function is shorthand for calling \function{declareAdapterForType()}
+with \function{NO_ADAPTER_NEEDED} and \function{DOES_NOT_SUPPORT} as adapters
+from the type to each of the specified protocols.  Note, therefore, that the
+listed protocols must be adaptable to \class{IOpenProtocol}.
+\end{funcdesc}
+
+
+\begin{funcdesc}{DOES_NOT_SUPPORT}{component, protocol}
+This function simply returns \constant{None}.  It is a placeholder used whenever
+an object, type, or protocol does not implement or imply another protocol.
+Whenever adaptation is not possible, but the \module{protocols} API function
+you are calling requires an adapter, you should supply this function as the
+adapter.  Some protocol implementations, such as the one for Zope interfaces,
+are unable to handle adapters other than \function{NO_ADAPTER_NEEDED} and
+\function{DOES_NOT_SUPPORT}.
+\end{funcdesc}
+
+
+\begin{classdesc*}{Interface}
+Subclass this to create an interface.  See section \ref{protocols-defining}
+for more details.
+\end{classdesc*}
 
 
 
 
 
+
+
+
+
+\begin{funcdesc}{NO_ADAPTER_NEEDED}{component, protocol}
+This function simply returns \var{component}.  It is a placeholder used whenever
+an object, type, or protocol directly implements or implies another protocol.
+Whenever an adapter is not required, but the \module{protocols} API function
+you are calling requires an adapter, you should supply this function as the
+adapter.  Some protocol implementations may be unable to handle adapters other
+than \function{NO_ADAPTER_NEEDED} and \function{DOES_NOT_SUPPORT}.
+\end{funcdesc}
+
+\begin{funcdesc}{protocolForType}{baseType,
+\optional{methods=(), implicit=False}} \versionadded{0.9.1}
+Return a protocol object that represents the subset of \var{baseType} denoted
+by \var{methods}.  It is guaranteed that you will receive the same protocol
+object if you call this routine more than once with eqivalent paremeters.  This
+behavior is preserved even across pickling and unpickling of the returned
+protocol object.
+
+\var{baseType} should be a type object, and \var{methods} should be a sequence
+of attribute or method names.  (The order of the names is not important.)  The
+\var{implicit} flag allows adapting objects that don't explicitly declare
+support for the protocol.
+
+If you supply a true value for the \var{implicit} flag, the returned protocol
+will also adapt objects that have the specified methods or attributes.  In
+other words, \code{protocolForType(file, ['read','close'], True)} returns a
+protocol that will consider any object with \method{read} and \method{close}
+methods to provide that protocol, as well as objects that explicitly support
+\code{protocolForType(file, ['read','close'])}.
+
+A more detailed description of this function's operations and purpose may be
+found in section \ref{protocols-generated-type}.
+
+(Note: this function may generate up to \code{2**len(\var{methods})} protocol
+objects, so beware of using large method lists.)
+\end{funcdesc}
+
+
+
+
+
+
+\begin{funcdesc}{protocolForURI}{uri} \versionadded{0.9.1}
+Return a protocol object that represents the supplied URI or UUID string.  It
+is guaranteed that you will receive the same protocol object if you call this
+routine more than once with equal strings.  This behavior is preserved even
+across pickling and unpickling of the returned protocol object.
+
+The purpose of this function is to permit modules to refer to protocols defined
+in another module, that may or may not be present at runtime.  A more detailed
+description of this function's operations and purpose may be found in
+section \ref{protocols-generated-uri}.
+\end{funcdesc}
+
+\begin{funcdesc}{sequenceOf}{protocol} \versionadded{0.9.1}
+Return a protocol object that represents a sequence of objects adapted to
+\var{protocol}.  Thus, \code{protocols.sequenceOf(IFoo)} is a protocol that
+represents a \class{protocols.IBasicSequence} of objects supporting the
+\class{IFoo} protocol.  It is guaranteed that you will receive the same protocol
+object if you call this routine more than once with the same protocol, even
+across pickling and unpickling of the returned protocol object.
+
+When this function creates a new sequence protocol, it automatically declares
+an adapter function from \class{protocols.IBasicSequence} to the new protocol.
+The adapter function returns the equivalent of \code{[adapt(x,protocol) for x
+in sequence]}, unless one of the adaptations fails, in which case it returns
+\code{None}, causing the adaptation to fail.
+
+The built-in \class{list} and \class{tuple} types are declared as
+implementations of \class{protocols.IBasicSequence}, so protocols returned by
+\function{sequenceOf()} can be used immediately to convert lists or tuples into
+lists of objects supporting \var{protocol}.  If you need to adapt other kinds
+of sequences using your \function{sequenceProtocol()}, you will need to declare
+that those sequences implement \class{protocols.IBasicSequence} unless they
+subclass \class{tuple}, \class{list}, or some other type that implements
+\class{protocols.IBasicSequence}.
+\end{funcdesc}
 
 
 
@@ -2049,7 +2172,7 @@ items listed in the respective keyword arguments.
 
 
 \begin{classdesc}{StickyAdapter}{ob, proto}
-\versionadded{1.0}
+\versionadded{0.9.1}
 This base class is the same as the \class{Adapter} class, but with an extra
 feature.  When a \class{StickyAdapter} instance is created, it declares itself
 as an adapter for its \member{subject}, so that subsequent \function{adapt()}
@@ -2088,88 +2211,6 @@ use the same instance to supply them.
 
 
 
-
-\begin{classdesc}{Attribute}{doc\optional{,name=\constant{None}, value=\constant{None}}}
-This class is used to document attributes required by an interface.  An example
-usage:
-
-\begin{verbatim%
-}from protocols import Interface, Attribute
-
-class IFoo(Interface):
-
-    Bar = Attribute("""All IFoos must have a Bar attribute""")
-\end{verbatim}
-
-If you are using the ``Abstract Base Class'' or ABC style of interface
-documentation, you may wish to also use the \var{name} and \var{value}
-attributes.  If supplied, the \class{Attribute} object will act as a data
-descriptor, supplying \var{value} as a default value, and storing any newly set
-value in the object's instance dictionary.  This is useful if you will be
-subclassing the abstract base and creating instances of it, but still want to
-have documentation appear in the interface.  When the interface is displayed
-with tools like \program{pydoc} or \function{help()}, the attribute
-documentation will be shown.
-\end{classdesc}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-\begin{funcdesc}{protocolForURI}{uri} \versionadded{1.0}
-Return a protocol object that represents the supplied URI or UUID string.  It
-is guaranteed that you will receive the same protocol object if you call this
-routine more than once with equal strings.  This behavior is preserved even
-across pickling and unpickling of the returned protocol object.
-
-The purpose of this function is to permit modules to refer to protocols defined
-in another module, that may or may not be present at runtime.  A more detailed
-description of this function's operations and purpose may be found in
-section \ref{protocols-generated}.
-\end{funcdesc}
-
-\begin{funcdesc}{protocolForType}{baseType,
-\optional{methods=(), implicit=False}} \versionadded{1.0}
-Return a protocol object that represents the subset of \var{baseType} denoted
-by \var{methods}.  It is guaranteed that you will receive the same protocol
-object if you call this routine more than once with eqivalent paremeters.  This
-behavior is preserved even across pickling and unpickling of the returned
-protocol object.
-
-\var{baseType} should be a type object, and \var{methods} should be a sequence
-of attribute or method names.  (The order of the names is not important.)  The
-\var{implicit} flag allows adapting objects that don't explicitly declare
-support for the protocol.
-
-If you supply a true value for the \var{implicit} flag, the returned protocol
-will also adapt objects that have the specified methods or attributes.  In
-other words, \code{protocolForType(file, ['read','close'], True)} returns a
-protocol that will consider any object with \method{read} and \method{close}
-methods to provide that protocol, as well as objects that explicitly support
-\code{protocolForType(file, ['read','close'])}.
-
-A more detailed description of this function's operations and purpose may be
-found in section \ref{protocols-generated}.
-
-(Note: this function may generate up to \code{2**len(\var{methods})} protocol
-objects, so beware of using large method lists.)
-\end{funcdesc}
-
-
 \newpage
 \subsubsection{Classes and Functions typically used for Customization/Extension}
 
@@ -2196,6 +2237,21 @@ instances, and then use them with the declaration API.  You can also subclass
 in your subclass' \function{__init__} method.
 \end{classdesc*}
 
+\begin{classdesc}{Variation}{baseProtocol \optional{, context=None}}
+\versionadded{0.9.1}
+A \class{Variation} is a \class{Protocol} that "inherits" adapter declarations
+from an existing protocol.  When you create a \class{Variation}, it declares
+that it is implied by its \var{baseProtocol}, and so any adpater suitable for
+adapting to the base protocol is therefore suitable for the \class{Variation}.
+This allows you to then declare adapters to the variation protocol, without
+affecting those declared for the base protocol.  In this way, you can have a
+protocol object that represents the use of the base protocol in a particular
+context.  You can optionally specify that context via the \var{context}
+argument, which will then serve as the \member{context} attribute of the
+protocol.  For more background on how this works and what it might be used for,
+see section \ref{protocols-context}.
+\end{classdesc}
+
 
 \begin{classdesc}{InterfaceClass}{name, bases, dictionary}
 \class{InterfaceClass}, a subclass of \class{Protocol} and \class{type}, is a
@@ -2206,11 +2262,14 @@ will only use \class{InterfaceClass} if you need to combine it with another
 metaclass, in a subclass of \class{Interface}.
 \end{classdesc}
 
-
-
-
-
-
+\begin{classdesc}{IBasicSequence} \versionadded{0.9.1}
+This interface represents the ability to iterate over a container-like object,
+such as a list or tuple.  An \class{IBasicSequence} object must have an
+\method{__iter__()} method.  By default, only the built-in \class{list} and
+\class{tuple} types are declared as having instances providing this interface.
+If you want to be able to adapt to \function{sequenceOf()} protocols from other
+sequence types, you should declare that their instances support this protocol.
+\end{classdesc}
 
 \begin{classdesc*}{ProviderMixin}
 If you have a class with a \method{__conform__} method for its instances, but
@@ -2227,6 +2286,12 @@ method invoke the base \method{__conform__} method as a default, using
 supermeta(MyClass,self).__conform__(protocol)}.)  See below for more on
 the \function{supermeta()} function.
 \end{classdesc*}
+
+
+
+
+
+
 
 
 \begin{funcdesc}{metamethod}{func}
@@ -2262,7 +2327,6 @@ to \class{IOpenImplementor}, its \function{declareClassImplements} method is
 called as well.
 \end{funcdesc}
 
-
 \begin{funcdesc}{declareAdapterForObject}{protocol, adapter, ob \optional{,
 depth=1}}
 Declare that \var{adapter} adapts the object \var{ob} to \var{protocol}, by
@@ -2271,7 +2335,6 @@ adapting \var{protocol} to \class{IOpenProtocol} and calling its
 \class{IOpenProvider}.  See section \ref{protocols-instances} for details.
 \end{funcdesc}
 
-
 \begin{funcdesc}{declareAdapterForProtocol}{protocol, adapter, proto \optional{,
 depth=1}}
 Declare that \var{adapter} adapts objects that provide protocol \var{proto}
@@ -2279,6 +2342,25 @@ to \var{protocol}, by calling
 \code{adapt(\var{proto},IOpenProtocol).addImpliedProtocol(\var{protocol},\var{adapter},\var{depth})}.
 
 \end{funcdesc}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2632,22 +2714,26 @@ adapter supports the following subset of the declaration API:
 
 \begin{itemize}
 
-\item The only adapters supported are \function{NO_ADAPTER_NEEDED} and
-\function{DOES_NOT_SUPPORT}.  Calling \method{__adapt__()} on a Zope
-\class{Interface} will thus only return the original object, or \constant{None}.
-Note that this may change in future releases of Zope X3, as Jim Fulton has
-expressed an intention to add an \method{__adapt__()} method using a global
-adapter registry.   At that time, it may also become possible to register
-other adapters via the \module{protocols} declaration API.
+\item The only adapters supported via Zope APIs are \function{NO_ADAPTER_NEEDED}
+and \function{DOES_NOT_SUPPORT}.  By using PyProtocols APIs, you may declare and
+use other adapters for Zope interfaces, but Zope itself will not use them, since
+the Zope interface API does not directly support adaptation.
 
-\item Zope interfaces do not conform to \module{protocols} package ``shortest
-path wins'' semantics.  Instead, new declarations override older ones.
+\item Zope's interface APIs do not conform to \module{protocols} package
+``shortest path wins'' semantics.  Instead, new declarations override older
+ones.
+
+\item Interface-to-interface adaptation may not work if a class only declares
+what it implements using Zope's interface API.  That is, if a class declares
+that it implements \class{ISomeZopeInterface}, and you define an adaptation from
+\class{ISomeZopeInterface} to \class{ISomeOtherInterface}, PyProtocols may not
+recognize that the class can be adapted to \class{ISomeOtherInterface}.
 
 \item Changing the \member{__bases__} of a class that has Zope interfaces
 declared for it (either as ``class provides'' or ``instances provide''), may
 have unexpected results, because Zope uses inheritance of a single descriptor
 to control declarations.  In general, it will only work if the class whose
-\member{bases} are changed, has no declarations of its own.
+\member{bases} are changed, has no declarations of its own.  (XXX MS4?)
 
 \item You cannot declare an implication relationship from a Zope
 \class{Interface}, because Zope only supports implication via
@@ -2661,7 +2747,6 @@ Zope \class{Interface}.  Declaring that a class' instances or that an object
 provides the extended interface, will automatically declare that the class'
 instances or the object provides the Zope \class{Interface} as well.  For
 example:
-
 
 \begin{verbatim%
 }import protocols
@@ -2688,20 +2773,17 @@ store information about what interface a class or object provides.  But each has
 a different interpretation of the contents, and does not expect to find
 ``foreign'' interfaces contained within.  So, until this issue between Zope and
 Twisted is resolved, it is not very useful to create interfaces that extend
-both Zope and Twisted interfaces.
+both Zope and Twisted interfaces.  (XXX MS4?)
 
 \item Zope does not currently appear to support classes inheriting direct
 declarations (e.g. \code{classProvides}).  This may be a bug in the current
-version.
+version.  (XXX MS4?)
 
 \end{itemize}
 
 The current implementation of support for Zope X3 interfaces is currently based
 on the Zope X3 CVS version; it does not work with older releases such as the
 ``milestone 2'' release.
-
-
-
 
 \newpage
 \subsubsection{\module{protocols.twisted_support} --- Support for Twisted Interfaces}
@@ -3166,6 +3248,12 @@ interface they expect their local protocols' \member{context} attribute to
 supply!  Also, see below for a web site with some interesting papers on
 patterns for using localized adaptation of this kind.
 
+\note{In practice, the idea of having local protocols turned out to be useful enough
+that as of version 0.9.1, our \class{LocalProtocol} example class was added to
+the protocols package as \class{protocols.Variation}.  So, if you want to
+make use of the idea, you don't need to type in the source or write your own
+any more.}
+
 \begin{seealso}
 
 \seetitle[http://www.objectteams.org/]{Object Teams}{If you find the idea of
@@ -3181,12 +3269,6 @@ object so that the adapter can be informed when the adapted object's methods
 are called directly by other code.)}
 
 \end{seealso}
-
-
-
-
-
-
 
 
 

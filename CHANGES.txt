@@ -2,7 +2,7 @@ Fixes and Enhancements since PyProtocols 0.9
 
  - Added the 'factoryMethod' and 'equivalentProtocols' keywords to 'advise()'.
 
- - (NEEDS DOC) Added 'sequenceOf()', allowing you to easily create a protocol
+ - Added 'sequenceOf()', allowing you to easily create a protocol
    that represents a sequence of some base protocol, and automatically adapt
    basic sequences (e.g. lists and tuples) to a "sequence of" the base
    protocol, as long as all members of the input sequence can be adapted to the
@@ -20,14 +20,14 @@ Fixes and Enhancements since PyProtocols 0.9
    module is used in a larger program, the linkage between the symbolic and
    actual forms of the interface can be accomplished semi-automatically.
 
- - (NEEDS DOC) Enhanced Zope 3 support: Now, adapters can be registered between
-   Zope interfaces, and any types or instances.  Note, however, that
+ - Enhanced Zope 3 support: Now, adapters can be registered between Zope
+   interfaces, and any types or instances.  Note, however, that
    interface-to-interface adaptation may not work if a class only declares what
    it implements using the Zope interface API.  This limitation might be able
    to be removed later.  Zope interfaces can now pass a much larger segment of
    the test suite than before.
 
- - (NEEDS DOC) Added 'protocols.Variation(baseProtocol,context=None)'; this
+ - Added 'protocols.Variation(baseProtocol,context=None)'; this
    implements the 'LocalProtocol' example in the documentation.
 
  - Added 'Adapter' and 'StickyAdapter' convenience base classes.  'Adapter'

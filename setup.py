@@ -10,7 +10,7 @@ execfile('src/setup/prologue.py')
 
 # Metadata
 PACKAGE_NAME = "PyProtocols"
-PACKAGE_VERSION = "0.9"
+PACKAGE_VERSION = "0.9.1"
 HAPPYDOC_IGNORE = ['-i', 'tests', '-i', 'setup']
 
 
@@ -45,7 +45,7 @@ setup(
 
     description="Open Protocols and Component Adaptation for Python",
     author="Phillip J. Eby",
-    author_email="transwarp@eby-sarna.com",
+    author_email="peak@eby-sarna.com",
     license="PSF or ZPL",
 
     url="http://peak.telecommunity.com/PyProtocols.html",
