@@ -102,22 +102,22 @@ class AdviseFunction(TestCase):
         assert adapt(self.ob, ID, None) is self.ob
 
 
+    def checkBadConform(self):
+        def __conform__(proto):
+            pass
+        self.ob.__conform__ = __conform__
+        self.assertBadConform(self.ob, [IA], __conform__)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    def assertBadConform(self, ob, protocols, conform):
+        try:
+            adviseObject(ob, provides=protocols)
+        except TypeError,v:
+            assert v.args==(
+                "Incompatible __conform__ on adapted object", ob, conform
+            ), v.args
+        else:
+            raise AssertionError("Should've detected invalid __conform__")
 
 
 
@@ -151,12 +151,53 @@ class AdviseClass(AdviseFunction):
         assert adapt(Sub, IA, None) is Sub
 
 
+
+
+
+
+
+
+
+
+
+
+
+    def checkInheritedConform(self):
+
+        class Base(self.ob):
+            def __conform__(self,protocol):
+                pass
+
+        class Sub(Base):
+            pass
+
+        self.assertBadConform(Sub, [IA], Base.__conform__)
+
+
+    def checkInstanceConform(self):
+
+        class Base(self.ob):
+            def __conform__(self,protocol):
+                pass
+
+        b = Base()
+
+        self.assertBadConform(b, [IA], b.__conform__)
+
+
 class AdviseType(AdviseClass):
 
     def setUp(self):
         class Class(object):
             pass
         self.ob = Class
+
+
+
+
+
+
+
 
 
 

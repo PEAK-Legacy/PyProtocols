@@ -103,8 +103,6 @@ def declareAdapterForProtocol(protocol, adapter, proto, depth=1):
 
 def declareAdapterForObject(protocol, adapter, ob, depth=1):
     """Declare that 'adapter' adapts 'ob' to 'protocol'"""
-    ob = adapt(ob,IOpenProvider)
-    ob.declareProvides(protocol,adapter,depth)
     adapt(protocol,IOpenProtocol).registerObject(ob,adapter,depth)
 
 
@@ -118,6 +116,8 @@ IOpenProtocol.registerImplementation(InterfaceClass)    # VERY BAD!!
 IOpenProtocol.registerImplementation(Protocol)          # NEVER DO THIS!!
 
 # From this line forward, the declaration APIs can work.  Use them instead!
+
+
 
 
 

@@ -1,6 +1,6 @@
 from __future__ import generators
 from new import instancemethod
-from types import ClassType, FunctionType
+from types import ClassType, FunctionType, InstanceType
 import sys
 
 __all__ = [

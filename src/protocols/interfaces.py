@@ -8,7 +8,7 @@ __all__ = [
 ]
 
 import api
-from advice import metamethod
+from advice import metamethod, classicMRO
 from adapters import composeAdapters, updateWithSimplestAdapter
 from adapters import NO_ADAPTER_NEEDED, DOES_NOT_SUPPORT
 
@@ -108,18 +108,18 @@ class Protocol:
     registerImplementation = metamethod(registerImplementation)
 
 
-
     def registerObject(self, ob, adapter=NO_ADAPTER_NEEDED,depth=1):
 
-        # Just handle implied protocols
+        # Object needs to be able to handle registration
+        api.adapt(ob,IOpenProvider).declareProvides(self,adapter,depth)
 
+        # Handle implied protocols
         for proto, (extender,d) in self.getImpliedProtocols():
             api.declareAdapterForObject(
                 proto, composeAdapters(adapter,self,extender), ob, depth+d
             )
 
     registerObject = metamethod(registerObject)
-
 
     def __adapt__(self, obj):
 
@@ -130,36 +130,18 @@ class Protocol:
         except AttributeError:
             typ = type(obj)
 
-        factory=get(typ)
-        if factory is not None:
-            return factory[0](obj,self)
-
         try:
             mro = typ.__mro__
         except AttributeError:
-            # XXX We should probably emulate the "classic" MRO here, but
-            # XXX being able to use 'InstanceType' is important for adapting
-            # XXX any classic class, and 'object' is important for universal
-            # XXX adapters.
-            mro = type('x',(typ,object),{}).__mro__[:-1]+(InstanceType,object)
-            typ.__mro__ = mro   # mommy make it stop!
+            # Note: this adds 'InstanceType' and 'object' to end of MRO
+            mro = classicMRO(typ,extendedClassic=True)
 
-        for klass in mro[1:]:
+        for klass in mro:
             factory=get(klass)
             if factory is not None:
-                # Can't cache successful lookups until we can clear them...
-                # XXX declareAdapterForType(self,factory[0],klass,factory[1])
                 return factory[0](obj,self)
 
-        # Alas, we can't cache failed lookups until we have a way to clear them
-        # XXX declareAdapterForType(self, DOES_NOT_SUPPORT, typ, 99999)
-
     __adapt__ = metamethod(__adapt__)
-
-
-
-
-
 
 
     def addImplicationListener(self, listener):
@@ -169,29 +151,6 @@ class Protocol:
             self.__listeners = WeakKeyDictionary()
 
         self.__listeners[listener] = 1
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

@@ -41,28 +41,27 @@ from advice import getMRO, metamethod
 
 class ProviderMixin:
 
-    __provided = ()
+    """Mixin to support per-instance declarations"""
 
     advise(
         instancesProvide=[IOpenProvider, IImplicationListener]
     )
 
-
     def declareProvides(self,protocol,adapter=NO_ADAPTER_NEEDED,depth=1):
-        if not self.__provided:
-            self.__provided = {}
-        if updateWithSimplestAdapter(self.__provided,protocol,adapter,depth):
+        registry = self.__dict__.get('__protocols_provided__')
+        if registry is None:
+            self.__protocols_provided__ = registry = {}
+        if updateWithSimplestAdapter(registry,protocol,adapter,depth):
             protocol.addImplicationListener(self)
 
     declareProvides = metamethod(declareProvides)
 
-
     def newProtocolImplied(self, srcProto, destProto, adapter, depth):
-
-        if srcProto not in self.__provided:
+        registry = self.__dict__.get('__protocols_provided__',())
+        if srcProto not in registry:
             return
 
-        baseAdapter, d = self.__provided[srcProto]
+        baseAdapter, d = registry[srcProto]
         adapter = composeAdapters(baseAdapter,srcProto,adapter)
 
         declareAdapterForObject(
@@ -71,13 +70,14 @@ class ProviderMixin:
 
     newProtocolImplied = metamethod(newProtocolImplied)
 
-
     def __conform__(self,protocol):
-        if protocol in self.__provided:
-            return self.__provided[protocol][0](self,protocol)
+
+        for cls in getMRO(self):
+            conf = cls.__dict__.get('__protocols_provided__',())
+            if protocol in conf:
+                return conf[protocol][0](self,protocol)
 
     __conform__ = metamethod(__conform__)
-
 
 
 class conformsRegistry(dict):
@@ -168,7 +168,9 @@ class MiscObjectsAsOpenProvider(object):
 
     advise(
         instancesProvide=[IOpenProvider],
-        asAdapterForTypes=[FunctionType,ModuleType,InstanceType,ClassType,type]
+        asAdapterForTypes=[
+            FunctionType, ModuleType, InstanceType, ClassType, type, object
+        ]
     )
 
 
@@ -176,6 +178,9 @@ class MiscObjectsAsOpenProvider(object):
         for item in getMRO(ob):
             try:
                 reg = item.__dict__.get('__conform__')
+                if reg is None:
+                    # Make sure we don't obscure a method from the class!
+                    reg = getattr(item,'__conform__',None)
             except AttributeError:
                 raise TypeError(
                     "Only objects with dictionaries can use this adapter",
@@ -195,12 +200,12 @@ class MiscObjectsAsOpenProvider(object):
         self.reg = reg
 
 
+
+
+
     def declareProvides(self, protocol, adapter=NO_ADAPTER_NEEDED, depth=1):
         if updateWithSimplestAdapter(self.reg, protocol, adapter, depth):
             protocol.addImplicationListener(self.reg)
-
-
-
 
 
     def newRegistry(self,subject):
@@ -218,11 +223,6 @@ class MiscObjectsAsOpenProvider(object):
         reg.subject = r
 
         return reg
-
-
-
-
-
 
 
 
@@ -287,7 +287,12 @@ del ZopeInterface, __adapt__
 
 # Adapter for Zope X3 Interfaces
 
+# XXX this would be a lot cleaner if written to the new zope.interface API...
+# XXX this isn't seriously tested yet; it may still have lurking bugs
+
+
 class ZopeInterfaceAsProtocol(object):
+
     __slots__ = 'iface'
 
     advise(
@@ -295,18 +300,15 @@ class ZopeInterfaceAsProtocol(object):
         asAdapterForTypes=ZopeInterfaceTypes,
     )
 
+
     def __init__(self, iface, proto):
         self.iface = iface
 
-    def addImpliedProtocol(self, proto, adapter=NO_ADAPTER_NEEDED,depth=1):
-        raise TypeError(
-            "Zope interfaces can't add implied protocols",
-            self.iface, proto
-        )
 
     def __adapt__(self, obj):
         if self.iface.isImplementedBy(obj):
             return obj
+
 
     def registerImplementation(self,klass,adapter=NO_ADAPTER_NEEDED,depth=1):
         if adapter is NO_ADAPTER_NEEDED:
@@ -323,6 +325,45 @@ class ZopeInterfaceAsProtocol(object):
                 self.iface, klass, adapter
             )
 
+
+    def addImpliedProtocol(self, proto, adapter=NO_ADAPTER_NEEDED,depth=1):
+
+        raise TypeError(
+            "Zope interfaces can't add implied protocols",
+            self.iface, proto
+        )
+
+
     def registerObject(ob,adapter=NO_ADAPTER_NEEDED):
-        pass    # Zope interfaces handle implied protocols directly
+
+        if isinstance(ob,(type,ClassType)):
+            ob.__class_implements__ = (
+                self.iface, + getattr(ob,'__class_implements__',())
+            )
+        else:
+            # Don't verify implementation, since it's not a class
+            ZopeImplements(ob, self.iface, False)
+
+        # Zope interfaces handle implied protocols directly, so the above
+        # should be all we need to do.
+
+
+    def addImplicationListener(self, listener):
+        # Zope interfaces don't add protocols, so we don't need to actually
+        # send any implication notices.  Therefore, subscribing is a no-op.
+        pass
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
