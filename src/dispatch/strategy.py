@@ -86,22 +86,22 @@ def validateCriterion(criterion, dispatch_function):
     criterion = ICriterion(criterion)
     assert criterion.dispatch_function is dispatch_function
     
-    assert criterion.implies(NullCriterion), (
-        criterion,"should imply NullCriterion"
-    )
-    assert criterion.implies(criterion), (criterion,"should imply itself")
-
-    assert not criterion.implies(~criterion), (
-        criterion,"should not imply its inverse"
-    )
-    assert not (~criterion).implies(criterion), (
-        criterion,"should not be implied by its inverse"
-    )
     assert criterion==criterion, (criterion, "should equal itself")
     assert criterion!=NullCriterion,(criterion,"shouldn't equal NullCriterion")
     assert criterion!=~criterion,(criterion,"shouldn't equal its inverse")
     assert criterion==~~criterion,(criterion,"should equal its double-inverse")
 
+    assert criterion.implies(NullCriterion), (
+        criterion,"should imply NullCriterion"
+    )
+    assert criterion.implies(criterion), (criterion,"should imply itself")
+
+    assert not (~criterion).implies(criterion), (
+        criterion,"should not be implied by its inverse"
+    )
+    assert not criterion.implies(~criterion), (
+        criterion,"should not imply its inverse", ~criterion
+    )
     d = {}
     for seed in criterion.seeds(d):
         d[seed] = seed in criterion
