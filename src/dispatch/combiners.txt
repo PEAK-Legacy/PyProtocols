@@ -4,8 +4,8 @@ Result Combination
 
 Sometimes, more than one method of a generic function (or ``Dispatcher`` entry)
 applies in a given circumstance.  For example, you might need to sum the
-results of a series of pricing rules in order to compute product's price.  Or,
-sometimes you'd like a method to be able to modify the result of a
+results of a series of pricing rules in order to compute a product's price.
+Or, sometimes you'd like a method to be able to modify the result of a
 less-specific method.
 
 For these scenarios, you will want to use one of several "result combination"

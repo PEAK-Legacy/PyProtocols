@@ -13,10 +13,6 @@
 
  TODO
 
-    * Support before/after/around methods, and result combination ala CLOS
-
-    * Add C speedups
-
     * Support DAG-walking for visualization, debugging, and ambiguity detection
 """
 
@@ -24,6 +20,10 @@ from dispatch.interfaces import *
 from types import ClassType as _ClassType
 
 _cls  = _ClassType,type
+
+
+
+
 
 
 

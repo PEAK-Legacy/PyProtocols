@@ -1,43 +1,8 @@
-"""Method combining subclasses of Dispaatcher and GenericFunction"""
+"""Method combining subclasses of Dispatcher and GenericFunction"""
 
 from strategy import ordered_signatures
 from interfaces import AmbiguousMethod
-from functions import Dispatcher, GenericFunction
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+from functions import Dispatcher
 
 class MapDispatcher(Dispatcher):
     """Abstract base class for method combiners that merge metadata
@@ -47,7 +12,6 @@ class MapDispatcher(Dispatcher):
     of metadata.  Then use the subclass as a method combiner for a dispatcher
     or generic function.  See 'combiners.txt' for sample code.
     """
-
     def getItems(self,signature,method):
         """Return an iterable of '(key,value)' pairs for given rule"""
         raise NotImplementedError
@@ -74,9 +38,4 @@ class MapDispatcher(Dispatcher):
             if should_stop:
                 break
         return d
-
-
-
-
-
 
