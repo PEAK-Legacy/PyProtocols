@@ -409,8 +409,14 @@ class Dispatcher:
 
 
     def combine(self,cases):
-        from strategy import single_best_method
-        return single_best_method(cases)
+        import strategy
+        for group in strategy.ordered_signatures(cases):
+            if len(group)>1:
+                raise AmbiguousMethod(group)
+            elif group:
+                return group[0][1]
+            else:
+                raise NoApplicableMethods
 
 
     def _addCase(self,case):
@@ -432,12 +438,6 @@ class Dispatcher:
 
         self.cases.append(case)
         self._dispatcher = None
-
-
-
-
-
-
 
 
 
@@ -558,13 +558,13 @@ class GenericFunction(Dispatcher):
         for signature in IDispatchPredicate(predicate):
             self[signature] = function
 
-
-
-
-
-
-
-
+    def combine(self,cases):
+        import strategy
+        return strategy.method_chain(
+            strategy.safe_methods(
+                strategy.ordered_signatures(cases)
+            )
+        )
 
 
 
@@ -578,21 +578,25 @@ class GenericFunction(Dispatcher):
         If 'cond' is parseable, it will be parsed using the caller's frame
         locals and globals.
         """
-        cond = self.parseRule(cond) or cond
+        return self._decorate(cond)
+
+
+    def _decorate(self,cond,frame=None,depth=2):   # XXX
+
+        frame = frame or sys._getframe(depth)
+        cond = self.parseRule(cond,frame=frame) or cond
 
         def registerMethod(frm,name,value,old_locals):
-
             kind,module,locals_,globals_ = getFrameInfo(frm)
 
             if kind=='class':
-
                 # 'when()' in class body; defer adding the method
                 def registerClassSpecificMethod(cls):
                     import strategy
                     req = strategy.Signature(
                         [(strategy.Argument(0),ITest(cls))]
                     )
-                    self.addMethod(cond & req, value)
+                    self.addMethod(req & cond, value)
                     return cls
 
                 addClassAdvisor(registerClassSpecificMethod,frame=frm)
@@ -605,11 +609,7 @@ class GenericFunction(Dispatcher):
 
             return value
 
-        return add_assignment_advisor(registerMethod)
-
-
-
-
+        return add_assignment_advisor(registerMethod,frame=frame)
 
 
 

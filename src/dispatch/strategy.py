@@ -14,20 +14,20 @@
     Predicate, Signature, PositionalSignature, Argument -- primitives to
         implement indexable multiple dispatch predicates
 
-
-    single_best_method -- Method combiner that returns a single "best"
-        (i.e. most specific) method, or raises AmbiguousMethod.
-
-    chained_methods -- Method combiner that allows calling the "next method"
-        with 'next_method()'.
-
-    next_method -- invoke the next most-applicable method, or raise
-        AmbiguousMethod if appropriate.
-
-    most_specific_signatures, ordered_signatures -- utility functions for
-        creating method combiners
+    most_specific_signatures, ordered_signatures, method_chain, method_list,
+        all_methods, safe_methods -- utility functions for creating method
+        combiners
 
 """
+
+
+
+
+
+
+
+
+
 
 
 
@@ -42,19 +42,20 @@
 from __future__ import generators
 from protocols import Protocol, Adapter, StickyAdapter
 from protocols.advice import getMRO
-import protocols, operator
+import protocols, operator, inspect
 from types import ClassType, InstanceType
 ClassTypes = (ClassType, type)
 from sys import _getframe
 from weakref import WeakKeyDictionary
 from dispatch.interfaces import *
 from dispatch.functions import NullTest
+from new import instancemethod
 
 __all__ = [
     'ProtocolTest', 'ClassTest', 'Inequality', 'Min', 'Max',
-    'single_best_method', 'chained_methods', 'next_method',
     'Predicate', 'Signature', 'PositionalSignature', 'Argument',
     'most_specific_signatures', 'ordered_signatures',
+    'method_chain', 'method_list', 'all_methods', 'safe_methods',
     'default',
 ]
 
@@ -63,7 +64,6 @@ rev_ops = {
     '<': '>=', '<=': '>', '=<': '>',
     '<>': '==', '!=': '==', '==':'!='
 }
-
 
 
 
@@ -538,80 +538,80 @@ def ordered_signatures(cases):
     overlapping, equivalent, or disjoint with one another, but are more
     specific than any other case in the lists that follow."""
 
-    all = []
     rest = cases[:]
 
     while rest:
         best = most_specific_signatures(rest)
         map(rest.remove,best)
-        all.append(best)
-
-    return all
+        yield best
 
 
-def next_method(*__args,**__kw):
-
-    """Execute the next applicable method"""
-
-    try:
-        __active_methods__ = _getframe(2).f_locals['__active_methods__']
-    except KeyError:
-        raise RuntimeError("next_method() not called from generic function")    # XXX
-
-    for method in __active_methods__:
-        return method(*__args, **__kw)
-    else:
-        raise NoApplicableMethods
+def all_methods(grouped_cases):
+    """Yield all methods in 'grouped_cases'"""
+    for group in grouped_cases:
+        for signature,method in group:
+            yield method
 
 
+def safe_methods(grouped_cases):
+    """Yield non-ambiguous methods (plus optional raiser of AmbiguousMethod)"""
 
-
-
+    for group in grouped_cases:
+        if len(group)>1:
+            def ambiguous(*args,**kw):
+                raise AmbiguousMethod(group)
+            yield ambiguous
+            break
+        for signature,method in group:
+            yield method
 
 
 
 
 
-def single_best_method(cases):
-    """Return a single "best" method from 'cases'"""
-    if cases:
-        best = most_specific_signatures(cases)
-        if len(best)==1:
-            return best[0][1]
+
+
+
+def method_list(methods):
+    """Return callable that yields results of calling 'methods' w/same args"""
+
+    def combined(*args,**kw):
+        for m in methods:
+            yield m(*args,**kw)
+
+    return combined
+
+
+def method_chain(methods):
+    """Chain 'methods' such that each may call the next"""
+
+    methods = iter(methods)
+
+    for method in methods:
+        try:
+            args = inspect.getargspec(method)[0]
+        except TypeError:
+            return method   # not a function, therefore not chainable
+
+        if args and args[0]=='next_method':
+            next_method = method_chain(methods)
+            return instancemethod(method,next_method,type(next_method))
         else:
-            methods = dict([(method,True) for signature,method in best])
-            if len(methods) == 1:
-                return methods.keys()[0]
+            return method
 
-        def ambiguous(*__args,**__kw):
-            raise AmbiguousMethod
+    def no_applicable(*args,**kw):
+        raise NoApplicableMethods(args,kw)
 
-        return ambiguous
+    return no_applicable
 
 
-def chained_methods(cases):
-    """Return a combined method that chains via a first 'next' argument"""
-    mro = ordered_signatures(cases)
 
-    def iterMethods():
-        for cases in mro:
-            if len(cases)==1:
-                yield cases[0][1]
-            else:
-                methods = dict([(method,True) for signature,method in cases])
-                if len(methods) == 1:
-                    yield methods.keys()[0]
-                else:
-                    raise AmbiguousMethod
-        raise NoApplicableMethods
 
-    def method(*__args,**__kw):
-        __active_methods__ = iterMethods()  # here to be found by next_method()
-        for method in __active_methods__:
-            return method(*__args, **__kw)
-        else:
-            raise NoApplicableMethods
-    return method
+
+
+
+
+
 
 class ExprBase(object):
 

@@ -57,9 +57,10 @@ class MapDispatcher(Dispatcher):
 
     def combine(self,items):
         """Build a dictionary from a sequence of '(signature,method)' pairs"""
-        d = {};  should_stop = False
-        items = ordered_signatures(items)
-        for level in items:
+        d = {}
+        should_stop = False
+
+        for level in ordered_signatures(items):
             current = {}
             for item in level:
                 should_stop = should_stop or self.shouldStop(*item)
@@ -73,7 +74,6 @@ class MapDispatcher(Dispatcher):
             if should_stop:
                 break
         return d
-
 
 
 

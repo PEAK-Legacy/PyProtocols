@@ -1,13 +1,137 @@
-=========================
-Custom Result Combination
-=========================
+==================
+Result Combination
+==================
 
 Sometimes, the default strategy of selecting the "most-specific" method or
 result is inadequate for a particular task.  You may therefore wish to
 implement custom result combining strategies by subclassing ``Dispatcher`` or
 ``GenericFunction``, and overriding the ``combine()`` method as appropriate.
 
-    >>> from dispatch import strategy, functions, combiners
+However, the ``dispatch.combiners`` module provides an assortment of useful
+already-written result combinations, which we will also cover here.
+
+>>> from dispatch import strategy, functions, combiners, NoApplicableMethods
+
+
+
+Default Result Combination
+==========================
+
+XXX need test for default Dispatcher combination strategy (i.e. most-specific
+only)
+
+
+Before/After/Around Methods
+===========================
+
+* Filter by qualifier (qualify(s,f) -> s,(q,f) -> {q: [(s,f)]})
+
+* Invoke before before, after after
+
+
+Custom Result Combination
+=========================
+
+To implement a custom result combination, you will subclass ``Dispatcher``
+or ``GenericFunction``, as appropriate, and overide the ``combine()`` method
+to implement your result combination algorithm.
+
+The ``combine()`` method takes one argument: a sequence of ``(signature,res)``
+tuples (also known as "cases"), where ``res`` is either a dispatcher result or
+a generic function method, and ``signature`` is an ``ISignature`` describing
+the condition under which that result or method should apply.  The
+``combine()`` method must then return a single callable (for generic functions)
+or a single result (for dispatcher classes).  It may raise ``AmbiguousMethod``
+or ``NoApplicableMethods`` to indicate an error condition.
+
+Initially, the input sequence will be in definition order.  That is, each
+case (``(signature,res)`` pair) will appear in the order it was added to the
+dispatcher or generic function.  It is up to the ``combine()`` method to do
+any re-ordering or sorting desired.  For your convenience, the
+``dispatch.strategy`` module includes several useful functions for sorting,
+filtering, and combining methods from the input sequence.
+
+
+Method Combination Utilities
+----------------------------
+
+The following method combination utilities are available from the
+``dispatch.strategy`` module.  They can be assembled in various ways to
+create interesting method combinations:
+
+``ordered_signatures(cases)``
+    Yields a series of cases grouped by specificity, such that each group
+    is a set of equally-specific cases, but which are more specific than the
+    cases in groups that follow.  The grouped cases can then be passed to
+    ``safe_methods()`` or ``all_methods()`` in order to extract methods for
+    combining.
+
+    Note that groups containing more than one case are *ambiguous*.  That is,
+    it is not statically determinable which cases are more specific than the
+    others.  In general, a dispatcher should raise ``AmbiguousMethod`` if the
+    first group yielded by this function has a length greater than 1.
+
+``safe_methods(grouped_cases)``
+    Yields methods from the grouped cases until an ambiguous group is found or
+    the input is exhausted.  An ambiguous group in the input will be replaced
+    by a callable in the output that raises ``AmbiguousMethod`` when called.
+
+    >>> list(strategy.safe_methods([]))
+    []
+    >>> list(strategy.safe_methods([[(1,2)],[(3,4)],[(5,6)]]))
+    [2, 4, 6]
+    >>> list(strategy.safe_methods([[(1,2)],[(3,4),(5,6)]]))
+    [2, <function ambiguous at ...>]
+
+
+``all_methods(grouped_cases)``
+    Yields all methods from the grouped cases, including ones in ambiguous
+    groups.
+
+    >>> list(strategy.all_methods([]))
+    []
+    >>> list(strategy.all_methods([[(1,2)],[(3,4),(5,6)]]))
+    [2, 4, 6]
+
+
+``method_chain(methods)``
+    Returns a callable that invokes the first method in ``methods``.  If
+    that method has a ``next_method`` parameter, then when called it will be
+    passed an extra argument, pointing to the next applicable method in
+    ``methods``, and so on recursively, until a method without a
+    ``next_method`` parameter is reached.  (Thus, if the first method in
+    ``methods`` does not have a ``next_method`` parameter, it is returned
+    directly.)  If there are no methods in ``methods``, then a dummy method
+    is returned that raises ``NoApplicableMethods`` when called.
+
+    >>> def f1(next_method): print "f1"; return next_method()
+    >>> def f2(next_method): print "f2"; return next_method()
+    >>> def f3(): print "f3"; return "done"
+
+    >>> strategy.method_chain([f1,f2,f3])()
+    f1
+    f2
+    f3
+    'done'
+
+    >>> strategy.method_chain([])()
+    Traceback (most recent call last):
+    ...
+    NoApplicableMethods...
+
+
+``method_list(methods)``
+    Returns a callable that when called, yields the results of calling each of
+    the supplied methods in turn with the same arguments:
+
+    >>> def f1(x): return "f1"+x
+    >>> def f2(x): return "f2"+x
+    >>> for item in strategy.method_list([f1,f2])("y"): print item
+    f1y
+    f2y
+    >>> list(strategy.method_list([])()) # empty method list yields no results
+    []
+
 
 
 
@@ -50,7 +174,7 @@ By creating these classes, and some signatures to use in their place::
     >>> b = strategy.Signature(x=B)
     >>> c = strategy.Signature(x=C)
     >>> d = strategy.Signature(x=D)
-    
+
 Our example map combiner will use functions as its rules, with function
 attributes serving as keys and values.  We'll define some functions that have
 the same keys but different values, some with the same keys and same values,

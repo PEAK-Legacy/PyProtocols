@@ -195,11 +195,11 @@ class TestTests(TestCase):
 
         self.assertEqual( most_specific_signatures([(s1,0),(s2,0)]), [(s2,0)] )
 
-        self.assertEqual( ordered_signatures(all_sigs),
+        self.assertEqual( list(ordered_signatures(all_sigs)),
             [[(s2,0),(s3,0),(s4,0),(s5,0)],[(s1,0)]]
         )
 
-        self.assertEqual( ordered_signatures([(s1,0),(s2,0)]),
+        self.assertEqual( list(ordered_signatures([(s1,0),(s2,0)])),
             [[(s2,0)],[(s1,0)]]
         )
 
@@ -1069,17 +1069,17 @@ class GenericTests(TestCase):
         def both_vehicles(ob1,ob2):
             return "They're both vehicles."
 
-        def both_land(ob1,ob2):
+        def both_land(next_method,ob1,ob2):
             return next_method(ob1,ob2)+"  They are both land vehicles."
 
-        def both_sea(ob1,ob2):
+        def both_sea(next_method,ob1,ob2):
             return next_method(ob1,ob2)+"  They are both sea vehicles."
 
-        def mixed_vehicles(ob1,ob2):
+        def mixed_vehicles(next_method,ob1,ob2):
             return next_method(ob1,ob2)+ \
                 "  One vehicle is a land vehicle, the other is a sea vehicle."
 
-        [dispatch.generic(chained_methods)]
+        [dispatch.generic()]
         def compare(v1,v2): pass
         compare.addMethod([(Vehicle, Vehicle)], both_vehicles)
         compare.addMethod([(LandVehicle, LandVehicle)],both_land)
