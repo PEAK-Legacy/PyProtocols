@@ -1479,10 +1479,8 @@ protocols to adapter factories.  Keep in mind that this means the protocols and
 adapter factories will continue to live until your object is garbage collected.
 Also, that means for your object to be pickleable, all of the protocols and
 adapter factories used must be pickleable.  (This latter requirement can be
-quite difficult to meet, since adapter factories are often functions.)
-
-XXX should we add __reduce__ to NO_ADAPTER_NEEDED/DOES_NOT_SUPPORT?  NB
-composed adapters aren't currently pickleable either.
+quite difficult to meet, since composed adapter factories are dynamically
+created functions at present.)
 
 Note that none of these restrictions apply if you are only using declarations
 about types and protocols, as opposed to individual objects.  (Or if you only
@@ -1503,6 +1501,8 @@ as supporting a protocol based on an object's current state.
 In the next section, we'll look more at the static nature of declarations,
 and explore what it means to make conflicting (or refining) protocol
 declarations.
+
+
 
 
 
