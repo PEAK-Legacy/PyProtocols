@@ -59,7 +59,7 @@ class CriterionIndex:
         seeds = self.allSeeds
         caseItems = self.matchingSeeds.setdefault(case,[])
 
-        for key in criterion.seeds(seeds):
+        for key in list(criterion.seeds(seeds)):    # avoid iter corruption
             if key not in seeds:
                 self.addSeed(key)
 
@@ -95,6 +95,10 @@ class CriterionIndex:
 
     def addSeed(self,seed):
         """Add a previously-missing seed"""
+
+        if seed in self.allSeeds:
+            return  # avoid duping entries if this is a reseed via dispatcher
+
         criteria = self.criteria
 
         for case,itsSeeds in self.matchingSeeds.items():
@@ -102,10 +106,6 @@ class CriterionIndex:
                 itsSeeds.append(seed)
 
         self.allSeeds[seed] = None
-
-
-
-
 
 
 
@@ -325,14 +325,13 @@ class BaseDispatcher:
         if val is NoApplicableMethods:
             raise NoApplicableMethods
         return val
-        
+
 try:
     from dispatch._speedups import BaseDispatcher, DispatchNode
 except ImportError:
     pass
 else:
     protocols.declareImplementation(DispatchNode,[IDispatchTable])
-
 
 
 
@@ -690,7 +689,6 @@ class AbstractGeneric(Dispatcher):
 
     def __call__(__self,*args,**kw):
         return __self.delegate(*args,**kw)
-
 
 
 
