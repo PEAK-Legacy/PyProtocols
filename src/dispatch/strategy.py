@@ -26,9 +26,9 @@
     most_specific_signatures, ordered_signatures, method_chain, method_list,
         all_methods, safe_methods, separate_qualifiers -- utility functions for
         creating method combinations
+
+    validateCriterion -- check if a criterion's implementation is sane
 """
-
-
 
 
 
@@ -55,7 +55,7 @@ __all__ = [
     'Min', 'Max', 'Predicate', 'Signature', 'PositionalSignature', 'Argument',
     'most_specific_signatures', 'ordered_signatures', 'separate_qualifiers',
     'method_chain', 'method_list', 'all_methods', 'safe_methods', 'Pointer',
-    'default', 'IdentityCriterion', 'NullCriterion',
+    'default', 'IdentityCriterion', 'NullCriterion', 'validateCriterion',
 ]
 
 rev_ops = {
@@ -76,6 +76,47 @@ rev_ops = {
 
 
 
+
+
+
+
+def validateCriterion(criterion, dispatch_function):
+    """Does 'criterion' have a sane implementation?"""
+
+    criterion = ICriterion(criterion)
+    assert criterion.dispatch_function is dispatch_function
+    
+    assert criterion.implies(NullCriterion), (
+        criterion,"should imply NullCriterion"
+    )
+    assert criterion.implies(criterion), (criterion,"should imply itself")
+
+    assert not criterion.implies(~criterion), (
+        criterion,"should not imply its inverse"
+    )
+    assert not (~criterion).implies(criterion), (
+        criterion,"should not be implied by its inverse"
+    )
+    assert criterion==criterion, (criterion, "should equal itself")
+    assert criterion!=NullCriterion,(criterion,"shouldn't equal NullCriterion")
+    assert criterion!=~criterion,(criterion,"shouldn't equal its inverse")
+    assert criterion==~~criterion,(criterion,"should equal its double-inverse")
+
+    d = {}
+    for seed in criterion.seeds(d):
+        d[seed] = seed in criterion
+
+    matches = list(criterion.matches(d))
+    for seed in matches:
+        assert d[seed], (criterion,"should have contained",seed)
+        del d[seed]
+
+    for value in d.values():
+        assert not value, (criterion,"should've included",seed,"in matches")
+
+   
+    criterion.subscribe(d)
+    criterion.unsubscribe(d)
 
 
 

@@ -777,17 +777,6 @@ class PredicateTests(TestCase):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
     def testParseExpressionMatching(self):
         parse = GenericFunction(lambda x,y,z:None).parse
         pe = lambda e: parse(e,locals(),globals())

@@ -142,7 +142,7 @@ class CriteriaTests(TestCase):
             self.failUnless(klass in seeds)
             self.failUnless(object in seeds)
             self.failIf(len(seeds)<>2)
-            self.checkCriterionBasics(klass,strategy.dispatch_by_mro)
+            validateCriterion(klass,strategy.dispatch_by_mro)
 
     def testCriterionAdaptation(self):
         self.failUnless(Hummer in ICriterion(Wheeled))
@@ -244,45 +244,9 @@ class CriteriaTests(TestCase):
 
 
 
-    def checkCriterionBasics(self,criterion,dispfunc):
-        criterion = ICriterion(criterion)
-        self.failUnless(criterion.dispatch_function is dispfunc)
-        self.failUnless(criterion.implies(NullCriterion))
-        self.failUnless(criterion.implies(criterion))
-        self.failIf(criterion.implies(~criterion))
-        self.failIf((~criterion).implies(criterion))
-        self.assertEqual(criterion,criterion)
-        self.assertNotEqual(criterion,NullCriterion)
-        self.assertNotEqual(criterion,~criterion)
-        self.assertEqual(criterion,~~criterion)
-
-        d = {}
-        for seed in criterion.seeds(d):
-            d[seed] = seed in criterion
-
-        matches = list(criterion.matches(d))
-        for seed in matches:
-            self.failUnless(d[seed])
-            del d[seed]
-
-        for value in d.values():
-            self.failIf(value)  # should have returned all the true values
-
-        criterion.subscribe(self)
-        criterion.unsubscribe(self)
-
-
     def testTruth(self):
         for t in True,False:
-            self.checkCriterionBasics(
-                TruthCriterion(t),strategy.dispatch_by_truth
-            )
-
-
-
-
-
-
+            validateCriterion(TruthCriterion(t),strategy.dispatch_by_truth)
 
 
     def testPointers(self):
@@ -305,7 +269,7 @@ class CriteriaTests(TestCase):
     def testIdentityCriterion(self):
         ob = object()
         i = Pointer(ob)
-        self.checkCriterionBasics(i,strategy.dispatch_by_identity)
+        validateCriterion(i,strategy.dispatch_by_identity)
         i = ICriterion(i)
 
         self.assertEqual(list(i.seeds({})),[None,id(ob)])
@@ -321,14 +285,9 @@ class CriteriaTests(TestCase):
 
 
 
-
-
-
-
-
     def testSubclassCriterion(self):
         s = SubclassCriterion(Vehicle)
-        self.checkCriterionBasics(s,strategy.dispatch_by_subclass)
+        validateCriterion(s,strategy.dispatch_by_subclass)
 
         # seeds()
         self.assertEqual( s.seeds({}), [Vehicle,None])
@@ -391,7 +350,7 @@ class CriteriaTests(TestCase):
         self.failUnless(("a","a") in t4); self.failIf(("b","b") in t4)
 
         for t in t1,t2,t3,t4:
-            self.checkCriterionBasics(t,strategy.dispatch_by_inequalities)
+            validateCriterion(t,strategy.dispatch_by_inequalities)
 
 
 
