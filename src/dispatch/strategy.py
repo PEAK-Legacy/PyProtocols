@@ -831,7 +831,8 @@ class Signature(object):
             return self
 
         return Signature(
-            [(k,v) for (k,d),v in me] +[(k,v) for (k,d),v in they]
+            [(k[0],self.data[k]) for k in self.keys] +
+            [(k,v) for (k,d),v in they]
         )
 
 
@@ -856,7 +857,6 @@ class Signature(object):
                 )
             ])
         return Predicate([self,other])
-
 
 
     def __eq__(self,other):

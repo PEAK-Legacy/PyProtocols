@@ -491,7 +491,6 @@ class TestTests(TestCase):
 
 
     def testSignatureArithmetic(self):
-
         x_gt_10 = Signature(x=Inequality('>',10))
         x_lt_20 = Signature(x=Inequality('<',20))
         y_in_LandVehicle = Signature(y=LandVehicle)
@@ -527,10 +526,6 @@ class TestTests(TestCase):
             Predicate([x_gt_10 & y_in_LandVehicle])
         )
 
-
-
-
-
         # pred | pred
         self.assertEqual((Predicate([x_gt_10]) | Predicate([y_in_LandVehicle])),
             Predicate([x_gt_10, y_in_LandVehicle])
@@ -540,6 +535,15 @@ class TestTests(TestCase):
         self.assertEqual((Predicate([x_gt_10]) & Predicate([y_in_LandVehicle])),
             Predicate([x_gt_10 & y_in_LandVehicle])
         )
+
+        # Ensure ordering preserved among conditions within a signature
+        self.assertNotEqual(
+            (x_gt_10 & y_in_LandVehicle).items(), 
+            (y_in_LandVehicle & x_gt_10).items())
+
+        self.assertNotEqual(
+            (x_gt_10 & y_in_LandVehicle & x_lt_20).items(), 
+            (y_in_LandVehicle & x_gt_10 & x_lt_20).items())
 
 
     def testSignatureOrdering(self):
@@ -553,10 +557,6 @@ class TestTests(TestCase):
                 self.assertEqual(s.items(),
                     [((k,v.dispatch_function),v) for k,v in data]
                 )
-
-
-
-
 
 
 
