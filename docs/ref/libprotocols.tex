@@ -261,7 +261,7 @@ whose design is based largely on the specification presented in \pep{246}:
 
 Return an implementation of \var{protocol} (a protocol object) for
 \var{component} (any object).  The implementation returned may be
-\var{component}, or an adapter that implements the protocol on its
+\var{component}, or a wrapper that implements the protocol on its
 behalf.  If no implementation is available, return \var{default}.  If no
 \var{default} is provided, call \code{\var{factory}(\var{component},
 \var{protocol})} and return the result.  If no \var{factory} is supplied,
@@ -555,9 +555,50 @@ This is syntax sugar for creating the interface first, and then using
 this approach if you are the author of the interface!  Otherwise, you must use
 \function{declareAdapter()} after the fact.
 
-In the next section, we will begin looking at the \module{protocols} declaration
+In later sections, we will begin looking at the \module{protocols} declaration
 APIs -- like \function{declareAdapter()} and \function{advise()} -- in more
-detail.
+detail.  But first, we must look briefly at the interfaces that the
+\module{protocols} package expects from the protocols, adapters, and other
+objects supplied as parameters to the declaration API.
+
+
+
+
+
+
+
+
+
+
+
+
+\subsection{Interfaces Used by the Declaration API}
+
+Like any other API, the \module{protocols} declaration API has certain
+expectations regarding its parameters.  These expectations are documented and
+referenced in code using interfaces defined in the \module{protocols.interfaces}
+module.
+
+You will rarely use or subclass any of these interface objects, unless you are
+customizing or extending the system.  They exist primarily for documentation
+purposes, and to facilitate the operation of the package's declaration APIs.
+
+%But, because the
+
+IAdapterFactory
+
+IProtocol
+
+IAdaptingProtocol
+
+IOpenProtocol
+
+IOpenProvider
+
+IOpenImplementor
+
+
+
 
 
 
@@ -574,34 +615,118 @@ detail.
 
 \subsection{Declarating Implementations and Adapters}
 
-\subsubsection{Declaration Primitives}
+There are three types of relationships that a protocol can participate in:
 
-declareAdapterForType
+\begin{itemize}
+\item A relationship from a class or type, to a protocol it supports or adapts
+to,
 
-declareAdapterForProtocol
+\item A relationship from an instance, to a protocol it provides or adapts to,
+and
 
-declareAdapterForObject
+\item A relationship from a protocol, to a protocol that implies or is adaptable
+to it.
+\end{itemize}
+
+All of these relationships may be declared by reference to the source type,
+instance or protocol, the desired destination protocol, and the adapter to be
+used. (In the event that no adapter is needed, the special adapter
+\function{protocols.NO_ADAPTER_NEEDED} is specified.)
+
+To declare relationships like these, the \module{protocols} declaration API
+provides three ``primitive'' declaration functions.  Each takes a \var{protocol}
+argument that must be adaptable to the \class{IOpenProtocol} interface, an
+adapter function (or \function{protocols.NO_ADAPTER_NEEDED}), and the source
+type, instance, or protocol.  The functions are
+\function{declareAdapterForType()}, \function{declareAdapterForObject()}, and
+\function{declareAdapterForProtocol()}, respectively.
+
+You will not ordinarily use these primitives, however, unless you are
+customizing or extending the framework.  It is generally easier to call one
+of the higher level functions in the declaration API.  These higher-level
+functions may make several calls to the primitive functions on your behalf, or
+supply useful defaults for certain parameters.  They are, however, based
+entirely on the primitive functions, which is important for customizations and
+extensions.  This will be covered more in section \ref{customizing-adaptation}.
+
+The next higher layer of declaration APIs are the explicit declaration
+functions, \function{declareImplementation}, \function{declareAdapter}, and
+\function{adviseObject}.  These functions are structured to support the most
+common declaration use cases.
+
+For declaring protocol information about a type or class:
+
+\begin{funcdesc}{declareImplementation}{typ
+\optional{, instancesProvide=[ ]} \optional{, instancesDoNotProvide=[ ]}}
+
+Declare that instances of class or type \var{typ} do or do not provide
+implementations of the specified protocols.  \var{instancesProvide} and
+\var{instancesDoNotProvide} must be sequences of protocol objects that
+provide (or are adaptable to) the \class{IOpenProtocol} interface,
+such as \class{protocols.Interface} subclasses, or Zope \class{Interface}
+objects.
+
+This function is shorthand for calling \function{declareAdapterForType()}
+with \function{NO_ADAPTER_NEEDED} and \function{DOES_NOT_SUPPORT} as adapters
+from the type to each of the specified protocols.  Note, therefore, that the
+listed protocols must be adaptable to \class{IOpenProtocol}.  See
+\function{declareAdapterForType()} in section \ref{protocols-contents} for
+details.
+\end{funcdesc}
 
 
-\subsubsection{The Convenience Declaration API}
+For declaring protocol information about a specific instance:
 
-declareImplementation
+\begin{funcdesc}{adviseObject}{ob
+\optional{, provides=[ ]} \optional{, doesNotProvide=[ ]}}
+Declare that \var{ob} provides (or does not provide) the specified protocols.
+This is shorthand for calling \function{declareAdapterForType()}
+with \function{NO_ADAPTER_NEEDED} and \function{DOES_NOT_SUPPORT} as adapters
+from the object to each of the specified protocols.  Note, therefore, that
+\var{ob} must be adaptable to \class{IOpenProvider}, and the listed protocols
+must be adaptable to \class{IOpenProtocol}.  See
+\function{declareAdapterForObject()} in section \ref{protocols-contents} for
+details.
+\end{funcdesc}
 
-adviseObject
 
-declareAdapter
 
+
+
+
+
+And for declaring all other kinds of protocol relationships:
+
+\begin{funcdesc}{declareAdapter}{factory, provides,
+\optional{, forTypes=[ ]} \optional{, forProtocols=[ ]}
+\optional{, forObjects=[ ]}}
+
+Declare that \var{factory} provides the protocols listed in \var{provides}
+as an adapter for the classes/types listed in \var{forTypes}, for objects
+providing the protocols listed in \var{forProtocols}, and for the specific
+objects listed in \var{forObjects}.
+
+This function is shorthand for calling the primitive declaration
+functions for each of the protocols listed in \var{provides} and each of the
+sources listed in the respective keyword arguments.
+\end{funcdesc}
+
+%Notice that because \function{declareAdapter()} can call all three primitive
+%declaration functions, it is capable of doing
+
+%The \module{protocols} package supplies
+%several higher-level APIs that are easier to use,
+
+%Specifying all three items can be tedious, however, when multiple protocols,
+%types
 
 \subsubsection{Convenience Declarations in Class, Protocol and Module Bodies}
 
 advise
 
-
-
 \subsection{Creating and Using Adapters}
 
 IAdapterFactory
-
 
 \subsection{Protocol Implication and Adapter Precedence
 \label{proto-implication}}
@@ -611,9 +736,7 @@ subsetting, extending...
 
 
 
-
-
-\subsection{Module Contents}
+\subsection{Module Contents\label{protocols-contents}}
 
 \begin{funcdesc}{adapt}{component, protocol,
 \optional{, default \optional{, factory}}}
@@ -695,26 +818,31 @@ for more details.
 
 
 
-\begin{funcdesc}{declareImplementation}{typ
-\optional{, instancesProvide=()} \optional{, instancesDoNotProvide=()}}
-
-Declare that instances of class or type \var{typ} do or do not provide
-implementations of the specified protocols.  \var{instancesProvide} and
-\var{instancesDoNotProvide} must be sequences of protocol objects that
-provide, or are adaptable to, the \class{protocols.IOpenProtocol} interface,
-such as \class{protocols.Interface} subclasses, or Zope \class{Interface}
-objects.
-
-This function is shorthand for calling \function{declareAdapterForType()}
-with \function{DOES_NOT_SUPPORT} and \function{NO_ADAPTER_NEEDED} as adapters
-from the type to each of the specified protocols.
+\begin{funcdesc}{declareAdapterForType}{protocol, adapter, typ \optional{,
+depth=1}}
+Declare that \var{adapter} adapts instances of class or type \var{typ}
+to \var{protocol}, by adapting \var{protocol} to \class{IOpenProtocol} and
+calling its \function{registerImplementation} method.  If \var{typ} is adaptable
+to \class{IOpenImplementor}, its \function{declareClassImplements} method is
+called as well.
 \end{funcdesc}
 
-declareAdapterForType
+\begin{funcdesc}{declareAdapterForObject}{protocol, adapter, ob \optional{,
+depth=1}}
+Declare that \var{adapter} adapts the object \var{ob} to \var{protocol}, by
+adapting \var{ob} to \class{IOpenProvider} and calling its
+\function{declareProvides} method.  \var{protocol} is also adapted to
+\class{IOpenProtocol}, and its \function{registerObject} method is called.
+\end{funcdesc}
 
-declareAdapterForProtocol
+\begin{funcdesc}{declareAdapterForProtocol}{protocol, adapter, proto \optional{,
+depth=1}}
+Declare that \var{adapter} adapts objects that provide protocol \var{proto}
+to \var{protocol}, by adapting \var{protocol} to \class{IOpenProtocol} and
+calling its \function{addImpliedProtocol} method.
+\end{funcdesc}
 
-declareAdapterForObject
+declareImplementation
 
 adviseObject
 
@@ -727,6 +855,9 @@ Attribute
 metamethod
 
 supermeta
+
+
+
 
 \subsubsection{\module{protocols.adapters} --- ``Adapter arithmetic'' support}
 
@@ -769,28 +900,7 @@ addClassAdvisor, isClassAdvisor, getFrameInfo
 
 
 
-
-
-
-
-
-
-
-
 \subsection{Customizing and Extending the Declaration API\label{customizing-adaptation}}
-
-\subsubsection{Interfaces Supplied by the \module{protocols} Package}
-
-You will rarely use any of these interface objects directly, unless you are
-customizing or extending the system.  They exist for
-documentation purposes, and to facilitate the operation of the package's
-declaration APIs.
-
-You do not subclass these interface objects, unless you are defining a new
-interface that implies the existing one.
-
-'IAdapterFactory', 'IProtocol', 'IAdaptingProtocol', 'IOpenProtocol', 'IOpenProvider',
-    'IOpenImplementor'
 
 
 \subsubsection{The \class{IOpenProtocol} Interface \label{open-protocols}}
@@ -814,6 +924,19 @@ description of the methods this interface requires is in section
 IOpenProtocol
 
 metaclass issues, fwd ref to metamethod and supermeta
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
