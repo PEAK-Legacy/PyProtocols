@@ -200,7 +200,7 @@ class IDocumentable(Interface):
         """Return documentation for the object (not including its contents)"""
 
     def getContents(includeInherited):
-        """"Return list of (key,value) pairs for namespace contents, if any"""
+        """Return list of (key,value) pairs for namespace contents, if any"""
 \end{verbatim}
 
 Now, in the ``real world,'' no existing Python objects provide this interface.
@@ -271,8 +271,6 @@ class FunctionAsDocumentable(object):
         return ()
 
     # ... etc.
-
-
 \end{verbatim}
 
 The \class{FunctionAsDocumentable} class wraps a function object with the
@@ -284,6 +282,8 @@ wrapper to use when given an object to document.
 But wait! Isn't this just as complicated as writing a documentation tool the
 ``old fashioned'' way?  We still have to write code to get the data we need,
 \emph{and} we still need to figure out what code to use.  Where's the benefit?
+
+
 
 Enter the \pep{246} \function{adapt()} function.  \function{adapt()} has two
 required arguments: an object to adapt, and a \strong{protocol} that you want
@@ -694,7 +694,7 @@ is of a different type.
 
 
 
-
+\newpage
 \subsubsection{Replacing Introspection with Adaptation\label{replintrowadapt}}
 
 \begin{quotation}
@@ -776,7 +776,7 @@ introspection}
 
 
 
-
+\newpage
 \subsubsection{Differences Between \function{protocols.adapt()} and \pep{246}}
 
 If you have read \pep{246} or are looking for an exact implementation of it,
@@ -817,7 +817,7 @@ its most common applications.
 
 
 
-
+\newpage
 \subsection{Defining and Subclassing Interfaces \label{protocols-defining}}
 
 The easiest way to define an interface with the \module{protocols} package is
@@ -981,7 +981,7 @@ objects supplied as parameters to the declaration API.
 
 
 
-
+\newpage
 \subsection{Interfaces Used by the Declaration API\label{protocols-declaration-interfaces}}
 
 Like any other API, the \module{protocols} declaration API has certain
@@ -1145,7 +1145,7 @@ Declarations for Individual Objects''.
 
 
 
-
+\newpage
 \subsection{Declaring Implementations and Adapters}
 There are three kinds of relationships that a protocol can participate in:
 
@@ -1432,7 +1432,7 @@ A sequence of protocols that the enclosing module provides.  Equivalent to
 
 
 
-
+\newpage
 \subsubsection{Protocol Declarations for Individual Objects \label{protocols-instances}}
 
 Because objects' behavior usually comes from a class definition, it's not too
@@ -1514,7 +1514,7 @@ declarations.
 
 
 
-
+\newpage
 \subsection{Protocol Implication and Adapter Precedence \label{proto-implication}}
 
 So far, we've only dealt with simple one-to-one relationships between
@@ -1678,7 +1678,7 @@ for more details on these and other functions that relate to adapter paths.
 
 
 
-
+\newpage
 \subsection{Package Contents and Contained Modules\label{protocols-contents}}
 
 The following functions, classes, and interfaces are available from the
@@ -1842,7 +1842,7 @@ have documentation appear in the interface.  When the interface is displayed
 with tools like \program{pydoc} or \function{help()}, the attribute
 documentation will be shown.
 \end{classdesc}
-
+\newpage
 \subsubsection{Classes and Functions typically used for Customization/Extension}
 
 These classes and functions are also available from the top-level
@@ -1965,7 +1965,7 @@ to \var{protocol}, by calling
 
 
 
-
+\newpage
 \subsubsection{\module{protocols.interfaces} --- Package Interfaces\label{protocols-interfaces-module}}
 \declaremodule{}{protocols.interfaces}
 
@@ -2211,7 +2211,7 @@ support the requirements defined by \class{IProtocol} as well.
 
 
 
-
+\newpage
 \subsubsection{\module{protocols.adapters} --- ``Adapter arithmetic'' support \label{protocol-adapters-module}}
 \declaremodule{}{protocols.adapters}
 
@@ -2293,7 +2293,7 @@ and \method{get()} methods.  Values stored in the mapping will be
 
 
 
-
+\newpage
 \subsubsection{\module{protocols.zope_support} --- Support for Zope Interfaces}
 \declaremodule[protocols.zopesupport]{}{protocols.zope_support}
 
@@ -2312,6 +2312,15 @@ expressed an intention to add an \method{__adapt__()} method using a global
 adapter registry.   At that time, it may also become possible to register
 other adapters via the \module{protocols} declaration API.
 
+\item Zope interfaces do not conform to \module{protocols} package ``shortest
+path wins'' semantics.  Instead, new declarations override older ones.
+
+\item Changing the \member{__bases__} of a class that has Zope interfaces
+declared for it (either as ``class provides'' or ``instances provide''), may
+have unexpected results, because Zope uses inheritance of a single descriptor
+to control declarations.  In general, it will only work if the class whose
+\member{bases} are changed, has no declarations of its own.
+
 \item You cannot declare an implication relationship from a Zope
 \class{Interface}, because Zope only supports implication via
 inheritance, which is fixed at interface definition time.  Therefore, you cannot
@@ -2324,15 +2333,6 @@ Zope \class{Interface}.  Declaring that a class' instances or that an object
 provides the extended interface, will automatically declare that the class'
 instances or the object provides the Zope \class{Interface} as well.  For
 example:
-
-
-
-
-
-
-
-
-
 
 
 \begin{verbatim%
@@ -2362,20 +2362,20 @@ a different interpretation of the contents, and does not expect to find
 Twisted is resolved, it is not very useful to create interfaces that extend
 both Zope and Twisted interfaces.
 
+\item Zope does not currently appear to support classes inheriting direct
+declarations (e.g. \code{classProvides}).  This may be a bug in the current
+version.
+
 \end{itemize}
 
 The current implementation of support for Zope X3 interfaces is currently based
-on the Zope X3 ``milestone 2'' release; it does not work with later versions at
-this time, as Zope X3's interface declaration API is currently in flux.
+on the Zope X3 CVS version; it does not work with older releases such as the
+``milestone 2'' release.
 
 
 
 
-
-
-
-
-
+\newpage
 \subsubsection{\module{protocols.twisted_support} --- Support for Twisted Interfaces}
 \declaremodule[protocols.twistedsupport]{}{protocols.twisted_support}
 
@@ -2392,11 +2392,10 @@ protocol-to-protocol adapters are registered via Twisted's
 \function{registerAdapter()}, implication listeners are \emph{not} notified.
 
 \item You cannot usefully create a ``subset'' of a Twisted interface, or an
-adaptation from a Twisted interface to another interface type.  The
-declaration might succeed, and it might even work reasonably well for
-adapter paths of depth one.  But Twisted does not support transitive adaptation,
-nor can it notify the destination interface(s) of any new incoming adapter
-paths.
+adaptation from a Twisted interface to another interface type, as Twisted
+insists that interfaces must subclass its interface base class.  Also, Twisted
+does not support transitive adaptation, nor can it notify the destination
+interface(s) of any new incoming adapter paths.
 
 \item If you register an adapter factory that can return \constant{None} with
 a Twisted interface, note that Twisted does not check for a \class{None} return
@@ -2411,11 +2410,24 @@ instances providing them).  You may therefore obtain unexpected results if you
 declare that a class provides a Twisted interface or an interface that extends a
 Twisted interface.
 
+\item Changing the \member{__bases__} of a class that has Twisted interfaces
+declared for it may have unexpected results, because Twisted uses inheritance of
+a single descriptor to control declarations.  In general, it will only work if
+the class whose \member{bases} are changed, has no declarations of its own.
 
 
 
+\item Any adapter factory may be used for protocol-to-protocol adapter
+declarations.  But, for any other kind of declaration,
+\function{NO_ADAPTER_NEEDED} and \function{DOES_NOT_SUPPORT} are the only
+adapter factories that can be used with Twisted.
 
-
+\item Twisted interfaces do not conform to \module{protocols} package ``shortest
+path wins'' semantics.  For protocol-to-protocol adapter declarations, only one
+adapter declaration between a given pair of interfaces is allowed.  Any
+subsequent declarations with the same source and destination will result in
+a \exception{ValueError}.  For all other kinds of adapter declarations, new
+declarations override older ones.
 
 \item You cannot extend both a Zope interface and a Twisted interface in the
 same \class{protocols.Interface}.  Although this may not give you any errors,
@@ -2445,19 +2457,7 @@ both Zope and Twisted interfaces.
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+\newpage
 \subsubsection{\module{protocols.advice} --- Metaclasses and other ``Magic''}
 \declaremodule{}{protocols.advice}
 
@@ -2580,7 +2580,7 @@ it holds a live reference to the object.
 
 
 
-
+\newpage
 \subsection{Big Example 2 --- Extending the Framework for Context\label{protocols-context}}
 
 Now it's time for our second ``big'' example.  This time, we're going to add
@@ -2867,7 +2867,7 @@ are called directly by other code.)}
 
 
 
-
+\newpage
 \subsection{Additional Examples and Usage Notes}
 
 If you have any ideas or examples you'd like to share for inclusion in this
@@ -3072,7 +3072,7 @@ Pattern}{The original write-up of this handy approach to simplifying
 framework code.}
 \end{seealso}
 
-
+\newpage
 \subsubsection{Replacing introspection with Adaptation, Revisited\label{introspect-elim}}
 
 \begin{quotation}

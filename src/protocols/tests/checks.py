@@ -3,7 +3,8 @@
 __all__ = [
     'TestBase', 'ImplementationChecks', 'ProviderChecks',
     'InstanceImplementationChecks', 'makeClassTests', 'ClassProvidesChecks',
-    'AdaptiveChecks', 'SimpleAdaptiveChecks',
+    'AdaptiveChecks', 'SimpleAdaptiveChecks', 'makeMetaClassProvidesTests',
+    'BasicClassProvidesChecks',
 ]
 
 from unittest import TestCase, makeSuite, TestSuite
@@ -19,11 +20,10 @@ def a2(ob,p):
     return 'a2',ob
 
 
-class IPure(Interface):
-    # We use this for pickle/copy tests because the other protocols
-    # imply various dynamically created interfaces, and so any object
-    # registered with them won't be picklable
-    pass
+
+
+
+
 
 
 
@@ -132,13 +132,13 @@ class ProviderChecks(TestBase):
         declareAdapter(factory,provides=ifaces,forObjects=[self.ob])
 
     def checkSimpleRegister(self):
-        #print self.ob.__implements__
         self.declareObImplements([self.IA])
         self.assertObProvidesOnlyA()
 
     def checkImpliedRegister(self):
         self.declareObImplements([self.IB])
         self.assertObProvidesAandB()
+
 
 
 
@@ -248,6 +248,8 @@ class InstanceImplementationChecks(TestBase):
 
     """Non-adapter class-instances-provide checks"""
 
+    # Everybody can handle these
+
     def declareObImplements(self,ifaces):
         declareImplementation(self.klass, ifaces)
 
@@ -282,8 +284,6 @@ class ImplementationChecks(InstanceImplementationChecks):
         assert adapt(inst,self.IA,None) is inst
         assert adapt(Sub,self.IA,None) is None   # check not passed up to class
         assert adapt(Sub,self.IB,None) is None
-
-
 
     def checkRejectInheritanceAndReplace(self):
         self.declareObImplements([self.IB])
@@ -326,15 +326,28 @@ class ImplementationChecks(InstanceImplementationChecks):
 
 
 
-class ClassProvidesChecks:
+class BasicClassProvidesChecks:
 
     """Object-provides checks for classes and types"""
+
+    # Twisted doesn't support these because it makes no object/type distinction
 
     def checkNoInstancePassThru(self):
         inst = self.ob()
         adviseObject(self.ob, provides=[self.IA])
         assert adapt(inst, self.IA, None) is None
 
+    def checkChangingBases(self):
+        M1, M2 = self.setupBases(self.ob)
+        adviseObject(M1, provides=[self.IA])
+        adviseObject(M2, provides=[self.IB])
+        self.assertM1ProvidesOnlyAandM2ProvidesB(M1,M2)
+        self.assertChangingBasesChangesInterface(M1,M2,M1,M2)
+
+
+class ClassProvidesChecks(BasicClassProvidesChecks):
+
+    # Twisted doesn't support these because it makes no object/type distinction
 
     def checkInheritedDeclaration(self):
         class Sub(self.ob): pass
@@ -353,19 +366,6 @@ class ClassProvidesChecks:
 
         adviseObject(Sub,provides=[self.IB])
         assert adapt(Sub,self.IB,None) is Sub
-
-
-    def checkChangingBases(self):
-
-        # Zope and Twisted fail this because they rely on the first-found
-        # __implements__ attribute and ignore a class' MRO/__bases__
-
-        M1, M2 = self.setupBases(self.ob)
-        adviseObject(M1, provides=[self.IA])
-        adviseObject(M2, provides=[self.IB])
-        self.assertM1ProvidesOnlyAandM2ProvidesB(M1,M2)
-        self.assertChangingBasesChangesInterface(M1,M2,M1,M2)
-
 
 def makeInstanceTests(base,Picklable,NewStyle):
 
@@ -409,7 +409,6 @@ def makeInstanceTests(base,Picklable,NewStyle):
 
 
 def makeClassProvidesTests(base):
-
     """Generate a set of class-provides-oriented test classes using 'base'"""
 
     class AdviseClass(base):
@@ -427,26 +426,27 @@ def makeClassProvidesTests(base):
     return AdviseClass, AdviseType
 
 
+def makeMetaClassProvidesTests(base):
+    """Generate a set of class-provides-oriented test classes using 'base'"""
 
+    # Notice that we don't test the *metaclass* of the next two configurations;
+    # it would fail because the metaclass itself can't be adapted to an open
+    # provider, because it has a __conform__ method (from ProviderMixin).  For
+    # that to work, there'd have to be *another* metalevel.
 
+    class AdviseMixinClass(base):
+        def setUp(self):
+            class Meta(ProviderMixin, type): pass
+            class Test(object): __metaclass__ = Meta
+            self.ob = Test
 
+    class AdviseMixinMultiMeta2(base):
+        def setUp(self):
+            class Meta(ProviderMixin, type): pass
+            class Test(ProviderMixin,object): __metaclass__ = Meta
+            self.ob = Test
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    return AdviseMixinClass, AdviseMixinMultiMeta2
 
 
 def makeClassTests(base):

@@ -4,7 +4,6 @@ from unittest import TestCase, makeSuite, TestSuite
 from protocols import *
 
 import protocols.zope_support
-
 from zope.interface import Interface
 
 # Dummy interfaces and adapters used in tests
@@ -25,7 +24,8 @@ class NewStyle(object):
     pass
 
 from checks import ImplementationChecks, makeClassTests, makeInstanceTests
-from checks import ProviderChecks, ClassProvidesChecks
+from checks import ProviderChecks, BasicClassProvidesChecks
+from checks import makeMetaClassProvidesTests
 
 class BasicChecks(ImplementationChecks):
     IA = IA
@@ -39,7 +39,14 @@ class InstanceChecks(ProviderChecks):
     Interface = Interface
     IPure = IPure
 
+class ClassChecks(BasicClassProvidesChecks, ProviderChecks):
+    IA = IA
+    IB = IB
+    Interface = Interface
+    IPure = IPure
+
 TestClasses = makeClassTests(BasicChecks)
+TestClasses += makeMetaClassProvidesTests(ClassChecks)
 TestClasses += makeInstanceTests(InstanceChecks,Picklable,NewStyle)
 
 class IB(protocols.Interface):
@@ -57,43 +64,18 @@ class InstanceChecks(ProviderChecks):
     Interface = Interface
     IPure = IPure
 
+class ClassChecks(BasicClassProvidesChecks, ProviderChecks):
+    IA = IA
+    IB = IB
+    Interface = Interface
+    IPure = IPure
+
 TestClasses += makeClassTests(BasicChecks)
+TestClasses += makeMetaClassProvidesTests(ClassChecks)
 TestClasses += makeInstanceTests(InstanceChecks,Picklable,NewStyle)
 
 def test_suite():
     return TestSuite([makeSuite(t,'check') for t in TestClasses])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

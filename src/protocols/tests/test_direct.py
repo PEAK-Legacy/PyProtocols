@@ -10,6 +10,7 @@ from unittest import TestCase, makeSuite, TestSuite
 from protocols import *
 from checks import ProviderChecks, AdaptiveChecks, ClassProvidesChecks
 from checks import makeClassProvidesTests, makeInstanceTests
+from checks import makeMetaClassProvidesTests
 
 class IA(Interface):  pass
 class IB(IA): pass
@@ -33,7 +34,6 @@ class BasicChecks(AdaptiveChecks, ProviderChecks):
 class ClassChecks(ClassProvidesChecks, BasicChecks):
 
     """Checks to be done on classes and types"""
-
 
 
 
@@ -91,13 +91,6 @@ class AdviseMixinInstance(BasicChecks):
 # provider, because it has a __conform__ method (from ProviderMixin).  For
 # that to work, there'd have to be *another* metalevel.
 
-class AdviseMixinClass(ClassChecks):
-
-    def setUp(self):
-        class Meta(ProviderMixin, type): pass
-        class Test(object): __metaclass__ = Meta
-        self.ob = Test
-
 class AdviseMixinMultiMeta1(BasicChecks):
 
     def setUp(self):
@@ -105,24 +98,12 @@ class AdviseMixinMultiMeta1(BasicChecks):
         class Test(ProviderMixin,object): __metaclass__ = Meta
         self.ob = Test()
 
-class AdviseMixinMultiMeta2(ClassChecks):
 
-    def setUp(self):
-        class Meta(ProviderMixin, type): pass
-        class Test(ProviderMixin,object): __metaclass__ = Meta
-        self.ob = Test
+class InstanceTestsBase(BasicChecks, InstanceConformChecks):
+    pass
 
-
-
-
-
-
-
-
-
-
-class InstanceTestsBase(BasicChecks, InstanceConformChecks): pass
-class ClassTestsBase(ClassChecks, ClassConformChecks): pass
+class ClassTestsBase(ClassChecks, ClassConformChecks):
+    pass
 
 class Picklable:
     # Pickling needs classes in top-level namespace
@@ -132,15 +113,22 @@ class NewStyle(object):
     pass
 
 TestClasses = (
-    AdviseMixinInstance, AdviseMixinClass, AdviseMixinMultiMeta1,
-    AdviseMixinMultiMeta2
+    AdviseMixinInstance, AdviseMixinMultiMeta1,
 )
 
+TestClasses += makeMetaClassProvidesTests(ClassChecks)
 TestClasses += makeClassProvidesTests(ClassTestsBase)
 TestClasses += makeInstanceTests(InstanceTestsBase,Picklable,NewStyle)
 
+
 def test_suite():
     return TestSuite([makeSuite(t,'check') for t in TestClasses])
+
+
+
+
+
+
 
 
 
