@@ -15,18 +15,18 @@ if 'HAPPYDOC_TITLE' not in globals():
     HAPPYDOC_TITLE = PACKAGE_NAME + ' API Reference'
 
 
-from setuptools import setup, Command, Extension, Feature
+from setuptools import Command
 from distutils.command.sdist import sdist as old_sdist
-from distutils.command.build_ext import build_ext as old_build_ext
 
 
-try:
-    from Pyrex.Distutils.build_ext import build_ext
-    EXT = '.pyx'
 
-except ImportError:
-    build_ext = old_build_ext
-    EXT = '.c'
+
+
+
+
+
+
+
 
 
 
@@ -101,8 +101,8 @@ SETUP_COMMANDS = {
     'sdist': sdist,
     'happy': happy,
     'sdist_nodoc': old_sdist,
-    'build_ext': build_ext,
 }
+
 
 
 
