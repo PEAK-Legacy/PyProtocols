@@ -695,7 +695,7 @@ is of a different type.
 
 
 
-\subsubsection{Replacing Introspection with Adaptation}
+\subsubsection{Replacing Introspection with Adaptation\label{replintrowadapt}}
 
 \begin{quotation}
 To summarize: don't type check.
@@ -728,10 +728,13 @@ about the interfaces supported by the supplied component
 Obviously, the first case is handled quite well by \function{adapt()}, at
 least in an environment where it's easy to declare adapters between types and
 protocols.  The second and third cases may at first seem to demand an ability
-to introspect what interfaces are supported by a component.  But, as we'll
-see later, they are almost always better served by defining new protocols
-that supply the required behavior or metadata, and then requesting
-implementations of those protocols.
+to introspect what interfaces are supported by a component.  But they are almost
+always better served by defining new protocols that supply the required behavior
+or metadata, and then requesting implementations of those protocols.
+
+
+
+
 
 In all three use cases, replacing introspection with adaptation opens the
 framework to third party extensions, without further modifications being
@@ -741,8 +744,8 @@ the availability of a standard mechanism for adaptation means that the
 extension mechanism need only be documented once: right here in this
 document.
 
-In section \ref{introspect-elim}, we will present examples of how to
-refactor all three kinds of introspection code to purely adaptation-driven
+In section \ref{introspect-elim}, we will present techniques for refactoring
+all three kinds of introspection code to purely adaptation-driven
 code, showing how the flexibility and readability of the code improves in the
 process.  But first, we will need to cover how protocols and interfaces can
 be defined, declared, and adapted, using the API provided by the
@@ -755,9 +758,6 @@ Considered Harmful}{A brief critique of common justifications for using
 introspection}
 
 \end{seealso}
-
-
-
 
 
 
@@ -2868,34 +2868,32 @@ are called directly by other code.)}
 
 
 
-\subsection{Additional Examples}
+\subsection{Additional Examples and Usage Notes}
 
-XXX
-
-\subsubsection{Replacing introspection with Adaptation \label{introspect-elim}}
-
-XXX
-
+If you have any ideas or examples you'd like to share for inclusion in this
+section, please contact the author.  In the meantime, here are a few additional
+examples of things you can do with \function{adapt()} and the \module{protocols}
+package.
 
 
+\subsubsection{Double Dispatch and the ``Visitor'' Pattern\label{dispatch-example}}
 
+Double dispatch and the ``Visitor'' pattern are mechanisms for selecting a
+method to be executed, based on the type of two objects at the same time.
+To implement either pattern, both object types must have code specifically to
+support the pattern.  Object adaptation makes this easier by requiring at most
+one of the objects to directly support the pattern; the other side can provide
+support via adaptation.  This is useful both for writing new code clearly and
+for adapting existing code to use the pattern.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+First, let's look at double dispatching.  Suppose we are creating a business
+application GUI that supports drag-and-drop.  We have various kinds of objects
+that can be dragged and dropped onto other objects: users, files, folders, a
+trash can, and a printer.  When we drop a user on a file, we want to grant the
+user access to the file, and when we drop a file on the user, we want to email
+them the file.  If we drop a file on a folder, it should be filed in the folder,
+but if we drop the folder on the file, that's an error.  The classic ``double
+dispatch'' approach would look something like:
 
 
 
@@ -2907,5 +2905,253 @@ XXX
 
 
 
+
+
+
+
+\begin{verbatim%
+}class Printer:
+    def drop(self,thing):
+        thing.droppedOnPrinter(self)
+
+class Trashcan:
+    def drop(self,thing):
+        thing.droppedInTrash(self)
+
+class User:
+    def drop(self,thing):
+        thing.droppedOnUser(self)
+
+    def droppedOnPrinter(self,printer):
+        printer.printUser(self)
+
+    def droppedInTrash(self,trash):
+        self.delete()
+
+class File:
+    def drop(self,thing):
+        thing.droppedOnFile(self)
+
+    def droppedOnPrinter(self,printer):
+        printer.printFile(self)
+
+    def droppedOnUser(self,user):
+        user.sendMail(self)
+
+    def droppedInTrash(self,trash):
+        self.delete()
+\end{verbatim}
+
+We've left out any of the methods that actually \emph{do} anything, of course,
+and all of the methods for things that the objects don't do.  For example, the
+\class{Trashcan} should have methods for \method{droppedInTrash()},
+\method{droppedOnPrinter()}, etc., that display an error or beep or whatever.
+(Of course, in Python you can just trap the \exception{AttributeError} from the
+missing method to do this; but we didn't show that here either.)
+
+
+Every time another kind of object is added to this system, new \code{droppedOnX}
+methods spring up everywhere like weeds.  Now let's look at the adaptation
+approach:
+
+\begin{verbatim%
+}class Printer:
+    def drop(self,thing):
+        adapt(thing,IPrintable,factory=Unprintable).printOn(self)
+
+class Trashcan:
+    def drop(self,thing):
+        adapt(thing,IDeletable,factory=Undeleteable).delete(self)
+
+class User:
+    advise(instancesProvide=[IDeletable,IPrintable])
+    def drop(self,thing):
+        adapt(thing,IMailable,factory=Unmailable).mailTo(self)
+
+class File:
+    advise(instancesProvide=[IDeletable,IMailable,IPrintable])
+    def drop(self,thing):
+        adapt(thing,IInsertable,factory=Uninsertable).insertInto(self)
+\end{verbatim}
+
+\class{Unprintable}, \class{Undeletable}, \class{Umailable}, and
+\class{Uninsertable} are classes that implement the \method{printOn()},
+\method{delete()}, \method{mailTo()}, and \method{insertInto()} methods by
+giving the user feedback that the operation isn't possible.  Because they are
+adapter factories, they have access to the dropped object, and because they have
+methods that accept the drop target, they can present a meaningful error.  (This
+technique of using a \var{factory} argument that provides an empty or
+error-raising implementation of an interface, is an example of the \strong{null
+object pattern}.)
+
+Notice that the adaptation approach is much more scalable, because new methods
+are not required for every new droppable item.  Third parties can declare
+adaptations between two other developers' objects, making drag and drop between
+them possible.
+
+
+
+The ``Visitor'' pattern is a specialized form of double dispatch, used to apply
+an algorithm to a structured collection of objects.  For example, the Python
+\program{docutils} tookit implements the visitor pattern to create various
+kinds of output from a document node tree (much like an XML DOM).  Each node has
+a \method{walk()} method that accepts a ``visitor'' argument.  The visitor must
+provide a set of \code{visit_X} methods, where X is the name of a type of node.
+The idea of the approach is that one can write new visitor types that perform
+different functions.  One visitor writes out HTML, another writes out LaTeX or
+maybe plain ASCII text.  The nodes don't care what the visitor does, they just
+tell it what kind of object is being visited.
+
+Like double dispatch, this pattern is definitely an improvement over writing
+large if-then-else blocks to introspect types.  But it does have a few
+drawbacks.  First, all the types must have unique names.  Second, the visitor
+must have methods for all possible node types (or the caller must handle the
+absence of the methods).  Third, there is no way for the methods to mimic the
+inheritance or interface structure of the source types.  So, if there are node
+types like \class{Shape} and \class{Square}, you must write \method{visit_Shape}
+and \method{visit_Square} methods, even if you would like to treat all subtypes
+of \class{Shape} the same.
+
+The object adaptation approach to this, is to define visitor(s) as adapters from
+the objects being traversed, to an interface that supplies the desired behavior.
+For example, one might define \class{IHTMLWriter} and \class{ILaTeXWriter}
+interfaces, with \class{writeHTML()} and \class{writeLaTeX()} methods.  Then, by
+defining adapters from the appropriate node base types to these interfaces, the
+desired behavior is achieved.  Just
+\code{adapt(document,IHTMLWriter).writeHTML()}, and off you go.
+
+This approach is far less fragile, since new node types do not require new
+methods in the visitors, and if the new node type specializes an existing type,
+the default adaptation might be reasonable.  Also, the approach is non-invasive,
+so it can be applied to existing frameworks that don't support the visitor
+pattern (such as \module{xml.dom.minidom}).  Further, the adapters can exercise
+fine-grained control over any traversal that takes place, since it is the
+adapter rather than the adaptee that controls the visiting order.
+
+
+
+
+
+Last, but not least, notice that by adapting from interfaces rather than
+types, one can apply this pattern to multiple implementations of the interface.
+For example, Python has many XML DOM implementations; to the extent that two
+implementations provide the same interface, the adapters you write could be used
+with any of them, even if each pacakge has different names for their node types.
+
+Are there any downsides to using adaptation over double-dispatch or the Visitor
+pattern?  The total size of your program may be larger, because you'll be
+writing lots of adapter classes.  But, your program will also be more modular,
+and you'll be able to group the classes in ways that make more sense for the
+reader.  Using adaptation also may or may not be slower than the simpler
+patterns, depending on various implementation factors.
+
+It's rare that the overhead is significant, however.  In most uses of these
+patterns, runtime is dominated by the useful work being done, not by the
+dispatching.  The exception is when a structure to be visited contains many
+thousands of elements that need virtually no work done to them.  For example,
+if an XML visitor wrote text nodes out unchanged, and the input was mostly text
+nodes.  Under such conditions, the time taken by the dispatch mechanism (whether
+name-based or adapter-based) would be more visible.
+
+The author has found, however, that in that situation, one can gain more speed
+by registering null adapter factories or \function{DOES_NOT_SUPPORT} for the
+element types in question.  This shortens the adapter lookup time enough to make
+the adaptation overhead competitive with name-based approaches.  But this only
+needs to be done when ``trivial'' elements dominate the structures to be
+processed, \emph{and} performance is critical.
+
+\begin{seealso}
+\seetitle[http://citeseer.nj.nec.com/nordberg96variations.html]{Variations on
+the Visitor Pattern}{A critique of the Visitor pattern that raises some of the
+same issues we raise here, and with similar solutions.  Reading its C++
+examples, however, will increase your appreciation for the simplicity and
+modularity that \function{adapt()} offers!}
+
+\seetitle[http://citeseer.nj.nec.com/woolf96null.html]{The Null Object
+Pattern}{The original write-up of this handy approach to simplifying
+framework code.}
+\end{seealso}
+
+
+\subsubsection{Replacing introspection with Adaptation, Revisited\label{introspect-elim}}
+
+\begin{quotation}
+``Potentially-idempotent adapter functions are a honking great
+idea -- let's do more of those'', to paraphrase the timbot.
+
+\hfill --- Alex Martelli, on \newsgroup{comp.lang.python}
+\end{quotation}
+
+All programs that use GOTO's can be rewritten without GOTOs, using higher-level
+constructs for control flow like function calls, \code{while} loops, and so on.
+In the same way, type checks -- and even interface checks -- are not essential
+in the presence of higher-level control constructs such as adaptation.  Just as
+getting rid of GOTO ``spaghetti code'' helped make programs easier to read and
+understand, so too can replacing introspection with adaptation.
+
+In section \ref{replintrowadapt}, we listed three common uses for using
+type or interface checks (e.g. using \function{isinstance()}):
+
+\begin{itemize}
+
+\item To manually adapt a supplied component to a needed interface
+
+\item To select one of several possible behaviors, based on the kind of
+component supplied
+
+\item To select another component, or take some action, using information
+about the interfaces supported by the supplied component
+
+\end{itemize}
+
+By now, you've seen enough uses of the \class{protocols} module that it should
+be apparent that all three of the above use cases can -- in principle -- be
+handled by adaptation.  However, in the course of moving PEAK from using
+introspection to adaptation, I ran into some use cases that at first seemed
+very difficult to ``adapt''.  However, once I understood how to handle them,
+I realized that there was a straightforward approach to refactoring any
+introspection use cases I encountered.  Although this approach seems to have
+more than one step, in reality they are all variations on the same theme: expose
+the hidden interface, then adapt to it.  Here's how you do it:
+
+\begin{enumerate}
+\item First, is this just a case of adapting different types to a common
+interface?  If yes, then just declare the adapters and use \function{adapt()}
+normally.  If the interface isn't explicit or documented, make it so.
+
+\item Is this a case of choosing a behavior, based on the type?  If yes, then
+\emph{define the missing interface} that you want to adapt to.  In other words,
+code that switches on type to select a behavior, really wants the behavior to be
+in the \emph{other} object.  So, there is in effect an ``undocumented implicit
+interface'' that the code is adapting the other object to.  Make the interface
+explicit and documented, move the code into adapters (or into the other
+classes!), and use \function{adapt()}.
+
+\item Is this a case of choosing a behavior or a component based on using
+interfaces as metadata?  If so, this is really a special case of \#2.
+An example of this use case is where Zope X3 provides UI components based on
+what interfaces an object supports.  In this case, the ``undocumented implicit
+interface'' is the ability to select an appropriate UI component!  Or perhaps
+it's an ability to provide a set of ``tags'' or ``keys'' that can be used to
+look up UI components or other things.  You'll have to decide what the real
+``essence'' is.  But either way, you make the needed behavior explicit (as an
+interface), and then use \function{adapt()}.
+\end{enumerate}
+
+Notice that in each case, the code is demonstrably improved. First, there is
+more documentation of the \emph{intended} behavior (as opposed to merely the
+actual behavior, which might be broken).  Second, there is greater
+extensibility, because it isn't necessary to change the code to add more type
+cases.  Third, the code is more readable, because the code's purpose is
+highlighted, not all the possible variations of its implementation.  In the
+words of Tim Peters, ``Explicit is better than implicit.  Simple is better than
+complex.  Sparse is better than dense.  Readability counts.''
+
+Now that we've covered how to replace all forms of introspection with
+adaptation, I'll readily admit that I still write code that does introspection
+when I'm in ``first draft'' mode!  Brevity is the soul of prototyping, and I
+don't mind banging out a few quick \code{if isinstance():} checks in order to
+figure out what it is I want the code to do.  But then, I refactor, because
+I want my code to be...  adaptable!  Chances are good, that you will too.
 
 
