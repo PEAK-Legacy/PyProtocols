@@ -3,13 +3,12 @@ from protocols import adapt, advise, Interface, Attribute
 
 class APITests(TestCase):
 
-    def checkAdaptTrapsTypeError(self):
+    def checkAdaptTrapsTypeErrorsOnConform(self):
         class Conformer:
             def __conform__(self,ob):
                 return []
         assert adapt(Conformer,list,None) is None
         assert adapt(Conformer(),list,None) == []
-
 
     def checkAdaptHandlesIsInstance(self):
         assert adapt([1,2,3],list,None) == [1,2,3]
@@ -37,6 +36,7 @@ class APITests(TestCase):
             )
         else:
             raise AssertionError("Should've caught invalid keyword")
+
 
 
     def checkAdviseClassKeywordsValidated(self):
@@ -79,6 +79,47 @@ class APITests(TestCase):
         assert adapt(c,AdaptingProtocol,None) == ("adapted",c)
         assert adapt(42,AdaptingProtocol,None) == ("adapted",42)
         assert adapt(42,42,None) is None
+
+    def checkAdaptFiltersTypeErrors(self):
+
+        class Nonconformist:
+            def __conform__(self,ob):
+                raise TypeError("You got me!")
+
+        class Unadaptive:
+            def __adapt__(self,ob):
+                raise TypeError("You got me!")
+
+        # These will get a type errors calling __conform__/__adapt__
+        # but should be ignored since the error is at calling level
+        assert adapt(None, Unadaptive, None) is None
+        assert adapt(Nonconformist, None, None) is None
+
+        # These will get type errors internally, and the error should
+        # bleed through to the caller
+        self.assertTypeErrorPassed(None, Unadaptive(), None)
+        self.assertTypeErrorPassed(Nonconformist(), None, None)
+
+
+    def assertTypeErrorPassed(self, *args):
+        try:
+            # This should raise TypeError internally, and be caught
+            adapt(*args)
+        except TypeError,v:
+            assert v.args==("You got me!",)
+        else:
+            raise AssertionError("Should've passed TypeError through")
+
+
+
+
+
+
+
+
+
+
+
 
     def checkAttribute(self):
 
