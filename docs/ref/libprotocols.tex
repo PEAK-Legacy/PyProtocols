@@ -82,10 +82,44 @@ the ``visitor pattern''.
 
 \begin{seealso}
 
-\seepep{246}{Object Adaptation}{PEP 246 describes an early version of the 
+\seepep{246}{Object Adaptation}{PEP 246 describes an early version of the
 adaptation protocol used by this package.}
 
 \end{seealso}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 \subsection{Protocols and Interfaces}
 
@@ -123,6 +157,10 @@ referring to some hypothetical ``hitchhiker'' protocol.  More realistically,
 the Microsoft COM framework uses UUIDs (Universally Unique Identifiers) to
 identify interfaces.  UUIDs can be represented as Python strings, and thus
 are usable as protocol objects.
+
+
+
+
 
 But a simple string or number is often not very useful as a protocol
 object.  Aside from the issue of how to assign strings or numbers to
@@ -163,6 +201,8 @@ will be described in section \ref{adapt-protocol}.  (Often, this method
 can be added to an existing class, or patched into an interface object
 implementation.)
 
+
+
 An \strong{open protocol} is an adapting protocol that is also capable of
 accepting adapter declarations, and managing its implication relationships
 with other protocols.  Open protocols can be used with this package's
@@ -170,11 +210,38 @@ protocol declaration API, as long as they implement (or can be adapted to)
 the \class{IOpenProtocol} interface, as will be described in section
 \ref{open-protocols}.
 
+Notice that the concepts of protocol objects, adpating protocols, and open
+protocols are themselves ``protocols".  The \module{protocols} package supplies
+three interface objects that symbolize these concepts: \class{IProtocol},
+\class{IAdaptingProtocol}, and \class{IOpenProtocol}, respectively.  Just as
+the English phrases represent the concepts in this text, the interface objects
+represent these concepts at runtime.
+
 Whether a protocol object is as simple as a string, or as complex as an
 open protocol, it can be used to request that a component support
 (or adapt to) the protocol that it symbolizes.  In the next section, we'll
 look at how to make such a request, and how the different kinds of protocol
 objects participate (or not) in fulfilling such requests.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 \subsection{\function{adapt()} and the Adaptation Protocol
@@ -203,7 +270,6 @@ raise \exception{NotImplementedError}.
 \var{default} may be supplied as a positional or keyword argument.
 \var{factory}, however, must be supplied as a keyword argument in order
 to be used.
-
 \end{funcdesc}
 
 The component adaptation process performed by \function{adapt()} proceeds
@@ -283,16 +349,32 @@ process.  But first, we will need to cover how protocols and interfaces can
 be defined, declared, and adapted, using the API provided by the
 \module{protocols} package.
 
+Now that you know how \function{adapt()} works, you can actually make use of it
+without any of the other tools in the \module{protocols} package.  Just define
+your own \function{__conform__} and \function{__adapt__} functions, and off
+you go!
 
+In practice, however, this is like creating a new kind of number type for
+Python: doable, but tedious and perhaps best left to a specialist.  For that
+reason, the \module{protocols} package supplies some useful basic protocol
+types, and a "declaration API" that lets you declare how protocols, types, and
+objects should be adapted to one another.  The rest of this document deals
+with how to use those types and APIs.
+
+Note, however, that you can still create your own kinds of protocol objects,
+or metaclasses that manage their own adapters, and many other things, using
+only the information supplied so far.  But, if you'd like to use your creations
+with the \module{protocols} declaration API, you'll need to read section
+\ref{customizing-adaptation}, ``Customizing and Extending the Declaration API".
 
 \subsubsection{Differences Between \function{protocols.adapt()} and \pep{246}}
 
-If you have read \pep{246} or are looking for an exact implmentation of it,
+If you have read \pep{246} or are looking for an exact implementation of it,
 you should know that there are a few differences between the \module{protocols}
 implementation of \function{adapt()} and the \pep{246} specification.  If you
 don't care about these differences, you can skip this mini-appendix and
-proceed directly to section \ref{protocols-defining}, ``Defining Interfaces
-and Protocols''.
+proceed directly to section \ref{protocols-defining}, ``Defining and Subclassing
+Interfaces''.
 
 The first difference is that \exception{TypeError} is treated differently in
 each implementation.  \pep{246} says that if a \function{__conform__} or
@@ -322,9 +404,11 @@ adaptation protocol more robust, more predictable, and easier to use for
 its most common applications.
 
 
-\subsection{Defining Interfaces and Protocols \label{protocols-defining}}
 
-\subsubsection{Defining and Subclassing Interfaces \label{interfaces-defining}}
+
+
+
+\subsection{Defining and Subclassing Interfaces \label{protocols-defining}}
 
 The easiest way to define an interface with the protocols package is to subclass
 \class{protocols.Interface}.  \class{Interface} does not supply any data or
@@ -336,7 +420,8 @@ common styles of defining interfaces, illustrated below:
 
 # "Pure" interface style
 
-class ISimpleMapping(Interface):
+class IReadMapping(Interface):
+
     """A getitem-only mapping"""
 
     def __getitem__(key):
@@ -346,6 +431,7 @@ class ISimpleMapping(Interface):
 # Abstract Base Class (ABC) style
 
 class AbstractMapping(Interface):
+
     """A getitem-only mapping"""
 
     def __getitem__(self,key):
@@ -353,13 +439,15 @@ class AbstractMapping(Interface):
         raise NotImplementedError
 \end{verbatim}
 
-The ``pure" style emphasizes the interface to the caller, and is not intended to
-be subclassed for implementation.  Notice that the \code{self} parameter is not
-included in its method definitions, and its method bodies are empty.  The ``ABC"
-style, however, emphasizes implementation, as it is intended to be subclassed
+The ``pure" style emphasizes the interface as seen by the caller, and is not
+intended to be subclassed for implementation.  Notice that the \code{self}
+parameter is not included in its method definitions, because \code{self} is not
+supplied when calling the methods.  The ``ABC" style, on the other hand,
+emphasizes implementation, as it is intended to be subclassed
 for that purpose.  Therefore, it includes method bodies, even for abstract
 methods.  Each style has different uses: ``ABC" is a popular rapid development
 style, while the ``pure" approach has some distinct documentation advantages.
+
 
 \class{protocols.Interface} may be used as a base class for either style.  You
 should be aware, however, that Interface objects use an explicit metaclass,
@@ -368,13 +456,14 @@ interface for implementation using another metaclass, you may need to create a
 third metaclass that combines \class{InterfaceClass} with your desired
 metaclass.
 
-Subclassing a subclass of \class{Interface} creates another \class{Interface},
+Subclassing a subclass of \class{Interface} creates a new \class{Interface}
 that implies the first interface.  This means that any object that is considered
-to provide the second interface, is considered to implicitly provide the base
+to provide the second interface, is considered to implicitly provide the first
 interface.  For example:
 
 \begin{verbatim%
-}class ISimpleWriteMapping(ISimpleMapping):
+}class IReadWriteMapping(IReadMapping):
+
     """Mapping with getitem and setitem only"""
 
     def __setitem__(key,value):
@@ -382,16 +471,368 @@ interface.  For example:
 
 \end{verbatim}
 
-The \code{ISimpleWriteMapping} interface implies the \code{ISimpleMapping}
-interface.  Therefore, any object that provides \code{ISimpleWriteMapping} is
-understood to also provide the \code{ISimpleMapping} interface.  The reverse,
+The \code{IReadWriteMapping} interface implies the \code{IReadMapping}
+interface.  Therefore, any object that provides \code{IReadWriteMapping} is
+understood to also provide the \code{IReadMapping} interface.  The reverse,
 however, is not true.
 
-Inheritance is only one way to declare that one interface implies another.  In
-later sections, we will discuss various other ways to do this, such as
-declaring an adapter that adapts objects from one protocol to another.
+Inheritance is only one way to declare that one interface implies another,
+however, and its uses are limited.  Let's say for example, that some package
+\code{A} supplies objects that support \code{IReadWriteMapping}, while package
+\code{B} needs objects that support \code{IReadMapping}.  But each package
+declared its own interface, neither inheriting from the other.
+
+As developers reading the documentation of these interfaces, it is obvious to
+us that \code{IReadWriteMapping} implies \code{IReadMapping}.  But there is no
+way for Python to know this, unless we explicitly declare it to be so, like
+this:
+
+
+
+
+\begin{verbatim%
+}import protocols
+from A import IReadWriteMapping
+from B import IReadMapping
+
+protocols.declareAdapter(
+    protocols.NO_ADAPTER_NEEDED,
+    provides = [IReadMapping],
+    forProtocols = [IReadWriteMapping]
+)
+\end{verbatim}
+
+In the above example, we use the \module{protocols} declaration API to say that
+no adapter is needed to provide the \code{B.IReadMapping} interface for
+objects that already provide the \code{A.IReadWriteMapping} interface.
+
+At this point, if we supply an object that implements (or can be adapted
+to) \code{IReadWriteMapping}, to a function that expects an
+\code{IReadMapping}, things should work out quite well for us, as long as
+we either call \code{adapt(ob,IReadMapping)} first, or if the code we're
+calling does it for us.
+
+There are still other ways to declare that one interface implies another.  For
+example, if the author of our example package \code{B} knew about package {A}
+and its \code{IReadWriteMapping} interface, he or she might have defined
+\code{IReadMapping} this way:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\begin{verbatim%
+}import protocols
+from protocols import Interface
+
+from A import IReadWriteMapping
+
+class IReadMapping(Interface):
+
+    """A getitem-only mapping"""
+
+    protocols.advise(
+        protocolIsSubsetOf = [IReadWriteMapping]
+    )
+
+    def __getitem__(key):
+        """Return value for key"""
+
+\end{verbatim}
+
+This is syntax sugar for creating the interface first, and then using
+\code{protocols.declareAdapter(NO_ADAPTER_NEEDED)}.  Of course, you can only use
+this approach if you are the author of the interface!  Otherwise, you must use
+\function{declareAdapter()} after the fact.
+
+In the next section, we will begin looking at the \module{protocols} declaration
+APIs -- like \function{declareAdapter()} and \function{advise()} -- in more
+detail.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\subsection{Declarating Implementations and Adapters}
+
+\subsubsection{Declaration Primitives}
+
+declareAdapterForType
+
+declareAdapterForProtocol
+
+declareAdapterForObject
+
+
+\subsubsection{The Convenience Declaration API}
+
+declareImplementation
+
+adviseObject
+
+declareAdapter
+
+
+\subsubsection{Convenience Declarations in Class, Protocol and Module Bodies}
+
+advise
+
+
+
+\subsection{Creating and Using Adapters}
+
+IAdapterFactory
+
+
+\subsection{Protocol Implication and Adapter Precedence
+\label{proto-implication}}
+
+subsetting, extending...
+
+
+
+
+
+
+\subsection{Module Contents}
+
+\begin{funcdesc}{adapt}{component, protocol,
+\optional{, default \optional{, factory}}}
+
+Return an implementation of \var{protocol} (a protocol object) for
+\var{component} (any object).  The implementation returned may be
+\var{component}, or an adapter that implements the protocol on its
+behalf.  If no implementation is available, return \var{default}.  If no
+\var{default} is provided, call \code{\var{factory}(\var{component},
+\var{protocol})} and return the result.  If no \var{factory} is supplied,
+raise \exception{NotImplementedError}.
+
+\var{default} may be supplied as a positional or keyword argument.
+\var{factory}, however, must be supplied as a keyword argument in order
+to be used.
+
+A detailed description of this function's operations and purpose may be found in
+section \ref{adapt-protocol}.
+\end{funcdesc}
+
+\begin{funcdesc}{NO_ADAPTER_NEEDED}{component, protocol}
+This function simply returns \var{component}.  It is a placeholder used whenever
+an object, type, or protocol directly implements or implies another protocol.
+Whenever an adapter is not required, but the \module{protocols} API function
+you are calling requires an adapter, you should supply this function as the
+adapter.  Some protocol implementations, such as the one for Zope interfaces,
+are unable to handle adapters other than \function{NO_ADAPTER_NEEDED} and
+\function{DOES_NOT_SUPPORT}.
+\end{funcdesc}
+
+\begin{funcdesc}{DOES_NOT_SUPPORT}{component, protocol}
+This function simply returns \constant{None}.  It is a placeholder used whenever
+an object, type, or protocol does not implement or imply another protocol.
+Whenever adaptation is not possible, but the \module{protocols} API function
+you are calling requires an adapter, you should supply this function as the
+adapter.  Some protocol implementations, such as the one for Zope interfaces,
+are unable to handle adapters other than \function{NO_ADAPTER_NEEDED} and
+\function{DOES_NOT_SUPPORT}.
+\end{funcdesc}
+
+\begin{classdesc*}{Protocol}
+\class{Protocol} is a base class that implements the \class{IOpenProtocol}
+interface, supplying internal adapter registries for adapting from other
+protocols or types/classes.  Note that you do not necessarily need to use this
+class (or any other \class{IOpenProtocol} implementation) in
+your programs.  Any object that implements the simpler \class{IProtocol} or
+\class{IAdaptingProtocol} interfaces may be used as protocols for the
+\function{adapt()} function.  Compliance with the \class{IOpenProtocol}
+interface is only required to use the \module{protocols} declaration API.
+(That is, functions whose names begin with \code{declare} or \code{advise}.)
+\end{classdesc*}
+
+
+\begin{classdesc}{InterfaceClass}{name, bases, dictionary}
+\class{InterfaceClass}, a subclass of \class{Protocol}, is a metaclass used to
+create new interfaces (i.e., protocol objects) using class statements.  You
+may set a class' \code{__metaclass__} to \class{InterfaceClass}, or simply
+subclass \class{Interface}.  Normally, you will only use \class{InterfaceClass}
+if you need to combine it with another metaclass, in a subclass of
+\class{Interface}.
+\end{classdesc}
+
+
+\begin{classdesc*}{Interface}
+Subclass this to create an interface.  See section \ref{protocols-defining}
+for more details.
+\end{classdesc*}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\begin{funcdesc}{declareImplementation}{typ
+\optional{, instancesProvide=()} \optional{, instancesDoNotProvide=()}}
+
+Declare that instances of class or type \var{typ} do or do not provide
+implementations of the specified protocols.  \var{instancesProvide} and
+\var{instancesDoNotProvide} must be sequences of protocol objects that
+provide, or are adaptable to, the \class{protocols.IOpenProtocol} interface,
+such as \class{protocols.Interface} subclasses, or Zope \class{Interface}
+objects.
+
+This function is shorthand for calling \function{declareAdapterForType()}
+with \function{DOES_NOT_SUPPORT} and \function{NO_ADAPTER_NEEDED} as adapters
+from the type to each of the specified protocols.
+\end{funcdesc}
+
+declareAdapterForType
+
+declareAdapterForProtocol
+
+declareAdapterForObject
+
+adviseObject
+
+declareAdapter
+
+advise
+
+Attribute
+
+metamethod
+
+supermeta
+
+\subsubsection{\module{protocols.adapters} --- ``Adapter arithmetic" support}
+
+minimumAdapter
+
+composeAdapters
+
+updateWithSimplestAdapter
+
+\subsubsection{\module{protocols.classic} --- Adapters to support built-in types
+and Zope Interfaces}
+
+\subsubsection{\module{protocols.advice} --- Metaclasses and other ``Magic"}
+
+addClassAdvisor, isClassAdvisor, getFrameInfo
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\subsection{Customizing and Extending the Declaration API\label{customizing-adaptation}}
+
+\subsubsection{Interfaces Supplied by the \module{protocols} Package}
+
+You will rarely use any of these interface objects directly, unless you are
+customizing or extending the system.  They exist for
+documentation purposes, and to facilitate the operation of the package's
+declaration APIs.
+
+You do not subclass these interface objects, unless you are defining a new
+interface that implies the existing one.
+
+'IAdapterFactory', 'IProtocol', 'IAdaptingProtocol', 'IOpenProtocol', 'IOpenProvider',
+    'IOpenImplementor'
+
+
+\subsubsection{The \class{IOpenProtocol} Interface \label{open-protocols}}
+
+\begin{classdesc*}{IOpenProtocol}
+\class{IOpenProtocol} is an interface object representing the behavior a
+protocol object must provide, to be usable with the \module{protocols}
+declaration API.  (That is, functions whose names begin with \code{declare}
+or \code{advise}.)
+
+Although the \module{protocols} package supplies a default implementation of
+this interface (\class{protocols.Protocol}), you may use any object that
+provides this interface -- and declares that it does so -- as a protocol for
+the declaration APIs.
+
+\class{IOpenProtocol} is a subclass of \class{IAdaptingProtocol}.  A complete
+description of the methods this interface requires is in section
+\ref{protocols-implementing}.
+\end{classdesc*}
+
+IOpenProtocol
+
+metaclass issues, fwd ref to metamethod and supermeta
+
+
+
+
+\subsubsection{Customizing Class/Type Declaration Management}
+
+IOpenImplementor
+
+\subsubsection{Customizing Single-Object Declaration Management}
+
+IOpenProvider
 
 \subsubsection{Using Protocol Objects}
+Although most common uses for protocols can be served by using \class{Interface}
+objects, there are sometimes situations that call for a dynamically created
+protocol, or a new kind of protocol with added or changed behaviors.
+
+For these situations, one may wish to use the \class{Protocol} or
+\class{InterfaceClass} classes directly.
 
 Protocol
 
@@ -401,81 +842,61 @@ IAdaptingProtocol
 
 IOpenProtocol
 
-\subsection{Creating and Using Adapters}
-
-IAdapterFactory
-
-NO_ADAPTER_NEEDED
-
-DOES_NOT_SUPPORT
 
 
-\subsection{The Core Declaration API}
-
-declareAdapterForType
-
-declareAdapterForProtocol
-
-declareAdapterForObject
 
 
-\subsection{Protocol Implication \label{proto-implication}}
-
-subsetting, extending...
-
-\subsection{The Convenience Declaration API}
-
-declareAdapter
-
-declareImplementation
-
-adviseObject
 
 
-\subsection{Convenience Declarations in Class, Protocol and Module Bodies}
 
-advise
 
-\subsection{The \class{IOpenProtocol} Interface \label{open-protocols}}
 
-IOpenProtocol
 
-metaclass issues, fwd ref to metamethod and supermeta
 
-\subsection{Protocols and Types}
 
-IOpenImplementor
 
-\subsection{Protocols and Instances}
 
-IOpenProvider
+
+
 
 \subsection{Examples}
 \subsubsection{Replacing introspection with Adaptation \label{introspect-elim}}
 
-\subsection{Advanced Techniques}
-\subsubsection{Instance-specific Declarations}
-\subsubsection{Custom Declaration Mechanisms}
-\subsubsection{Adapting ``Foreign'' Interfaces}
 
-\subsection{Module Contents}
 
-Attribute
 
-\module{protocols.classic}
 
-\module{protocols.adapters} -- "adapter arithmetic"
 
-minimumAdapter
 
-composeAdapters
 
-updateWithSimplestAdapter
 
-\module{protocols.advice}
 
-metamethod
 
-supermeta
 
-addClassAdvisor, isClassAdvisor, getFrameInfo
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
