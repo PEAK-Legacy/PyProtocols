@@ -2,7 +2,7 @@ from protocols import Interface, Attribute
 
 __all__ = [
     'IDispatchFunction', 'ITest', 'ISignature', 'IDispatchPredicate',
-    'AmbiguousMethod', 'NoApplicableMethods', 'ISimpleDispatchPredicate',
+    'AmbiguousMethod', 'NoApplicableMethods',
     'IDispatchableExpression', 'IGenericFunction', 'IDispatchTable',
     'EXPR_GETTER_ID','RAW_VARARGS_ID','RAW_KWDARGS_ID', 'IExtensibleFunction',
 ]
@@ -190,13 +190,13 @@ class IDispatchableExpression(Interface):
         """Return hashcode"""
 
 
-class ISimpleDispatchPredicate(Interface):
 
-    """Adaptation-based predicate for single-dispatch functions"""
 
-    def declareAdapter(protocol, factory):
-        """Declare 'factory' as an adapter to 'protocol' from this predicate"""
-        
+
+
+
+
+
 
 
 
@@ -204,7 +204,7 @@ class ISimpleDispatchPredicate(Interface):
 
 
 class IExtensibleFunction(Interface):
-    
+
     def __call__(*__args,**__kw):
         """Invoke the function and return results"""
 
@@ -212,7 +212,7 @@ class IExtensibleFunction(Interface):
         """Call 'method' when input matches 'predicate'
 
         (Note that single and multiple-dispatch functions use different
-        predicate types: 'ISimpleDispatchPredicate' and 'IDispatchPredicate'.
+        predicate types: type/class/sequence vs. 'IDispatchPredicate').
         """
 
     def when(cond):

@@ -819,7 +819,6 @@ class SimpleGenerics(TestCase):
             self.assertRaises(dispatch.NoApplicableMethods, g, item)
 
     def testMultiDefinition(self):
-
         class Classic: pass
         class NewStyle(object): pass
         class IFoo(protocols.Interface): pass
@@ -845,18 +844,19 @@ class SimpleGenerics(TestCase):
 
     def testAdaptedDefinition(self):
         class Classic: pass
+        class IFoo(protocols.Interface): pass
+        class A(protocols.Adapter):
+            protocols.advise(
+                instancesProvide=[IFoo],asAdapterForTypes=[Classic]
+            )
         g = dispatch.SimpleGeneric("x")
-
-        [dispatch.when(dispatch.ISimpleDispatchPredicate)]
+        [dispatch.when(IFoo)]
         def g(thing, *args,**kw):
             return thing
 
-        it = g([Classic])
-        self.assertNotEqual(it, [Classic])
-        self.failUnless(dispatch.ISimpleDispatchPredicate(it) is it)
-
-
-
+        c=Classic(); it = g(c)
+        self.assertNotEqual(it, c)
+        self.failUnless(IFoo(it) is it)
 
 
     def testWhenMethods(self):

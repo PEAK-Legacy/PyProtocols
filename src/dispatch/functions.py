@@ -105,10 +105,6 @@ class SimpleGeneric:
         @dispatch.when(IFoo)
         def doSomething(x,y,z):
             # do something to an 'x' that has been adapted to 'IFoo'
-
-    You can actually pass in anything that supports 'ISimpleDispatchPredicate',
-    but in practice this currently amounts to classes, types, protocols, and
-    sequences thereof.
     """
 
     protocols.advise(
@@ -119,19 +115,14 @@ class SimpleGeneric:
         self.__doc__ = doc
         self.protocol = protocols.Protocol()
 
-
-
     def __call__(self,__disparg, *__args,**__kw):
         what = self.protocol(__disparg,None)
         if what is None:
             raise NoApplicableMethods(__disparg)
         return what[1](what[0],*__args,**__kw)
 
-
     def addMethod(self,cond,func):
-        ISimpleDispatchPredicate(cond).declareAdapter(
-            self.protocol, lambda ob: (ob,func)
-        )
+        declarePredicate(cond, self.protocol, lambda ob: (ob,func))
         
 
     def when(self,cond):
@@ -146,60 +137,28 @@ class SimpleGeneric:
         return add_assignment_advisor(callback)
         
 
+# Bootstrap SimpleGeneric declaration helper function -- itself a SimpleGeneric
 
+declarePredicate = SimpleGeneric("Declare a SimpleGeneric dispatch predicate")
+proto = declarePredicate.protocol
 
+def declareForType(typ,proto,factory):
+    protocols.declareAdapter(factory,provides=[proto],forTypes=[typ])
 
+def declareForProto(pro,proto,factory):
+    protocols.declareAdapter(factory,provides=[proto],forProtocols=[pro])
 
+def declareForSequence(seq,proto,factory):
+    for item in seq: declarePredicate(item,proto,factory)    
 
+declareForType(ClassType, proto, lambda ob:(ob,declareForType))
+declareForType(type,      proto, lambda ob:(ob,declareForType))
 
+declareForProto(protocols.IOpenProtocol,proto,
+    lambda ob:(ob,declareForProto))
 
-
-
-
-
-
-
-
-
-
-class ClassAsSimplePredicate(protocols.Adapter):
-
-    protocols.advise(
-        instancesProvide=[ISimpleDispatchPredicate],
-        asAdapterForTypes=ClassTypes,
-    )
-
-    def declareAdapter(self,protocol,factory):
-        protocols.declareAdapter(
-            factory,provides=[protocol],forTypes=[self.subject]
-        )
-
-
-class ProtocolAsSimplePredicate(protocols.Adapter):
-
-    protocols.advise(
-        instancesProvide=[ISimpleDispatchPredicate],
-        asAdapterForProtocols=[protocols.IOpenProtocol],
-    )
-
-    def declareAdapter(self,protocol,factory):
-        protocols.declareAdapter(
-            factory,provides=[protocol],forProtocols=[self.subject]
-        )
-
-
-class ProtocolAsSimplePredicate(protocols.Adapter):
-
-    protocols.advise(
-        instancesProvide=[ISimpleDispatchPredicate],
-        asAdapterForProtocols=[protocols.sequenceOf(ISimpleDispatchPredicate)],
-    )
-
-    def declareAdapter(self,protocol,factory):
-        for pred in self.subject: pred.declareAdapter(protocol,factory)
-
-
-
+declareForProto(protocols.IBasicSequence,proto,
+    lambda ob:(ob,declareForSequence))
 
 
 
