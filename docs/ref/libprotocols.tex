@@ -3212,7 +3212,7 @@ So, let's create a \class{LocalProtocol} class:
         declareAdapterForProtocol(self,NO_ADAPTER_NEEDED,baseProtocol)
 
     def __repr__(self):
-        return "LocalProtocol(%r,%r)" % self.baseProtocol, self.context
+        return "LocalProtocol(%r,%r)" % (self.baseProtocol, self.context)
 \end{verbatim}
 
 And now, we can replace these two lines in our earlier \method{__get__} method:

@@ -1,4 +1,4 @@
-PyProtocols Release 0.9.1
+PyProtocols Release 0.9.2
 
  Copyright (C) 2003 by Phillip J. Eby.  All rights reserved.  This software may
  be used under the same terms as Zope or Python.  THERE ARE ABSOLUTELY NO

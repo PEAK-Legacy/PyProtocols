@@ -1,3 +1,8 @@
+Fixes since PyProtocols 0.9.1
+
+ - Fixed missing unit tests for 'Variation' class, and the two bugs in
+   'Variation' that weren't found because of the missing tests.
+
 Fixes and Enhancements since PyProtocols 0.9
 
  - Added the 'factoryMethod' and 'equivalentProtocols' keywords to 'advise()'.
