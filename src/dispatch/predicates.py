@@ -743,7 +743,7 @@ def _tupleToOrCriterion(ob):
 
 [expressionSignature.when(
     # matches 'isinstance(expr,Const)'
-    "expr in Call and expr.function==isinstance"
+    "expr in Call and expr.function is isinstance"
     " and len(expr.argexprs)==2 and expr.argexprs[1] in Const"
 )]
 def convertIsInstanceToClassCriterion(expr,criterion):
@@ -762,7 +762,7 @@ def _tupleToSubclassCriterion(ob):
 
 [expressionSignature.when(
     # matches 'issubclass(expr,Const)'
-    "expr in Call and expr.function==issubclass"
+    "expr in Call and expr.function is issubclass"
     " and len(expr.argexprs)==2 and expr.argexprs[1] in Const"
 )]
 def convertIsSubclassToSubClassCriterion(expr,criterion):
