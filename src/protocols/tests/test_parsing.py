@@ -5,7 +5,7 @@ from dispatch import *
 from dispatch.predicates import *; from dispatch.strategy import *
 from dispatch.ast_builder import *
 from dispatch import predicates
-import operator,sys,types
+import operator,sys,types,dispatch
 MAXINT = `sys.maxint`
 
 class StringBuilder:
@@ -625,7 +625,7 @@ class ExprBuilderTests(TestCase):
         self.assertEqual(pe("a<>b"), Call(operator.ne,a,b))
         self.assertEqual(pe("a!=b"), Call(operator.ne,a,b))
         self.assertEqual(pe("a==b"), Call(operator.eq,a,b))
-        self.assertEqual(pe("a in b"), Call(operator.contains,a,b))
+        self.assertEqual(pe("a in b"), Call(predicates.in_,a,b))
 
         self.assertEqual(pe("a is b"), Call(predicates.is_,a,b))
         self.assertEqual(pe("a not in b"), Call(predicates.not_in,a,b))
@@ -699,7 +699,7 @@ class PredicateTests(TestCase):
 
     def testParseInequalities(self):
 
-        parse = GenericFunction(['x','y','z']).parse
+        parse = GenericFunction(lambda x,y,z:None).parse
         pe = lambda e: parse(e,locals(),globals())
 
         x_cmp_y = lambda n: Signature([
@@ -738,7 +738,7 @@ class PredicateTests(TestCase):
 
     def testParseMembership(self):
 
-        parse = GenericFunction(['x','y','z']).parse
+        parse = GenericFunction(lambda x,y,z:None).parse
         pe = lambda e: parse(e,locals(),globals())
 
         in_test = lambda seq: OrTest(*[Inequality('==',v) for v in seq])
@@ -779,7 +779,7 @@ class PredicateTests(TestCase):
 
     def testParseDNF(self):
 
-        parse = GenericFunction(['x','y','z']).parse
+        parse = GenericFunction(lambda x,y,z:None).parse
         pe = lambda e: parse(e,locals(),globals())
 
         # and => Signature
@@ -820,7 +820,14 @@ class PredicateTests(TestCase):
 
     def testSimplePreds(self):
 
-        classify = defmethod(None, 'not not age<2', lambda age:"infant")
+        [dispatch.generic()]
+        def classify(age):
+            """Stereotype for age"""
+
+        def defmethod(gf,s,func):
+            gf.addMethod(gf.parse(s,locals(),globals()),func)
+
+        defmethod(classify,'not not age<2', lambda age:"infant")
         defmethod(classify,'age<13', lambda age:"preteen")
         defmethod(classify,'age<5',  lambda age:"preschooler")
         defmethod(classify,'20>age', lambda age:"teenager")
@@ -842,13 +849,6 @@ class PredicateTests(TestCase):
         self.assertEqual(classify(99),"senior")
         self.assertEqual(classify(Min),"infant")
         self.assertEqual(classify(Max),"senior")
-
-
-
-
-
-
-
 
 
 

@@ -4,7 +4,7 @@ __all__ = [
     'IDispatchFunction', 'ITest', 'ISignature', 'IDispatchPredicate',
     'AmbiguousMethod', 'NoApplicableMethods',
     'IDispatchableExpression', 'IGenericFunction', 'IDispatchTable',
-    'EXPR_GETTER_ID','RAW_VARARGS_ID','RAW_KWDARGS_ID', 'IExtensibleFunction',
+    'EXPR_GETTER_ID','RAW_VARARGS_ID','IExtensibleFunction',
 ]
 
 class AmbiguousMethod(Exception):
@@ -17,7 +17,7 @@ class NoApplicableMethods(Exception):
 
 EXPR_GETTER_ID = 0
 RAW_VARARGS_ID = 1
-RAW_KWDARGS_ID = 2
+
 
 
 
@@ -218,18 +218,7 @@ class IExtensibleFunction(Interface):
     def when(cond):
         """Add following function to this GF, w/'cond' as a guard
 
-        This is typically used in place of 'dispatch.when()' if you only intend
-        to use 'SimpleGeneric' functions in a module, or when adding a new
-        method to a generic function in another module.  For example, instead
-        of::
-
-            from foo import barFunc
-
-            @dispatch.when(XYZ)
-            def barFunc(x,y,z):
-                # code for situation XYZ
-
-        You can use::
+        This is used to add a method to a generic function.  E.g.::
 
             import foo
 
@@ -239,9 +228,20 @@ class IExtensibleFunction(Interface):
 
         After the execution of this alternate form, 'whatever' will be bound
         to the 'whatever' function as shown, but it will also have been added
-        to 'foo.barFunc' under condition 'XYZ'.  (In the first form, 'barFunc'
-        will be bound to the 'foo.barFunc' generic function instead.)
+        to 'foo.barFunc' under condition 'XYZ'.
         """
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class IGenericFunction(IExtensibleFunction):

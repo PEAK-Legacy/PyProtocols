@@ -3,7 +3,7 @@
 from __future__ import generators
 from dispatch.interfaces import *
 
-import protocols, inspect
+import protocols, inspect, sys
 from protocols.advice import add_assignment_advisor
 from protocols.interfaces import allocate_lock
 from new import instancemethod
@@ -11,7 +11,7 @@ from types import FunctionType, ClassType, InstanceType
 ClassTypes = (ClassType, type)
 
 __all__ = [
-    'GenericFunction', 'defmethod', 'when', 'NullTest', 'as', 'on',
+    'GenericFunction', 'NullTest', 'as', 'on', 'generic'
 ]
 
 
@@ -82,7 +82,7 @@ def as(*decorators):
 
 def _mkGeneric(oldfunc,argname):
     funcname = oldfunc.__name__
-    args, varargs, kwargs, defaults = spec = inspect.getargspec(oldfunc)
+    args, varargs, kwargs, defaults = inspect.getargspec(oldfunc)
     if defaults:
         tmpd = ["=__gfDefaults[%s]" % i for i in range(len(defaults))]
     else:
@@ -162,18 +162,59 @@ declareForProto(protocols.IBasicSequence,proto,
 
 
 
+def _mkNormalizer(func,dispatcher):
+    funcname = func.__name__
+    if funcname=='<lambda>':
+        funcname = "anonymous"
+
+    args, varargs, kwargs, defaults = inspect.getargspec(func)
+
+    if defaults:
+        tmpd = ["=__gfDefaults[%s]" % i for i in range(len(defaults))]
+    else:
+        tmpd = None
+
+    argspec = inspect.formatargspec(
+        args, varargs, kwargs, tmpd, formatvalue=lambda x:x)
+
+    allargs = inspect.formatargspec(args,varargs,kwargs)
+    outargs = inspect.formatargspec(args, varargs, kwargs,
+        formatvarargs=lambda name:name, formatvarkw=lambda name:name,
+        join=lambda seq:','.join(seq))
+    outargs = outargs[1:-1]+','
+    if outargs==',':
+        outargs=''
+        retargs = []
+    else:
+        retargs = filter(None,outargs.replace(' ','').split(','))
+
+    d ={}
+    s = """
+def setup(__dispatcher,__gfDefaults):
+
+    def %(funcname)s%(argspec)s:
+        return __dispatcher[(%(outargs)s)]%(allargs)s
+
+    return %(funcname)s
+""" % locals()
+    exec s in globals(),d
+    return d['setup'](dispatcher,defaults), retargs
+
+defaultNormalize = lambda *__args: __args
+
+
 class GenericFunction:
-    """Extensible multi-dispatch generic function
-
-    Note: this class is *not* threadsafe!  It probably needs to be, though.  :(
-    """
+    """Extensible multi-dispatch generic function"""
+    
     protocols.advise(instancesProvide=[IGenericFunction])
+    delegate = None
 
-    def __init__(self, args=(), method_combiner=None):
+    def __init__(self,func,method_combiner=None):
+        self.__call__, self.args = _mkNormalizer(func, self)
+        self.__doc__ = func.__doc__; self.__name__ = func.__name__
         if method_combiner is None:
             from strategy import single_best_method as method_combiner
         self.method_combiner = method_combiner
-        self.args = args
         self.__lock = allocate_lock()
         self.clear()
 
@@ -189,10 +230,11 @@ class GenericFunction:
         self.cases = []
         self.disp_indexes = {}
         self.expr_map = {}
-        self.expr_defs = [None,None,None]    # get,args,kw
+        self.expr_defs = [None,None]    # get,args
         self._dispatcher = None
         from dispatch.strategy import TGraph; self.constraints=TGraph()
         self._setupArgs()
+
 
     def addMethod(self,predicate,function):
         for signature in IDispatchPredicate(predicate):
@@ -201,7 +243,6 @@ class GenericFunction:
     def testChanged(self):
         self.dirty = True
         self._dispatcher = None
-
 
     def _build_dispatcher(self, state=None):
         if state is None:
@@ -244,13 +285,10 @@ class GenericFunction:
         memo[key] = node
         return node
 
-    def __call__(self,*__args,**__kw):
-
+    def __getitem__(self,argtuple):
         self.__lock.acquire()
-
         try:
             node = self._dispatcher
-
             if node is None:
                 node = self._dispatcher = self._build_dispatcher()
                 if node is None:
@@ -264,13 +302,11 @@ class GenericFunction:
                 return f
 
             cache = {
-                EXPR_GETTER_ID: get, RAW_VARARGS_ID:__args, RAW_KWDARGS_ID:__kw
+                EXPR_GETTER_ID: get, RAW_VARARGS_ID:argtuple,
             }
-
             while node is not None and type(node) is DispatchNode:
 
                 (expr, dispatch_function) = node.expr_id
-
                 if node.contents:
                     node.build()
 
@@ -278,22 +314,24 @@ class GenericFunction:
         finally:
             cache = None    # allow GC of values computed during dispatch
             self.__lock.release()
-
         if node is not None:
-            return node(*__args,**__kw)
-        else:
-            raise NoApplicableMethods
+            return node
+        raise NoApplicableMethods
+
+
+
+
+
+
+
 
 
     def __argByNameAndPos(self,name,pos):
 
-        def getArg(args,kw):
-            if len(args)<=pos:
-                return kw[name]
-            else:
-                return args[pos]
+        def getArg(args):
+            return args[pos]
 
-        return getArg, (RAW_VARARGS_ID,RAW_KWDARGS_ID)
+        return getArg, (RAW_VARARGS_ID,)
 
 
     def argByName(self,name):
@@ -310,19 +348,22 @@ class GenericFunction:
             map(self._addCase, cases)
 
 
-    [as(classmethod)]
-    def from_function(klass,func):
-        # XXX nested args, var, kw, docstring...
-        return klass(inspect.getargspec(func)[0])
-
     def when(self,cond):
         """Add following function to this GF, w/'cond' as a guard"""
+
+        if isinstance(cond,(str,unicode)):
+            frm = sys._getframe(1)
+            cond = self.parse(cond, frm.f_locals, frm.f_globals)
+
         def callback(frm,name,value,old_locals):
-            defmethod(self, cond, value, frm.f_locals, frm.f_globals)
-            if old_locals.get(name) is self:
+            self.addMethod(cond,value)
+            if old_locals.get(name) is self:  # XXX might be delegate in future
                 return self
             return value
         return add_assignment_advisor(callback)
+
+
+
 
 
 
@@ -490,114 +531,32 @@ class GenericFunction:
 
 
 
-def defmethod(gf,cond,func,local_dict=None,global_dict=None):
-    """Update or create a generic function, and return it
+def generic(combiner=None):
+    """Use the following function as the skeleton for a generic function
 
-    This is roughly equivalent to calling 'gf.addMethod(cond,func)', except
-    that there are various convenient default handling options.
-
-    First, if 'gf' is 'None', and 'func' is a Python function object, a new
-    'dispatch.GenericFunction' is created, using 'func' to determine the
-    generic function's argument names.  Otherwise, 'gf' must be an existing
-    'dispatch.IExtensibleFunction' (e.g. a 'dispatch.SimpleGeneric' or
-    'dispatch.GenericFunction').
-
-    If 'cond' is a string, and 'gf' implements 'IGenericFunction', the string
-    is parsed to create a dispatch predicate.  'local_dict' and 'global_dict'
-    are used for parsing, if supplied.  If not, the 'func_globals' of 'func'
-    are used for the locals and globals.
-    """
-
-    def dm_simple(gf,cond,func,local_dict=None,global_dict=None):
-        """Add a method to an existing GF, using a predicate object"""
-
-        gf = IExtensibleFunction(gf)
-        gf.addMethod(cond,func)
-        return gf
-   
-    
-    def dm_string(gf,cond,func,local_dict=None,global_dict=None):
-        """Add a method to an existing GF, using a string condition"""
-
-        gf = IGenericFunction(gf)
-
-        if global_dict is None:
-            global_dict = getattr(func,'func_globals',globals())
-        if local_dict is None:
-            local_dict = global_dict
-    
-        cond = gf.parse(cond,local_dict,global_dict)
-        return defmethod(gf,cond,func)
-
-
-
-    def dm_func(gf,cond,func,local_dict=None,global_dict=None):
-        """Create a new generic function, using function to get args info"""
-        return defmethod(
-           GenericFunction.from_function(func),cond,func,local_dict,global_dict
-        )
-
-    global defmethod    
-    doc = defmethod.__doc__
-    defmethod = GenericFunction.from_function(dm_simple)
-    defmethod.__doc__ = doc
-
-    dm_simple(defmethod,
-        defmethod.parse(
-            "gf in IGenericFunction and cond in IDispatchPredicate",
-            locals(),globals()),
-        dm_simple)
-
-    dm_string(defmethod, "gf in IGenericFunction and cond in str", dm_string)
-    dm_string(defmethod, "gf is None and func in FunctionType", dm_func)
-    dm_string(defmethod, "gf in IExtensibleFunction", dm_simple)
-    
-    return defmethod(gf,cond,func,local_dict,global_dict)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def when(cond):
-    """Add the following function to a generic function, w/'cond' as guard
-
-    This is equivalent to calling 'defmethod(old_function,cond,new_function)',
-    where 'old_function' is the previous definition of the function (or 'None'
-    if there was no previous definition), and 'new_function' is the function
-    definition following the 'when()'.  E.g.::
-
-        @dispatch.when("x is IFoo")
-        def foo(bar):
-            pass
-
-    The above is roughly equivalent to::
-
-        def _foo(bar):
-            pass
-        foo = dispatch.defmethod(None,"x is IFoo",_foo,locals(),globals())
-        
+    This is equivalent to doing 'func=dispatch.GenericFunction(func,combiner)'
+    after the function definition.
     """
     def callback(frm,name,value,old_locals):
-        return defmethod(
-            old_locals.get(name), cond, value, frm.f_locals, frm.f_globals
-        )
+        return GenericFunction(value,combiner)
 
     return add_assignment_advisor(callback)
-    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

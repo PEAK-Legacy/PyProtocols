@@ -15,8 +15,6 @@
 
     * Support before/after/around methods, and result combination ala CLOS
 
-    * Argument enhancements: variadic args, kw args, etc.
-
     * Add C speedups
 
     * Support DAG-walking for visualization, debugging, and ambiguity detection

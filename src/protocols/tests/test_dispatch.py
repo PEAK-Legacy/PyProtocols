@@ -286,7 +286,7 @@ class TestTests(TestCase):
 
 
     def testInequalityDispatch(self):
-        classify = GenericFunction(args=['age'])
+        classify = GenericFunction(lambda age:None)
         classify[(Inequality('<',2),)]   = lambda age:"infant"
         classify[(Inequality('<',13),)]  = lambda age:"preteen"
         classify[(Inequality('<',5),)]   = lambda age:"preschooler"
@@ -439,7 +439,7 @@ class TestTests(TestCase):
 
     def testTruthDispatch(self):
         x_gt_y = Call(operator.gt, Argument(name='x'), Argument(name='y'))
-        greater = GenericFunction(args=['x','y'])
+        greater = GenericFunction(lambda x,y:None)
         greater[Signature([(x_gt_y, TruthTest(False))])] = lambda x,y: False
         greater[Signature([(x_gt_y, TruthTest(True))])]  = lambda x,y: True
 
@@ -574,7 +574,7 @@ class ExpressionTests(TestCase):
 
     def testFunctionArguments(self):
 
-        f = GenericFunction(args=['a','b','c'])
+        f = GenericFunction(lambda a,b,c:None)
 
         fa,arga = f.argByName('a')
         fb,argb = f.argByName('b')
@@ -583,23 +583,19 @@ class ExpressionTests(TestCase):
         self.assertEqual(f.argByName('a'), f.argByName('a'))
 
         for arg in arga,argb,argc:
-            self.assertEqual(arg, (RAW_VARARGS_ID,RAW_KWDARGS_ID))
+            self.assertEqual(arg, (RAW_VARARGS_ID,))
 
         args = (1,2,3); kw={'a':1, 'b':2, 'c':3}
 
-        self.assertEqual(fa(args,{}), 1)
-        self.assertEqual(fb(args,{}), 2)
-        self.assertEqual(fc(args,{}), 3)
-
-        self.assertEqual(fa((),kw), 1)
-        self.assertEqual(fb((),kw), 2)
-        self.assertEqual(fc((),kw), 3)
+        self.assertEqual(fa(args), 1)
+        self.assertEqual(fb(args), 2)
+        self.assertEqual(fc(args), 3)
 
         self.assertRaises(KeyError, f.argByName, 'x')
 
 
     def testArgumentCanonicalization(self):
-        f = GenericFunction(args=['v1','v2'])
+        f = GenericFunction(lambda v1,v2:None)
         self.assertEqual(
             f.getExpressionId(Argument(name='v1')),
             f.getExpressionId(Argument(0))
@@ -608,6 +604,10 @@ class ExpressionTests(TestCase):
             f.getExpressionId(Argument(name='v2')),
             f.getExpressionId(Argument(1))
         )
+
+
+
+
 
 
 
@@ -625,7 +625,7 @@ class ExpressionTests(TestCase):
         c3 = Call(operator.sub, Argument(name='x'), Argument(name='y'))
         self.assertNotEqual(hash(c1), hash(c3))
 
-        f = GenericFunction(args=['x','y'])
+        f = GenericFunction(lambda x,y:None)
         self.assertEqual(f.getExpressionId(c1), f.getExpressionId(c2))
         self.assertNotEqual(f.getExpressionId(c1), f.getExpressionId(c3))
         self.assertEqual(
@@ -655,7 +655,7 @@ class ExpressionTests(TestCase):
 
 
     def testConsts(self):
-        f = GenericFunction(args=['x'])
+        f = GenericFunction(lambda x:None)
         x_plus_two = Call(operator.add,Argument(name='x'),Const(2))
 
         f[Signature([(x_plus_two,Inequality('>',10))])] = lambda x: True
@@ -674,7 +674,7 @@ class ExpressionTests(TestCase):
     def testGetattr(self):
         vehicle_mpg = Getattr(Argument(name='v'),'mpg')
         test_mpg = lambda test,val: (vehicle_mpg,Inequality(test,val))
-        fuel_efficient = GenericFunction(args=['v'])
+        fuel_efficient = GenericFunction(lambda v:None)
         fuel_efficient[Signature([test_mpg('==','N/A')])] = lambda v: True
         fuel_efficient[Signature([test_mpg('>',35)])]     = lambda v: True
         fuel_efficient[Signature([])] = lambda v: False
@@ -697,7 +697,7 @@ class ExpressionTests(TestCase):
 
     def testTuple(self):
         xy = Tuple(tuple,Argument(name='x'),Argument(name='y'))
-        xy_is_one_two = GenericFunction(args=['x','y'])
+        xy_is_one_two = GenericFunction(lambda x,y:None)
         xy_is_one_two[Signature([(xy,Inequality('==',(1,2)))])] = lambda x,y:True
         xy_is_one_two[Signature([])] = lambda x,y: False
 
@@ -719,7 +719,7 @@ class ExpressionTests(TestCase):
     def testVar(self):
         d1={}; d2={}
         x = Var('x',d1,d2)
-        foo = GenericFunction(args=[])
+        foo = GenericFunction(lambda:None)
         foo[Signature([(x,Inequality('==',"foo"))])] = lambda: True
         foo[Signature([])] = lambda: False
 
@@ -741,7 +741,7 @@ class ExpressionTests(TestCase):
         z = Call(operator.div,Argument(name='y'),Argument(name='z'))
 
         xyz = OrExpr(x,y,z)
-        or_ = GenericFunction(args=['x','y','z'])
+        or_ = GenericFunction(lambda x,y,z:None)
         or_[Signature([(xyz,TruthTest())])] = lambda x,y,z:True
         or_[Signature([])] = lambda x,y,z: False
 
@@ -759,7 +759,7 @@ class ExpressionTests(TestCase):
             self.assertNotEqual(xyz, item)
             self.assertNotEqual(hash(xyz), hash(item))
 
-        or_eq_23 = GenericFunction(args=['x','y'])
+        or_eq_23 = GenericFunction(lambda x,y:None)
         or_eq_23[Signature([(xy,Inequality('==',23))])] = lambda x,y:True
         or_eq_23[Signature([])] = lambda x,y: False
         self.failUnless(or_eq_23(23,0))
@@ -767,7 +767,7 @@ class ExpressionTests(TestCase):
         self.failIf(or_eq_23(0,0))
         self.failIf(or_eq_23(15,15))
 
-        or_eq_None = GenericFunction(args=['x','y'])
+        or_eq_None = GenericFunction(lambda x,y:None)
         or_eq_None[Signature([(xy,Inequality('==',None))])] = lambda x,y:True
         or_eq_None[Signature([])] = lambda x,y: False
         self.failUnless(or_eq_None(None,None))
@@ -782,7 +782,7 @@ class ExpressionTests(TestCase):
         z = Call(operator.div,Argument(name='y'),Argument(name='z'))
 
         xyz = AndExpr(x,y,z)
-        and_ = GenericFunction(args=['x','y','z'])
+        and_ = GenericFunction(lambda x,y,z:None)
         and_[Signature([(xyz,TruthTest())])] = lambda x,y,z:True
         and_[Signature([])] = lambda x,y,z: False
 
@@ -801,7 +801,7 @@ class ExpressionTests(TestCase):
             self.assertNotEqual(xyz, item)
             self.assertNotEqual(hash(xyz), hash(item))
 
-        and_eq_23 = GenericFunction(args=['x','y'])
+        and_eq_23 = GenericFunction(lambda x,y:None)
         and_eq_23[Signature([(xy,Inequality('==',23))])] = lambda x,y:True
         and_eq_23[Signature([])] = lambda x,y: False
         self.failUnless(and_eq_23(3,23))
@@ -809,7 +809,7 @@ class ExpressionTests(TestCase):
         self.failIf(and_eq_23(23,15))
         self.failIf(and_eq_23(23,0))
 
-        and_eq_None = GenericFunction(args=['x','y'])
+        and_eq_None = GenericFunction(lambda x,y:None)
         and_eq_None[Signature([(xy,Inequality('==',None))])] = lambda x,y:True
         and_eq_None[Signature([])] = lambda x,y: False
         self.failUnless(and_eq_None(None,None))
@@ -902,7 +902,7 @@ class SimpleGenerics(TestCase):
 
     def testWhenMethods(self):
 
-        m = GenericFunction(args=['v'])
+        m = GenericFunction(lambda v:None)
         m.when(Signature(v=LandVehicle))
         def foo(v):
             return "land"
@@ -985,7 +985,7 @@ class SimpleGenerics(TestCase):
 class GenericTests(TestCase):
 
     def testBasicSingleDispatch(self):
-        m = GenericFunction(args=['v'])
+        m = GenericFunction(lambda v:None)
         m[(LandVehicle,)] = lambda v: "land"
         m[(WaterVehicle,)] = lambda v: "water"
         self.assertEquals(m(Hummer()), "land")
@@ -994,7 +994,7 @@ class GenericTests(TestCase):
 
 
     def testSimpleDoubleDispatchAndNamedArgs(self):
-        faster = GenericFunction(args=['v1','v2'])
+        faster = GenericFunction(lambda v1,v2:None)
         faster[Signature(v1=GasPowered,v2=HumanPowered)] = lambda v1,v2: True
         faster[Signature(v1=Hummer,v2=Speedboat)] = lambda v1,v2: True
         faster[(object,object)] = lambda v1,v2: "dunno"
@@ -1003,13 +1003,13 @@ class GenericTests(TestCase):
         self.assertEqual(faster(Hummer(),Bicycle()), True)
 
     def testAmbiguity(self):
-        add = GenericFunction(args=['addend','augend'])
+        add = GenericFunction(lambda addend,augend:None)
         add[(object, int)] = operator.add
         add[(int, object)] = operator.sub
         self.assertRaises(AmbiguousMethod, add, 1, 2)
 
     def testDynamic(self):
-        roll = GenericFunction(args=['vehicle'])
+        roll = GenericFunction(lambda vehicle:None)
         class Tricycle(HumanPowered,LandVehicle): pass
         roll[Signature(vehicle=Wheeled)] = lambda ob: "We're rolling"
         self.assertRaises(NoApplicableMethods, roll, Tricycle())
@@ -1017,7 +1017,7 @@ class GenericTests(TestCase):
         self.assertEqual(roll(Tricycle()),"We're rolling")
 
     def testMRO(self):
-        t = GenericFunction(args=['vehicle','num'])
+        t = GenericFunction(lambda vehicle,num:None)
         t[Signature(vehicle=HumanPowered,num=Inequality('<',10))]=lambda v,n:False
         t[Signature(vehicle=WaterVehicle,num=Inequality('<',5))]=lambda v,n:True
         self.assertRaises(AmbiguousMethod, t, PaddleBoat(), 4)
@@ -1038,7 +1038,8 @@ class GenericTests(TestCase):
             return next_method(ob1,ob2)+ \
                 "  One vehicle is a land vehicle, the other is a sea vehicle."
 
-        compare = GenericFunction(args=['v1','v2'], method_combiner = chained_methods)
+        compare = GenericFunction(
+            lambda v1,v2:None, method_combiner = chained_methods)
         compare.addMethod([(Vehicle, Vehicle)], both_vehicles)
         compare.addMethod([(LandVehicle, LandVehicle)],both_land)
         compare.addMethod([(WaterVehicle, WaterVehicle)],both_sea)
@@ -1050,7 +1051,6 @@ class GenericTests(TestCase):
 
         land = Bicycle()
         sea = Speedboat()
-
         self.assertEqual( compare(land, land),
             "They're both vehicles.  They are both land vehicles.")
 
@@ -1066,7 +1066,7 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
 
     def testSubexpressionOrderingConstraints(self):
 
-        g = GenericFunction(args=['x','y'])
+        g = GenericFunction(lambda x,y:None)
         self.assertEqual(g.constraints.items(),[])
 
         df = Inequality.dispatch_function
@@ -1122,7 +1122,8 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
 
         tf = [F(),T()]
 
-        g = GenericFunction(args=['f1','f1.x','f2','f1x@!B', 'f1.y==f2.y'])
+        g = GenericFunction(
+            lambda f1,f1_x,f2,f1x_at_not_B, f1_y_eq_f2_y: None)
 
         # f1, f1.x, f2, f1.x@!B, f1.y=f2.y
 
@@ -1140,7 +1141,88 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
         self.assertEqual( w(C(),B(),B()),     "m2")
         self.assertEqual( w(C(),C(),C()),     "m3")
         self.assertEqual( w(C(),A(),A()),     "m4")
-        self.assertEqual( g(T()),             "m5")
+        self.assertEqual( g(T(),None,None,None,None), "m5")
+
+
+
+
+    def testArgNormalization(self):
+        from dispatch.functions import _mkNormalizer
+        class dispatcher:
+            def __getitem__(self,argtuple):
+                return lambda *_,**__: argtuple
+
+        f,a = _mkNormalizer(lambda foo: None, dispatcher())
+        self.assertEqual(a,['foo'])
+        self.assertEqual(f("bar"), ("bar",))
+        self.assertEqual(f(foo="bar"), ("bar",))
+
+        f,a = _mkNormalizer(lambda foo=42: None, dispatcher())
+        self.assertEqual(a,['foo'])
+        self.assertEqual(f("bar"), ("bar",))
+        self.assertEqual(f(foo="bar"), ("bar",))
+        self.assertEqual(f(), (42,))
+
+        f,a = _mkNormalizer(lambda foo,*z: None, dispatcher())
+        self.assertEqual(a,['foo','z'])
+        self.assertEqual(f("bar","baz"), ("bar",("baz",)))
+        self.assertEqual(f(foo="bar"), ("bar",()))
+
+        f,a = _mkNormalizer(lambda foo="shoo",blue=42,*z: None, dispatcher())
+        self.assertEqual(a,['foo','blue','z'])
+        self.assertEqual(f("bar","baz"), ("bar","baz",()))
+        self.assertEqual(f("bar","baz","spam"), ("bar","baz",("spam",)))
+        self.assertEqual(f(foo="bar"), ("bar",42,()))
+        self.assertEqual(f(blue="two"), ("shoo","two",()))
+        self.assertEqual(f(1,2,3,4), (1,2,(3,4)))
+        self.assertEqual(f(), ("shoo",42,()))
+
+        f,a = _mkNormalizer(lambda (x,y): None, dispatcher())
+        self.assertEqual(a,['x','y'])
+        self.assertEqual(f((1,2)), (1,2))
+
+        f,a = _mkNormalizer(lambda foo,(x,y),*z,**zz: None, dispatcher())
+        self.assertEqual(a,['foo','x','y','z','zz'])
+        self.assertEqual(
+            f("foo",(1,2),fizz="fuzz"), ("foo",1,2,(),{'fizz':'fuzz'})
+        )
+
+    def testKwArgHandling(self):
+        [dispatch.generic()]
+        def f(**fiz): """Test of kw handling"""
+
+        [f.when("'x' in fiz")]
+        def f(**fiz): return "x"
+
+        [f.when("'y' in fiz")]
+        def f(**fiz): return "y"
+        
+        self.assertEqual(f(x=1),"x")
+        self.assertEqual(f(y=1),"y")
+        self.assertRaises(AmbiguousMethod, f, x=1, y=1)
+
+    def testVarArgHandling(self):
+        [dispatch.generic()]
+        def f(*fiz): """Test of vararg handling"""
+
+        [f.when("'x' in fiz")]
+        def f(*fiz): return "x"
+
+        [f.when("'y' in fiz")]
+        def f(*fiz): return "y"
+        
+        self.assertEqual(f("foo","x"),"x")
+        self.assertEqual(f("bar","q","y"),"y")
+        self.assertEqual(f("bar","q","y"),"y")
+        self.assertEqual(f("y","q",),"y")
+        self.assertRaises(AmbiguousMethod, f, "x","y")
+
+
+
+
+
+
+
 
 
 
