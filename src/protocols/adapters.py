@@ -3,6 +3,7 @@
 __all__ = [
     'IMPLEMENTATION_ERROR','NO_ADAPTER_NEEDED','DOES_NOT_SUPPORT', 'Adapter',
     'minimumAdapter', 'composeAdapters', 'updateWithSimplestAdapter',
+    'StickyAdapter',
 ]
 
 
@@ -28,6 +29,16 @@ except ImportError:
     pass
 
 
+
+
+
+
+
+
+
+
+
+
 class Adapter(object):
 
     """Convenient base class for adapters"""
@@ -35,6 +46,36 @@ class Adapter(object):
     def __init__(self, ob, proto):
         self.subject = ob
         self.protocol = proto
+
+
+
+class StickyAdapter(object):
+
+    """Adapter that attaches itself to its subject for repeated use"""
+
+    attachForProtocols = ()
+
+    def __init__(self, ob, proto):
+
+        self.subject = ob
+        self.protocol = proto
+
+        # Declare this instance as a per-instance adaptation for the
+        # given protocol
+
+        provides = list(self.attachForProtocols)
+        if proto not in provides:
+            provides.append(proto)
+        
+        from protocols.api import declareAdapter
+        declareAdapter(lambda s,p: self, provides, forObjects=[ob])
+
+
+
+
+
+
+
 
 
 
