@@ -151,7 +151,7 @@ class SeededIndex:
 
     def mkNode(self,*args):
         node = DispatchNode(*args)
-        return lambda expr: self.dispatch_function(expr,node)
+        return instancemethod(self.dispatch_function,node,DispatchNode)
 
 
 
@@ -285,7 +285,7 @@ class TGraph:
 
 
 
-def dispatch_by_mro(ob,table):
+def dispatch_by_mro(table,ob):
     """Lookup '__class__' of 'ob' in 'table' using its MRO order"""
 
     try:
@@ -312,7 +312,7 @@ def dispatch_by_mro(ob,table):
         return table[object]
 
 
-def dispatch_by_subclass(ob,table):
+def dispatch_by_subclass(table,ob):
     if isinstance(ob,ClassTypes):
         while 1:
             if ob in table:
@@ -514,7 +514,7 @@ class Pointer(int):
             return "Pointer(%r)" % self.ref()
 
 
-def dispatch_by_identity(ob,table):
+def dispatch_by_identity(table,ob):
     oid = id(ob)
     if oid in table:
         return table[oid]
@@ -654,7 +654,7 @@ Min = _ExtremeType(-1, "Min")
 
 
 
-def dispatch_by_inequalities(ob,table):
+def dispatch_by_inequalities(table,ob):
     key = ob,ob
     try:
         return table[key]

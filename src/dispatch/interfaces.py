@@ -124,7 +124,7 @@ class ISeededCriterion(ICriterion):
 class IDispatchFunction(Interface):
     """Determine what path to take at a dispatch node, given an expression"""
 
-    def __call__(ob,table):
+    def __call__(table,ob):
         """Return entry from 'table' that matches 'ob' ('None' if not found)
 
         'table' is an 'IDispatchTable' mapping criterion seeds to dispatch

@@ -174,7 +174,7 @@ def concatenate_ranges(range_map):
     return output
 
 
-def dispatch_by_inequalities(ob,table):
+def dispatch_by_inequalities(table,ob):
 
     cdef int lo, hi, mid
     cdef void *tmp

@@ -486,7 +486,7 @@ class NotCriterion(MultiCriterion):
         return key not in self.criteria[0]
 
 
-def dispatch_by_truth(ob,table):
+def dispatch_by_truth(table,ob):
     return table.get(bool(ob))
 
 

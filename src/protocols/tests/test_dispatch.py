@@ -235,10 +235,10 @@ class CriteriaTests(TestCase):
         ob1, ob2, ob3 = object(),object(),object()
         id1, id2, id3 = map(id, [ob1,ob2,ob3])
         table = {id1:1,id2:2,None:3}
-        self.assertEqual(strategy.dispatch_by_identity(Vehicle,table), 3)
-        self.assertEqual(strategy.dispatch_by_identity(ob1,table), 1)
-        self.assertEqual(strategy.dispatch_by_identity(ob2,table), 2)
-        self.assertEqual(strategy.dispatch_by_identity(ob3,table), 3)
+        self.assertEqual(strategy.dispatch_by_identity(table, Vehicle), 3)
+        self.assertEqual(strategy.dispatch_by_identity(table, ob1), 1)
+        self.assertEqual(strategy.dispatch_by_identity(table, ob2), 2)
+        self.assertEqual(strategy.dispatch_by_identity(table, ob3), 3)
 
 
 
@@ -315,12 +315,12 @@ class CriteriaTests(TestCase):
 
         # dispatch
         table = {Vehicle:1,object:2,None:3}
-        self.assertEqual(strategy.dispatch_by_subclass(Vehicle,table), 1)
-        self.assertEqual(strategy.dispatch_by_subclass(LandVehicle,table), 1)
-        self.assertEqual(strategy.dispatch_by_subclass(object,table), 2)
-        self.assertEqual(strategy.dispatch_by_subclass(None,table), 3)
+        self.assertEqual(strategy.dispatch_by_subclass(table, Vehicle), 1)
+        self.assertEqual(strategy.dispatch_by_subclass(table, LandVehicle), 1)
+        self.assertEqual(strategy.dispatch_by_subclass(table, object), 2)
+        self.assertEqual(strategy.dispatch_by_subclass(table, None), 3)
         self.assertRaises(AttributeError,
-            strategy.dispatch_by_subclass, Bicycle,table)
+            strategy.dispatch_by_subclass, table, Bicycle)
 
 
 
@@ -399,7 +399,7 @@ class CriteriaTests(TestCase):
 
     def testClasslessDispatch(self):
         class Classic: pass # Classic classes have no __class_ attribute
-        strategy.dispatch_by_mro(Classic,{})
+        strategy.dispatch_by_mro({},Classic)
 
 
 
