@@ -197,10 +197,10 @@ class ClassTest(Adapter):
     def __ne__(self,other):
         return not self.__eq__(other)
 
-
-
-
-
+    def matches(self,table):
+        for key in table:
+            if key in self:
+                yield key
 
 
 class _ExtremeType(object):     # Courtesy of PEP 326
@@ -304,6 +304,15 @@ class Inequality(object):
     def __ne__(self,other):
         return not self.__eq__(other)
 
+    def matches(self,table):
+        eq = (self.val,self.val)
+        if self.ranges == [eq]:
+            yield eq    # only one matching key possible
+        else:
+            for key in table:
+                if key in self:
+                    yield key
+
 
 def concatenate_ranges(range_map):
     ranges = range_map.keys(); ranges.sort()
@@ -315,15 +324,6 @@ def concatenate_ranges(range_map):
         output.append((l,h))
         last = h
     return output
-
-
-
-
-
-
-
-
-
 
 
 class _Notifier(Protocol):
@@ -400,10 +400,10 @@ class ProtocolTest(StickyAdapter):
                     return bases[base][0] is not protocols.DOES_NOT_SUPPORT
         return False
 
-
-
-
-
+    def matches(self,table):
+        for key in table:
+            if key in self:
+                yield key
 
 
 

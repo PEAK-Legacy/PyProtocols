@@ -76,8 +76,8 @@ class ITest(Interface):
     def implies(otherTest):
         """Return true if truth of this test implies truth of 'otherTest'"""
 
-
-
+    def matches(table):
+        """Return iterable of keys from 'table' that this test is true for"""
 
 
     def subscribe(listener):

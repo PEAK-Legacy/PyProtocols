@@ -607,8 +607,8 @@ class TruthTest(object):
     def __ne__(self,otherTest):
         return not self.__eq__(otherTest)
 
-
-
+    def matches(self,table):
+        return self.truth,
 
 
 

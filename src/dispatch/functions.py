@@ -58,11 +58,11 @@ class NullTest:
     def subscribe(self,listener): pass
     def unsubscribe(self,listener): pass
 
+    def matches(self,table):
+        # NullTest is true for any key
+        return list(table)
+
 NullTest = NullTest()
-
-
-
-
 
 
 
@@ -422,12 +422,12 @@ class Dispatcher:
                             if key in sm[0].get(disp_id)
                     ]
 
-            for key,lst in caselists.items():
-                if key in test:
-                    lst.append(case)
+            for key in test.matches(caselists):
+                caselists[key].append(case)
 
         self.cases.append(case)
         self._dispatcher = None
+
 
 
 
