@@ -819,30 +819,30 @@ Declarations for Individual Objects''.
 
 
 \subsection{Declarating Implementations and Adapters}
-
-There are three types of relationships that a protocol can participate in:
+There are three kinds of relationships that a protocol can participate in:
 
 \begin{itemize}
-\item A relationship from a class or type, to a protocol its instances provide
-or adapt to,
+\item A relationship between a class or type, and a protocol its instances
+provide or can be adapted to,
 
-\item A relationship from an instance, to a protocol it provides or adapts to,
-and
+\item A relationship between an instance, and a protocol it provides or can
+be adapted to, and
 
-\item A relationship from a protocol, to a protocol that it implies or is
-adaptable to.
+\item A relationship between a protocol, and a protocol that it implies or can
+be adapted to.
 \end{itemize}
 
-All of these relationships may be declared by reference to the source type,
-instance or protocol, the desired destination protocol, and an adapter factory
-to be used. (In the event that no adapter is needed, the special adapter
-factory \function{NO_ADAPTER_NEEDED} is specified.)
+Each of these relationships is defined by a \strong{source} (a type,
+instance or protocol), a \strong{destination} (desired) protocol, and an
+\strong{adapter factory} used to convert from one to the other.  If no adapter
+is needed, we can say that the adapter factory is the special
+\function{NO_ADAPTER_NEEDED} function.
 
 To declare relationships like these, the \module{protocols} declaration API
-provides three ``primitive'' declaration functions.  Each takes a \var{protocol}
-argument that must support the \class{IOpenProtocol} interface, an
-adapter function (or \function{NO_ADAPTER_NEEDED}), and the source
-type, instance, or protocol.  The functions are
+provides three ``primitive'' declaration functions.  Each accepts a destination
+protocol (that must support the \class{IOpenProtocol} interface),
+an adapter factory (or \function{NO_ADAPTER_NEEDED}), and a source (type,
+instance, or protocol).  These three functions are
 \function{declareAdapterForType()}, \function{declareAdapterForObject()}, and
 \function{declareAdapterForProtocol()}, respectively.
 
@@ -855,7 +855,7 @@ entirely on the primitive functions, which is important for customizations and
 extensions.  This will be covered more in section \ref{customizing-adaptation}.
 
 The next higher layer of declaration APIs are the explicit declaration
-functions, \function{declareImplementation}, \function{declareAdapter}, and
+functions: \function{declareImplementation}, \function{declareAdapter}, and
 \function{adviseObject}.  These functions are structured to support the most
 common declaration use cases.
 
@@ -1079,7 +1079,7 @@ forProtocols=\var{protocols})}.
 Declare that the containing class \emph{itself} provides the specified
 protocols.  Supplying this argument is equivalent to calling
 \code{adviseObject(\var{containing class}, \var{protocols})}.  Note that this
-means that the containing class must support the \class{IOpenProvider}
+means that the containing class may need to support the \class{IOpenProvider}
 interface.  The \module{protocols} package supplies default adapters to
 support \class{IOpenProvider} for both classic and new-style classes, as long
 as they do not have custom \method{__conform__} methods.  See section
@@ -1104,35 +1104,76 @@ A sequence of protocols that the enclosing module provides.  Equivalent to
 
 
 
-
+\newpage
 \subsection{Creating and Using Adapters, Components, and Protocols}
 
-supporting reflexivity: if you create a wrapper, it should declare itself as
-supporting the protocol (declaration API does this automatically for you).
+Because the adaptation protocol is so simple and flexible, there are a few
+guidelines you should follow when using \function{adapt()} or creating
+\method{__conform__} and \method{__adapt__} methods, to ensure that adapted
+objects are as usable as unadapted objects.
 
-Wrapper functions should only wrap to object types that support the protocol
+First, adaptation should be \strong{reflexive}.  That is, if you
+\function{adapt()} an object to a protocol, and then \function{adapt()} the
+return value to the same protocol, the same object should be returned the
+second time.  If you are using the \module{protocols} declaration API, it
+suffices to declare that instances of the adapter class provide the protocol
+they adapt to.  That is, if an adapter class provides protocol P for objects
+of type X, then it should declare that it provides protocol P.
 
-symmetry not automatic; must define "unwrapper"
+If you are not using the declaration API, but relying only upon your custom
+\method{__conform__} and \method{__adapt__} methods, you need to ensure that
+any adapters you return will return themselves when asked to support the
+protocol that they were returned as an adapter for.
 
-preferable to keep the "base" object around, separate from each "interface
-pointer", to use for equality or identity comparison and to obtain alternate
-interfaces.
+Second, adaptation is not automatically \strong{symmetric}.  That is, if I have
+an object X that provides protocol P1, and I \function{adapt()} it to protocol
+P2, it is not guaranteed that I can \function{adapt()} the resulting object to
+P1 and receive the original object.  Ideally, someone who defines an adapter
+function would also declare an inverse adapter function to ``unwrap'' an
+adapted object to its original identity.  In practice, however, this can be
+complex, since the adapter would need some fairly global knowledge of the
+system to know when it is better to unwrap and rewrap, and when it is better to
+further wrap the existing wrapper.
+
+Another issue that occurs with such wrapper-based adaptation, is that the
+wrapper does not have the same object identity as the base object, and may not
+hash or compare equal to it, either.  Further, it is not guaranteed that
+subsequent calls to \function{adapt()} will yield the same wrapper object -- in
+fact it's quite unlikely.
+
+These characteristics of adapted objects can be easily dealt with, however, by
+following a few simple rules:
 
 
 
+\begin{itemize}
 
+\item Always \function{adapt()} from the ``original'' object you're supplied;
+avoid adapting adaptations.
 
+\item Always pass ``original'' objects to functions or methods that expect
+their input to support more than one protocol; only pass adapted objects to
+functions or methods that expect support for only one protocol.
 
+\item Always use ``original'' objects for equality or identity comparisons --
+or else ensure that callers know they will need to provide you with an equal or
+identical adapter.  (One good way to document this, is to include the
+requirement in the definition of the interface or protocol that your system
+requires.)
 
+\end{itemize}
 
+In some respects, these rules are similar to dealing with objects in strongly
+typed languages like Java.  In Java, if one simply has an ``object'', it is not
+possible to perform operations specific to an interface, without first
+``casting'' the object to that interface.  But, the object that was ``cast''
+can't be stored in the same variable that the ``object'' was in, because it
+is of a different type.
 
-
-
-
-
-
-
-
+While following these rules does require a certain amount of care, most of that
+care consists of being more careful to define or describe exactly what it is
+you want.  And that benefits both you and anyone who needs to interact with
+your code.
 
 
 
