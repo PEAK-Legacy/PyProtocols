@@ -39,7 +39,6 @@ built-in types) to a particular required interface
 \item Do all of the above, even when the components or frameworks involved
 were not written to take advantage of this package, and even if the frameworks
 have different mechanisms for defining interfaces.
-
 \end{itemize}
 
 Assuming that a particular framework either already supports this package, or
@@ -64,13 +63,14 @@ be able to use this package's API.  The user of a framework can often call
 framework.  And, it's possible to externally adapt a
 framework's interface objects as well.
 
-For example, the \module{protocols.classic} module includes an adapter that
-implements \class{IOpenProtocol} on behalf of Zope \class{Interface}
+For example, the \module{protocols.zope_support} and
+\module{protocols.twisted_support} modules define adapters that
+implement \class{IOpenProtocol} on behalf of Zope and Twisted \class{Interface}
 objects.  This allows them to be used as arguments to this package's protocol
-declaration API.  This works even though Zope is completely unaware of the
-\module{protocols} package.  (Of course, this does not give Zope
-\class{Interface} objects all of the capabilities that \class{Protocol}
-objects have, but it does make their existing functionality accessible
+declaration API.  This works even though Zope and Twisted are completely unaware
+of the \module{protocols} package.  (Of course, this does not give Zope or
+Twisted \class{Interface} objects all of the capabilities that \class{Protocol}
+objects have, but it does make most of their existing functionality accessible
 through the same API.)
 
 Finally, framework and non-framework developers alike may also wish to use the
@@ -1082,12 +1082,12 @@ create an instance of an \class{Interface}, that object does not provide
 class (or its instances) can be different.}
 
 In addition to its built-in implementations, the \module{protocols} package
-also supplies and declares an adapter factory that adapts Zope X3's
+also supplies and can declare adapter factories that adapt Zope X3 and Twisted's
 interface objects to the \class{IOpenProtocol} interface, thus allowing
-you to use Zope interfaces in calls to the declaration API.  Similar adapters
-for other frameworks' interfaces may be added, if there is sufficient demand
-and/or contributed code, and the frameworks' authors do not add the adapters
-to their frameworks.
+you to use Zope and Twisted interfaces in calls to the declaration API.  Similar
+adapters for other frameworks' interfaces may be added, if there is sufficient
+demand and/or contributed code, and the frameworks' authors do not add the
+adapters to their frameworks.
 
 
 \item[IOpenImplementor] \hfill \\
@@ -1146,7 +1146,7 @@ Declarations for Individual Objects''.
 
 
 
-\subsection{Declarating Implementations and Adapters}
+\subsection{Declaring Implementations and Adapters}
 There are three kinds of relationships that a protocol can participate in:
 
 \begin{itemize}
@@ -1196,8 +1196,8 @@ Declare that instances of class or type \var{typ} do or do not provide
 implementations of the specified protocols.  \var{instancesProvide} and
 \var{instancesDoNotProvide} must be sequences of protocol objects that
 provide (or are adaptable to) the \class{IOpenProtocol} interface,
-such as \class{protocols.Interface} subclasses, or Zope \class{Interface}
-objects.
+such as \class{protocols.Interface} subclasses, or \class{Interface} objects
+from Zope or Twisted.
 
 This function is shorthand for calling \function{declareAdapterForType()}
 with \function{NO_ADAPTER_NEEDED} and \function{DOES_NOT_SUPPORT} as adapters
@@ -1768,8 +1768,8 @@ Declare that instances of class or type \var{typ} do or do not provide
 implementations of the specified protocols.  \var{instancesProvide} and
 \var{instancesDoNotProvide} must be sequences of protocol objects that
 provide (or are adaptable to) the \class{IOpenProtocol} interface,
-such as \class{protocols.Interface} subclasses, or Zope \class{Interface}
-objects.
+such as \class{protocols.Interface} subclasses, or \class{Interface} objects
+from Zope or Twisted.
 
 This function is shorthand for calling \function{declareAdapterForType()}
 with \function{NO_ADAPTER_NEEDED} and \function{DOES_NOT_SUPPORT} as adapters
@@ -2288,6 +2288,170 @@ object-to-protocol adapter registries, keyed by type or protocol.  The
 and \method{get()} methods.  Values stored in the mapping will be
 \code{(\var{adapter},\var{depth})} tuples.
 \end{funcdesc}
+
+
+
+
+
+
+\subsubsection{\module{protocols.zope_support} --- Support for Zope Interfaces}
+\declaremodule{protocols-zope-support}{protocols.zope_support}
+
+Importing this module enables experimental support for using Zope X3
+\class{Interface} objects with the \module{protocols} package, by registering
+an adapter from Zope X3's \class{InterfaceClass} to \class{IOpenProtocol}.  The
+adapter supports the following subset of the declaration API:
+
+\begin{itemize}
+
+\item The only adapters supported are \function{NO_ADAPTER_NEEDED} and
+\function{DOES_NOT_SUPPORT}.  Calling \method{__adapt__()} on a Zope
+\class{Interface} will thus only return the original object, or \constant{None}.
+Note that this may change in future releases of Zope X3, as Jim Fulton has
+expressed an intention to add an \method{__adapt__()} method using a global
+adapter registry.   At that time, it may also become possible to register
+other adapters via the \module{protocols} declaration API.
+
+\item You cannot declare an implication relationship from a Zope
+\class{Interface}, because Zope only supports implication via
+inheritance, which is fixed at interface definition time.  Therefore, you cannot
+create a ``subset'' of a Zope \class{Interface}, and subscribing an
+\class{IImplicationListener} to an adapted Zope \class{Interface}
+silently does nothing.
+
+\item You can, however, declare that a \module{protocols.Interface} extends a
+Zope \class{Interface}.  Declaring that a class' instances or that an object
+provides the extended interface, will automatically declare that the class'
+instances or the object provides the Zope \class{Interface} as well.  For
+example:
+
+
+
+
+
+
+
+
+
+
+
+\begin{verbatim%
+}import protocols
+from zope.somepackage.interfaces import IBase
+
+class IExtended(protocols.Interface):
+    advise(
+        protocolExtends = [IBase]
+    )
+
+class AnImplementation:
+    advise(
+        instancesProvide = [IExtended]
+    )
+\end{verbatim}
+
+The above code should result in Zope recognizing that instances of
+\class{AnImplementation} provide the Zope \class{IBase} interface.
+
+\item You cannot extend both a Zope interface and a Twisted interface in the
+same \class{protocols.Interface}.  Although this may not give you any errors,
+Twisted and Zope both expect to use an \member{__implements__} attribute to
+store information about what interface a class or object provides.  But each has
+a different interpretation of the contents, and does not expect to find
+``foreign'' interfaces contained within.  So, until this issue between Zope and
+Twisted is resolved, it is not very useful to create interfaces that extend
+both Zope and Twisted interfaces.
+
+\end{itemize}
+
+The current implementation of support for Zope X3 interfaces is currently based
+on the Zope X3 ``milestone 2'' release; it does not work with later versions at
+this time, as Zope X3's interface declaration API is currently in flux.
+
+
+
+
+
+
+
+
+
+\subsubsection{\module{protocols.twisted_support} --- Support for Twisted Interfaces}
+\declaremodule{protocols-twisted-support}{protocols.twisted_support}
+
+Importing this module enables experimental support for using Twisted 1.0.5
+\class{Interface} objects with the \module{protocols} package, by registering
+an adapter from Twisted's \class{MetaInterface} to \class{IOpenProtocol}.  The
+adapter supports the following subset of the declaration API:
+
+\begin{itemize}
+
+\item Only protocol-to-protocol adapters defined via the \module{protocols}
+declaration API will be available to implication listeners.  If
+protocol-to-protocol adapters are registered via Twisted's
+\function{registerAdapter()}, implication listeners are \emph{not} notified.
+
+\item You cannot usefully create a ``subset'' of a Twisted interface, or an
+adaptation from a Twisted interface to another interface type.  The
+declaration might succeed, and it might even work reasonably well for
+adapter paths of depth one.  But Twisted does not support transitive adaptation,
+nor can it notify the destination interface(s) of any new incoming adapter
+paths.
+
+\item If you register an adapter factory that can return \constant{None} with
+a Twisted interface, note that Twisted does not check for a \class{None} return
+value from \function{getAdapter()}.  This means that code in Twisted might
+receive \constant{None} when it expected either an implementation or an error.
+
+\item Only Twisted's global adapter registry is supported for declarations and
+\function{adapt()}.
+
+\item Twisted doesn't support classes providing interfaces (as opposed to their
+instances providing them).  You may therefore obtain unexpected results if you
+declare that a class provides a Twisted interface or an interface that extends a
+Twisted interface.
+
+
+
+
+
+
+
+\item You cannot extend both a Zope interface and a Twisted interface in the
+same \class{protocols.Interface}.  Although this may not give you any errors,
+Twisted and Zope both expect to use an \member{__implements__} attribute to
+store information about what interface a class or object provides.  But each has
+a different interpretation of the contents, and does not expect to find
+``foreign'' interfaces contained within.  So, until this issue between Zope and
+Twisted is resolved, it is not very useful to create interfaces that extend
+both Zope and Twisted interfaces.
+
+\end{itemize}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
