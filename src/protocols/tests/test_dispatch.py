@@ -654,28 +654,6 @@ class ExpressionTests(TestCase):
 
 
 
-    def testFunctionArguments(self):
-
-        f = GenericFunction(lambda a,b,c:None)
-
-        fa,arga = f.argByName('a')
-        fb,argb = f.argByName('b')
-        fc,argc = f.argByName('c')
-
-        self.assertEqual(f.argByName('a'), f.argByName('a'))
-
-        for arg in arga,argb,argc:
-            self.assertEqual(arg, (RAW_VARARGS_ID,))
-
-        args = (1,2,3); kw={'a':1, 'b':2, 'c':3}
-
-        self.assertEqual(fa(args), 1)
-        self.assertEqual(fb(args), 2)
-        self.assertEqual(fc(args), 3)
-
-        self.assertRaises(KeyError, f.argByName, 'x')
-
-
     def testArgumentCanonicalization(self):
         f = GenericFunction(lambda v1,v2:None)
         self.assertEqual(
@@ -686,14 +664,6 @@ class ExpressionTests(TestCase):
             f.getExpressionId(Argument(name='v2')),
             f.getExpressionId(Argument(1))
         )
-
-
-
-
-
-
-
-
 
     def testCalls(self):
         self.assertEqual(Call(operator.add,1,2), Call(operator.add,1,2))
@@ -720,20 +690,9 @@ class ExpressionTests(TestCase):
         # Make the function handle 'x+y > 100'
         f[Signature([(c1,Inequality('>',100))])] = lambda x,y: "yes"
         f[Signature([])] = lambda x,y: "no"
-
         self.assertEqual(f(51,49), "no")
         self.assertEqual(f(99,10), "yes")
         self.assertEqual(f(27,89), "yes")
-
-
-
-
-
-
-
-
-
-
 
 
     def testConsts(self):

@@ -756,22 +756,22 @@ class Argument(ExprBase):
 
 
     def asFuncAndIds(self,generic):
-        byName = byPos = None
-        if self.name:
-            byName = generic.argByName(self.name)
-            if self.pos:
-                byPos = generic.argByPos(self.pos)
-                # check name/pos equal
-            else:
-                return byName
-        else:
-            return generic.argByPos(self.pos)
+        raise NameError("%r is not known to %s" % (self,generic))
 
 
     def __repr__(self):
         if self.name:
             return self.name
         return 'Argument(%r)' % self.pos
+
+
+
+
+
+
+
+
+
 
 
 

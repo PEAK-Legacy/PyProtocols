@@ -210,6 +210,7 @@ class Dispatcher:
 
     def __init__(self,args):
         self.args = args
+        self.argct = len(args)
         from dispatch.strategy import Argument
         self.argMap = dict([(name,Argument(name=name)) for name in args])
         self.__lock = allocate_lock()
@@ -229,7 +230,6 @@ class Dispatcher:
         self.cases = []
         self.disp_indexes = {}
         self.expr_map = {}
-        self.expr_defs = [None,None]    # get,args
         self._dispatcher = None
         from dispatch.strategy import TGraph; self.constraints=TGraph()
         self._setupArgs()
@@ -289,6 +289,9 @@ class Dispatcher:
         self.__lock.acquire()
         try:
             node = self._dispatcher
+            argct = self.argct
+            cache = None
+
             if node is None:
                 node = self._dispatcher = self._build_dispatcher()
                 if node is None:
@@ -297,48 +300,30 @@ class Dispatcher:
             def get(expr_id):
                 if expr_id in cache:
                     return cache[expr_id]
+                elif expr_id<argct:
+                    return argtuple[expr_id]
                 f,args = self.expr_defs[expr_id]
                 f = cache[expr_id] = f(*map(get,args))
                 return f
 
-            cache = {
-                EXPR_GETTER_ID: get, RAW_VARARGS_ID:argtuple,
-            }
             while node is not None and type(node) is DispatchNode:
 
                 (expr, dispatch_function) = node.expr_id
                 if node.contents:
                     node.build()
-
-                node = dispatch_function(get(expr), node)
+                if expr<argct:
+                    node = dispatch_function(argtuple[expr], node)
+                else:
+                    if cache is None:
+                        cache = {EXPR_GETTER_ID: get}                       
+                    node = dispatch_function(get(expr), node)
         finally:
-            cache = None    # allow GC of values computed during dispatch
+            cache = get = None    # allow GC of values computed during dispatch
             self.__lock.release()
+
         if node is not None:
             return node
         raise NoApplicableMethods
-
-
-
-
-
-
-
-
-
-    def __argByNameAndPos(self,name,pos):
-
-        def getArg(args):
-            return args[pos]
-
-        return getArg, (RAW_VARARGS_ID,)
-
-
-    def argByName(self,name):
-        return self.args_by_name[name]
-
-    def argByPos(self,pos):
-        return self.args_by_name[self.args[pos]]
 
 
     def _rebuild_indexes(self):
@@ -355,12 +340,27 @@ class Dispatcher:
 
 
     def _setupArgs(self):
-        self.args_by_name = abn = {}
-        self.argids = argids = {}
+        self.expr_defs = [None]*self.argct  # skip defs for arguments
         from dispatch.strategy import Argument
-        for n,p in zip(self.args,range(len(self.args))):
-            abn[n] = arg = self.__argByNameAndPos(n,p)
-            argids[self.getExpressionId(Argument(name=n))] = True
+        for p,n in enumerate(self.args):
+            self.expr_map[Argument(name=n)] = p
+            self.expr_map[Argument(pos=p)] = p
+            self.expr_map[Argument(name=n,pos=p)] = p
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -523,7 +523,7 @@ class Dispatcher:
     def _addConstraints(self, signature):
         pre = []
         for key,test in signature.items():
-            if key[0] not in self.argids:
+            if key[0] >= self.argct:    # constrain non-argument exprs
                 for item in pre: self.constraints.add(item,key)
             pre.append(key)
 

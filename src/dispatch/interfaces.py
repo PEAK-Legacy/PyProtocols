@@ -4,7 +4,7 @@ __all__ = [
     'IDispatchFunction', 'ITest', 'ISignature', 'IDispatchPredicate',
     'IDispatcher', 'AmbiguousMethod', 'NoApplicableMethods',
     'IDispatchableExpression', 'IGenericFunction', 'IDispatchTable',
-    'EXPR_GETTER_ID','RAW_VARARGS_ID','IExtensibleFunction',
+    'EXPR_GETTER_ID','IExtensibleFunction',
 ]
 
 class AmbiguousMethod(Exception):
@@ -15,8 +15,8 @@ class NoApplicableMethods(Exception):
     """No applicable method has been defined for the given arguments"""
 
 
-EXPR_GETTER_ID = 0
-RAW_VARARGS_ID = 1
+EXPR_GETTER_ID = -1
+
 
 
 
@@ -75,7 +75,7 @@ class ITest(Interface):
 
     def __invert__():
         """Return an inverse version of this test (i.e. 'not test')"""
-        
+
     def implies(otherTest):
         """Return true if truth of this test implies truth of 'otherTest'"""
 
@@ -212,36 +212,36 @@ class IDispatcher(Interface):
 
     def __setitem__(signature,body):
         """Store 'body' as the rule body for arg tuples matching 'signature'"""
-        
+
 
     def parse(expr_string, local_dict, global_dict):
         """Parse 'expr_string' --> ISignature or IDispatchPredicate"""
 
 
-    def argByName(name):
-        """Return 'asFuncAndIds()' for argument 'name'"""
-
-    def argByPos(pos):
-        """Return 'asFuncAndIds()' for argument number 'pos'"""
-
     def getExpressionId(expr):
         """Return an expression ID for use in 'asFuncAndIds()' 'idtuple'
 
-        Note that the constants 'EXPR_GETTER_ID', 'RAW_VARARGS_ID', and
-        'RAW_KWDARGS_ID' may be used in place of calling this method, if
-        one of the specified expressions is desired.
-
-        'EXPR_GETTER_ID' corresponds to a function that will return the value
-        of any other expression whose ID is passed to it.  'RAW_VARARGS_ID'
-        and 'RAW_KWDARGS_ID' correspond to the raw varargs tuple and raw
-        keyword args dictionary supplied to the generic function on a given
-        invocation."""
+        Note that the constant 'EXPR_GETTER_ID' may be used in place of calling
+        This method, if you want the ID corresponding to a function that will
+        return the value of any other expression whose ID is passed to it."""
 
     def testChanged():
         """Notify that a test has changed meaning, invalidating any indexes"""
 
     def clear():
         """Empty all signatures, methods, tests, expressions, etc."""
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class IExtensibleFunction(Interface):
