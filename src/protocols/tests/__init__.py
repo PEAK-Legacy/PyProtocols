@@ -84,32 +84,32 @@ def test_suite():
 
     from protocols.tests import test_advice, test_direct, test_classes
 
+    tests = [
+        test_advice.test_suite(),
+        test_classes.test_suite(),
+        test_direct.test_suite(),
+        makeSuite(APITests,'check'),
+    ]
+
+    try:
+        import zope.interface
+    except ImportError:
+        pass
+    else:
+        from protocols.tests import test_zope
+        tests.append( test_zope.test_suite() )
+
+    try:
+        import twisted.python.components
+    except ImportError:
+        pass
+    #else:
+    #    from protocols.tests import test_twisted
+    #    tests.append( test_twisted.test_suite() )
+
     return TestSuite(
-        [
-            test_advice.test_suite(),
-            test_classes.test_suite(),
-            test_direct.test_suite(),
-            makeSuite(APITests,'check'),
-        ]
+        tests
     )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

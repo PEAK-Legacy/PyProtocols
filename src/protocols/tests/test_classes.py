@@ -8,186 +8,152 @@
 
 from unittest import TestCase, makeSuite, TestSuite
 from protocols import *
+from checks import TestBase
 
 
-# Dummy interfaces and adapters used in tests
+class ImplementationChecks(TestBase):
 
-class IA(Interface):
-    pass
+    """Checks that only involve implementation, not adapters"""
 
-class IB(IA):
-    pass
+    def checkSimpleRegister(self):
+        declareImplementation(self.klass, [self.IA])
+        self.assertObProvidesOnlyA()
 
-def a1(ob,p):
-    return 'a1',ob
+    def checkImpliedRegister(self):
+        declareImplementation(self.klass, [self.IB])
+        self.assertObProvidesAandB()
 
-def a2(ob,p):
-    return 'a2',ob
+    def checkNoClassPassThru(self):
+        declareImplementation(self.klass, instancesProvide=[self.IA])
+        assert adapt(self.klass, self.IA, None) is None
 
-
-
-
-
-
-
-
-
-
-
-
-
+    def checkInheritedDeclaration(self):
+        declareImplementation(self.klass, instancesProvide=[self.IB])
+        class Sub(self.klass): pass
+        inst = self.make(Sub)
+        assert adapt(inst,self.IB,None) is inst
+        assert adapt(inst,self.IA,None) is inst
+        assert adapt(Sub,self.IA,None) is None   # check not passed up to class
+        assert adapt(Sub,self.IB,None) is None
 
 
 
-class BasicChecks(TestCase):
+    def checkRejectInheritanceAndReplace(self):
+        declareImplementation(self.klass, instancesProvide=[self.IB])
+
+        class Sub(self.klass): advise(instancesDoNotProvide=[self.IB])
+        inst = self.make(Sub)
+        assert adapt(inst,self.IA,None) is inst
+        assert adapt(inst,self.IB,None) is None
+
+        declareImplementation(Sub, instancesProvide=[self.IB])
+        assert adapt(inst,self.IB,None) is inst
+
+
+
+
+
+
+
+
+
+
+class BasicChecks(ImplementationChecks):
 
     """Checks to be done on every object"""
 
-    def checkSimpleRegister(self):
-        declareImplementation(self.klass, [IA])
-        assert adapt(self.ob, IA, None) is self.ob
-        assert adapt(self.ob, IB, None) is None
-        assert adapt(IA, self.ob, None) is None
-        assert adapt(IB, self.ob, None) is None
-        assert adapt(self.ob, self.ob, None) is None
-
-    def checkImpliedRegister(self):
-        declareImplementation(self.klass, [IB])
-        assert adapt(self.ob, IA, None) is self.ob
-        assert adapt(self.ob, IB, None) is self.ob
-        assert adapt(IA, self.ob, None) is None
-        assert adapt(IB, self.ob, None) is None
-        assert adapt(self.ob, self.ob, None) is None
-
     def checkDelayedImplication(self):
-
-        declareImplementation(self.klass, [IA])
-
-        class IC(Interface):
-            advise(protocolIsSubsetOf=[IA])
-
-        assert adapt(self.ob, IC, None) is self.ob
-
-    def assertAmbiguous(self, a1, a2, d1, d2, **kw):
-        try:
-            declareAdapter(a2,**kw)
-        except TypeError,v:
-            assert v.args == ("Ambiguous adapter choice", a1, a2, d1, d2)
+        declareImplementation(self.klass, [self.IA])
+        self.assertObProvidesSubsetOfA()
 
     def checkAmbiguity(self):
-        declareAdapter(a1,provides=[IA],forTypes=[self.klass])
-        self.assertAmbiguous(a1,a2,1,1,provides=[IA],forTypes=[self.klass])
-
-
+        declareAdapter(self.a1,provides=[self.IA],forTypes=[self.klass])
+        self.assertAmbiguous(
+            self.a1,self.a2,1,1,provides=[self.IA],forTypes=[self.klass]
+        )
 
     def checkOverrideDepth(self):
+        declareAdapter(self.a1,provides=[self.IB],forTypes=[self.klass])
+        assert adapt(self.ob,self.IA,None) == ('a1',self.ob)
 
-        declareAdapter(a1,provides=[IB],forTypes=[self.klass])
-        assert adapt(self.ob,IA,None) == ('a1',self.ob)
-
-        declareAdapter(a2,provides=[IA],forTypes=[self.klass])
-        assert adapt(self.ob,IA,None) == ('a2',self.ob)
+        declareAdapter(self.a2,provides=[self.IA],forTypes=[self.klass])
+        assert adapt(self.ob,self.IA,None) == ('a2',self.ob)
 
 
     def checkComposed(self):
-        class IC(Interface): pass
-        declareAdapter(a2,provides=[IC],forProtocols=[IA])
-        declareAdapter(a1,provides=[IA],forTypes=[self.klass])
+        class IC(self.Interface): pass
+        declareAdapter(self.a2,provides=[IC],forProtocols=[self.IA])
+        declareAdapter(self.a1,provides=[self.IA],forTypes=[self.klass])
         assert adapt(self.ob,IC,None) == ('a2',('a1',self.ob))
+
+
 
 
     def checkIndirectImplication(self):
         # IB->IA + ID->IC + IC->IB = ID->IA
 
-        class IC(Interface):
+        class IC(self.Interface):
             pass
         class ID(IC):
             pass
 
         declareImplementation(self.klass, [ID])
-        assert adapt(self.ob, IA, None) is None
-        assert adapt(self.ob, IB, None) is None
+        self.assertObProvidesCandDnotAorB(IC,ID)
+
+        declareAdapter(NO_ADAPTER_NEEDED, provides=[self.IB], forProtocols=[IC]
+        )
+
+        self.assertObProvidesABCD(IC,ID)
+
+    def assertObProvidesABCD(self,IC,ID):
+        assert adapt(self.ob, self.IA, None) is self.ob
+        assert adapt(self.ob, self.IB, None) is self.ob
         assert adapt(self.ob, IC, None) is self.ob
         assert adapt(self.ob, ID, None) is self.ob
 
-        declareAdapter(NO_ADAPTER_NEEDED, provides=[IB], forProtocols=[IC])
-
-        assert adapt(self.ob, IA, None) is self.ob
-        assert adapt(self.ob, IB, None) is self.ob
+    def assertObProvidesCandDnotAorB(self,IC,ID):
+        assert adapt(self.ob, self.IA, None) is None
+        assert adapt(self.ob, self.IB, None) is None
         assert adapt(self.ob, IC, None) is self.ob
         assert adapt(self.ob, ID, None) is self.ob
-
 
 
 
 
     def checkLateDefinition(self):
+        # Zope fails this because it has different override semantics
 
-        declareImplementation(self.klass, instancesDoNotProvide=[IA])
-        assert adapt(self.ob,IA,None) is None
+        declareImplementation(self.klass, instancesDoNotProvide=[self.IA])
+        assert adapt(self.ob,self.IA,None) is None
 
-        declareImplementation(self.klass, instancesProvide=[IA])
-        assert adapt(self.ob,IA,None) is self.ob
+        declareImplementation(self.klass, instancesProvide=[self.IA])
+        assert adapt(self.ob,self.IA,None) is self.ob
 
         # NO_ADAPTER_NEEDED at same depth should override DOES_NOT_SUPPORT
-        declareImplementation(self.klass, instancesDoNotProvide=[IA])
-        assert adapt(self.ob,IA,None) is self.ob
+        declareImplementation(self.klass, instancesDoNotProvide=[self.IA])
+        assert adapt(self.ob,self.IA,None) is self.ob
 
 
-    def checkNoClassPassThru(self):
-        declareImplementation(self.klass, instancesProvide=[IA])
-        assert adapt(self.klass, IA, None) is None
 
 
-    def checkInheritedDeclaration(self):
-        declareImplementation(self.klass, instancesProvide=[IB])
-        class Sub(self.klass): pass
-        inst = self.make(Sub)
-        assert adapt(inst,IB,None) is inst
-        assert adapt(inst,IA,None) is inst
-        assert adapt(Sub,IA,None) is None   # check not passed up to class
-        assert adapt(Sub,IB,None) is None
-
-
-    def checkRejectInheritanceAndReplace(self):
-        declareImplementation(self.klass, instancesProvide=[IB])
-
-        class Sub(self.klass): advise(instancesDoNotProvide=[IB])
-        inst = self.make(Sub)
-        assert adapt(inst,IA,None) is inst
-        assert adapt(inst,IB,None) is None
-
-        declareImplementation(Sub, instancesProvide=[IB])
-        assert adapt(inst,IB,None) is inst
 
 
 
     def checkChangingBases(self):
 
-        class M1(self.klass): pass
-        class M2(self.klass): pass
+        # Zope and Twisted fail this because they rely on the first-found
+        # __implements__ attribute and ignore a class' MRO/__bases__
 
+        M1, M2 = self.setupBases(self.klass)
         m1 = self.make(M1)
         m2 = self.make(M2)
-
-        declareImplementation(M1, instancesProvide=[IA])
-        declareImplementation(M2, instancesProvide=[IB])
-
-        assert adapt(m1,IA,None) is m1
-        assert adapt(m1,IB,None) is None
-        assert adapt(m2,IB,None) is m2
-
-        try:
-            M1.__bases__ = M2,
-        except TypeError:   # XXX 2.2 doesn't let newstyle __bases__ change
-            pass
-        else:
-            assert adapt(m1,IA,None) is m1
-            assert adapt(m1,IB,None) is m1
+        declareImplementation(M1, instancesProvide=[self.IA])
+        declareImplementation(M2, instancesProvide=[self.IB])
+        self.assertM1ProvidesOnlyAandM2ProvidesB(m1,m2)
+        self.assertChangingBasesChangesInterface(M1,M2,m1,m2)
 
 
-    def make(self,klass):
-        return klass()
+
 
 
 
@@ -251,6 +217,7 @@ TestClasses = (
 
 def test_suite():
     return TestSuite([makeSuite(t,'check') for t in TestClasses])
+
 
 
 

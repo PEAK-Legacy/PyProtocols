@@ -8,155 +8,102 @@
 
 from unittest import TestCase, makeSuite, TestSuite
 from protocols import *
+from checks import TestBase
+
+class ProviderChecks(TestBase):
+
+    """Non-adapter instance tests"""
+
+    def checkSimpleRegister(self):
+        adviseObject(self.ob, provides=[self.IA])
+        self.assertObProvidesOnlyA()
+
+    def checkImpliedRegister(self):
+        adviseObject(self.ob, provides=[self.IB])
+        self.assertObProvidesAandB()
 
 
-# Dummy interfaces and adapters used in tests
-
-class IA(Interface):
-    pass
-
-class IB(IA):
-    pass
-
-def a1(ob,p):
-    return 'a1',ob
-
-def a2(ob,p):
-    return 'a2',ob
 
 
 
-class IPure(Interface):
-    # We use this for pickle/copy tests because the other protocols
-    # imply various dynamically created interfaces, and so any object
-    # registered with them won't be picklable
-    pass
 
-class Picklable:
-    # Pickling needs classes in top-level namespace
-    pass
 
-class NewStyle(object):
-    pass
 
-class BasicChecks(TestCase):
+
+
+
+
+class BasicChecks(ProviderChecks):
 
     """Checks to be done on every object"""
 
-    def checkSimpleRegister(self):
-        adviseObject(self.ob, provides=[IA])
-        assert adapt(self.ob, IA, None) is self.ob
-        assert adapt(self.ob, IB, None) is None
-        assert adapt(IA, self.ob, None) is None
-        assert adapt(IB, self.ob, None) is None
-        assert adapt(self.ob, self.ob, None) is None
-
-    def checkImpliedRegister(self):
-        adviseObject(self.ob, provides=[IB])
-        assert adapt(self.ob, IA, None) is self.ob
-        assert adapt(self.ob, IB, None) is self.ob
-        assert adapt(IA, self.ob, None) is None
-        assert adapt(IB, self.ob, None) is None
-        assert adapt(self.ob, self.ob, None) is None
-
     def checkDelayedImplication(self):
-
-        adviseObject(self.ob, provides=[IA])
-
-        class IC(Interface):
-            advise(protocolIsSubsetOf=[IA])
-
-        assert adapt(self.ob, IC, None) is self.ob
-
-    def assertAmbiguous(self, a1, a2, d1, d2, **kw):
-
-        try:
-            declareAdapter(a2,**kw)
-        except TypeError,v:
-            assert v.args == ("Ambiguous adapter choice", a1, a2, d1, d2)
+        adviseObject(self.ob, provides=[self.IA])
+        self.assertObProvidesSubsetOfA()
 
     def checkAmbiguity(self):
-        declareAdapter(a1,provides=[IA],forObjects=[self.ob])
-        self.assertAmbiguous(a1,a2,1,1,provides=[IA],forObjects=[self.ob])
+        declareAdapter(self.a1,provides=[self.IA],forObjects=[self.ob])
+        self.assertAmbiguous(self.a1,self.a2,1,1,provides=[self.IA],forObjects=[self.ob])
 
 
     def checkOverrideDepth(self):
 
-        declareAdapter(a1,provides=[IB],forObjects=[self.ob])
-        assert adapt(self.ob,IA,None) == ('a1',self.ob)
+        declareAdapter(self.a1,provides=[self.IB],forObjects=[self.ob])
+        assert adapt(self.ob,self.IA,None) == ('a1',self.ob)
 
-        declareAdapter(a2,provides=[IA],forObjects=[self.ob])
-        assert adapt(self.ob,IA,None) == ('a2',self.ob)
+        declareAdapter(self.a2,provides=[self.IA],forObjects=[self.ob])
+        assert adapt(self.ob,self.IA,None) == ('a2',self.ob)
 
 
     def checkComposed(self):
-        class IC(Interface): pass
-        declareAdapter(a2,provides=[IC],forProtocols=[IA])
-        declareAdapter(a1,provides=[IA],forObjects=[self.ob])
+        class IC(self.Interface): pass
+        declareAdapter(self.a2,provides=[IC],forProtocols=[self.IA])
+        declareAdapter(self.a1,provides=[self.IA],forObjects=[self.ob])
         assert adapt(self.ob,IC,None) == ('a2',('a1',self.ob))
 
 
     def checkIndirectImplication(self):
         # IB->IA + ID->IC + IC->IB = ID->IA
 
-        class IC(Interface):
+        class IC(self.Interface):
             pass
         class ID(IC):
             pass
 
         adviseObject(self.ob, provides=[ID])
-        assert adapt(self.ob, IA, None) is None
-        assert adapt(self.ob, IB, None) is None
+        self.assertObProvidesCandDnotAorB(IC,ID)
+
+        declareAdapter(NO_ADAPTER_NEEDED, provides=[self.IB], forProtocols=[IC]
+        )
+
+        self.assertObProvidesABCD(IC,ID)
+
+    def assertObProvidesABCD(self,IC,ID):
+        assert adapt(self.ob, self.IA, None) is self.ob
+        assert adapt(self.ob, self.IB, None) is self.ob
         assert adapt(self.ob, IC, None) is self.ob
         assert adapt(self.ob, ID, None) is self.ob
 
-        declareAdapter(NO_ADAPTER_NEEDED, provides=[IB], forProtocols=[IC])
-
-        assert adapt(self.ob, IA, None) is self.ob
-        assert adapt(self.ob, IB, None) is self.ob
+    def assertObProvidesCandDnotAorB(self,IC,ID):
+        assert adapt(self.ob, self.IA, None) is None
+        assert adapt(self.ob, self.IB, None) is None
         assert adapt(self.ob, IC, None) is self.ob
         assert adapt(self.ob, ID, None) is self.ob
-
 
 
 
 
     def checkLateDefinition(self):
 
-        adviseObject(self.ob, doesNotProvide=[IA])
-        assert adapt(self.ob,IA,None) is None
+        adviseObject(self.ob, doesNotProvide=[self.IA])
+        assert adapt(self.ob,self.IA,None) is None
 
-        adviseObject(self.ob, provides=[IA])
-        assert adapt(self.ob,IA,None) is self.ob
+        adviseObject(self.ob, provides=[self.IA])
+        assert adapt(self.ob,self.IA,None) is self.ob
 
         # NO_ADAPTER_NEEDED at same depth should override DOES_NOT_SUPPORT
-        adviseObject(self.ob, doesNotProvide=[IA])
-        assert adapt(self.ob,IA,None) is self.ob
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        adviseObject(self.ob, doesNotProvide=[self.IA])
+        assert adapt(self.ob,self.IA,None) is self.ob
 
 
 
@@ -168,29 +115,29 @@ class ClassChecks(BasicChecks):
 
     def checkNoInstancePassThru(self):
         inst = self.ob()
-        adviseObject(self.ob, provides=[IA])
-        assert adapt(inst, IA, None) is None
+        adviseObject(self.ob, provides=[self.IA])
+        assert adapt(inst, self.IA, None) is None
 
 
     def checkInheritedDeclaration(self):
 
         class Sub(self.ob): pass
 
-        adviseObject(self.ob, provides=[IB])
-        assert adapt(Sub, IB, None) is Sub
-        assert adapt(Sub, IA, None) is Sub
+        adviseObject(self.ob, provides=[self.IB])
+        assert adapt(Sub, self.IB, None) is Sub
+        assert adapt(Sub, self.IA, None) is Sub
 
 
     def checkRejectInheritanceAndReplace(self):
-        adviseObject(self.ob, provides=[IB])
+        adviseObject(self.ob, provides=[self.IB])
 
-        class Sub(self.ob): advise(classDoesNotProvide=[IB])
+        class Sub(self.ob): advise(classDoesNotProvide=[self.IB])
 
-        assert adapt(Sub,IA,None) is Sub
-        assert adapt(Sub,IB,None) is None
+        assert adapt(Sub,self.IA,None) is Sub
+        assert adapt(Sub,self.IB,None) is None
 
-        adviseObject(Sub,provides=[IB])
-        assert adapt(Sub,IB,None) is Sub
+        adviseObject(Sub,provides=[self.IB])
+        assert adapt(Sub,self.IB,None) is Sub
 
 
 
@@ -205,21 +152,16 @@ class ClassChecks(BasicChecks):
 
     def checkChangingBases(self):
 
-        class M1(self.ob): pass
-        class M2(self.ob): pass
-        adviseObject(M1, provides=[IA])
-        adviseObject(M2, provides=[IB])
-        assert adapt(M1,IA,None) is M1
-        assert adapt(M1,IB,None) is None
-        assert adapt(M2,IB,None) is M2
+        # Zope and Twisted fail this because they rely on the first-found
+        # __implements__ attribute and ignore a class' MRO/__bases__
 
-        try:
-            M1.__bases__ = M2,
-        except TypeError:   # XXX 2.2 doesn't let newstyle __bases__ change
-            pass
-        else:
-            assert adapt(M1,IA,None) is M1
-            assert adapt(M1,IB,None) is M1
+        M1, M2 = self.setupBases(self.ob)
+        adviseObject(M1, provides=[self.IA])
+        adviseObject(M2, provides=[self.IB])
+        self.assertM1ProvidesOnlyAandM2ProvidesB(M1,M2)
+        self.assertChangingBasesChangesInterface(M1,M2,M1,M2)
+
+
 
 
 
@@ -251,7 +193,7 @@ class InstanceConformChecks:
         def __conform__(proto):
             pass
         self.ob.__conform__ = __conform__
-        self.assertBadConform(self.ob, [IA], __conform__)
+        self.assertBadConform(self.ob, [self.IA], __conform__)
 
 
     def assertBadConform(self, ob, protocols, conform):
@@ -273,7 +215,7 @@ class ClassConformChecks(InstanceConformChecks):
             def __conform__(self,protocol): pass
 
         class Sub(Base): pass
-        self.assertBadConform(Sub, [IA], Base.__conform__.im_func)
+        self.assertBadConform(Sub, [self.IA], Base.__conform__.im_func)
 
 
     def checkInstanceConform(self):
@@ -282,7 +224,7 @@ class ClassConformChecks(InstanceConformChecks):
             def __conform__(self,protocol): pass
 
         b = Base()
-        self.assertBadConform(b, [IA], b.__conform__)
+        self.assertBadConform(b, [self.IA], b.__conform__)
 
 
 class AdviseFunction(BasicChecks, InstanceConformChecks):
@@ -329,20 +271,20 @@ class AdviseType(AdviseClass):
 class AdviseInstance(AdviseFunction):
 
     def setUp(self):
-        self.ob = Picklable()
+        self.ob = self.Picklable()
 
     def checkPickling(self):
         from pickle import loads,dumps
-        adviseObject(self.ob, provides=[IPure])
+        adviseObject(self.ob, provides=[self.IPure])
         newOb = loads(dumps(self.ob))
-        assert adapt(newOb,IPure,None) is newOb
+        assert adapt(newOb,self.IPure,None) is newOb
 
 
 
 class AdviseNewInstance(AdviseInstance):
 
     def setUp(self):
-        self.ob = NewStyle()
+        self.ob = self.NewStyle()
 
 
 
