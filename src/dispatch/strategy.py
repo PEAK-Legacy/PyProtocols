@@ -85,7 +85,7 @@ class TGraph:
 
     def __init__(self):
         self.data = {}
-        
+
     def add(self,s,e):
         self.data.setdefault(s,{})
         for old_s,old_es in self.data.items():
@@ -125,7 +125,10 @@ def dispatch_by_mro(ob,table):
 
     """Lookup '__class__' of 'ob' in 'table' using its MRO order"""
 
-    klass = ob.__class__
+    try:
+        klass = ob.__class__
+    except AttributeError:
+        klass = type(ob)
 
     while True:
         if klass in table:
@@ -144,9 +147,6 @@ def dispatch_by_mro(ob,table):
 
     if klass is not object and object in table:
         return table[object]
-
-
-
 
 
 

@@ -274,7 +274,9 @@ class TestTests(TestCase):
             [(Min,19),(19,27),(27,Max)],
         )
 
-
+    def testClasslessDispatch(self):
+        class Classic: pass # Classic classes have no __class_ attribute
+        strategy.dispatch_by_mro(Classic,{})
 
 
 
