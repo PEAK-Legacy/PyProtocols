@@ -162,7 +162,7 @@ class APITests(TestCase):
 
 
 
-from protocols import protocolForType, protocolForURI, sequenceOf
+from protocols import protocolForType, protocolForURI, sequenceOf, advise
 from protocols import declareImplementation, Variation
 from UserDict import UserDict
 
@@ -204,7 +204,6 @@ declareImplementation(MyUserMapping,[IMyUnusualMapping])
 
 
 class GenerationTests(TestCase):
-
     def checkTypeSubset(self):
         d = {}
         assert IGetSetMapping(d,None) is d
@@ -228,11 +227,12 @@ class GenerationTests(TestCase):
         assert p is IProtocol1
 
     def checkSequence(self):
-        d1 = {}
-        d2 = {}
+        d1,d2 = {},{}
         seq = multimap([d1,d2])
         assert seq == [d1,d2]
         assert seq[0] is d1 and seq[1] is d2
+        class ISequenceLike(Interface): advise(protocolIsSubsetOf=[multimap])
+        ISequenceLike([d1,d2])
 
     def checkVariation(self):
         d = {}

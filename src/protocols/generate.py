@@ -259,13 +259,13 @@ def sequenceOf(baseProtocol):
 
         except KeyError:
             proto = registry[key] = SequenceProtocol(baseProtocol)
-            declareAdapterForProtocol(proto, ADAPT_SEQUENCE, IBasicSequence)
+            declareAdapterForProtocol(
+                proto, lambda o,p: ADAPT_SEQUENCE(o,proto), IBasicSequence
+            )
             return proto
 
     finally:
         __registryLock.release()
-
-
 
 
 
