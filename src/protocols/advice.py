@@ -6,7 +6,7 @@ import sys
 __all__ = [
     'addClassAdvisor', 'isClassAdvisor', 'metamethod', 'supermeta',
     'minimalBases', 'determineMetaclass', 'getFrameInfo', 'getMRO',
-    'classicMRO', 'mkRef', 'StrongRef', 'add_assignment_advisor'
+    'classicMRO', 'mkRef', 'StrongRef', 'add_assignment_advisor', 'as'
 ]
 
 
@@ -23,18 +23,18 @@ else:
     ClassicTypes = ClassType, ExtensionClass
 
 
+def as(*decorators):
 
+    if len(decorators)>1:
+        decorators = list(decorators)
+        decorators.reverse()
 
+    def callback(frame,k,v):
+        for d in decorators:
+            v = d(v)
+        frame.f_locals[k] = v
 
-
-
-
-
-
-
-
-
-
+    add_assignment_advisor(callback)
 
 
 

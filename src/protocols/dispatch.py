@@ -42,7 +42,7 @@
 from __future__ import generators
 from UserDict import UserDict
 from protocols import Interface, Attribute, Protocol, Adapter, StickyAdapter
-from protocols.advice import getMRO, add_assignment_advisor
+from protocols.advice import getMRO, add_assignment_advisor, as
 from protocols.interfaces import allocate_lock
 import protocols, operator, inspect
 from types import ClassType, InstanceType, FunctionType, NoneType
@@ -966,11 +966,11 @@ class GenericFunction:
             map(self._addCase, cases)
 
 
+    [as(classmethod)]
     def from_function(klass,func):
         # XXX nested args, var, kw, docstring...
         return klass(inspect.getargspec(func)[0])
 
-    from_function = classmethod(from_function)
 
 
 

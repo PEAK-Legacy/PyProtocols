@@ -146,18 +146,18 @@ class DecoratorTests(TestCase):
         self.assertEqual(log, [(sys._getframe(),'test2',42)]*2)
 
 
+    def checkAs(self):
 
+        def f(): pass
 
+        [as(lambda x: [x])]
+        f1 = f
 
+        self.assertEqual(f1, [f])
 
-
-
-
-
-
-
-
-
+        [as(list, lambda x: (x,))]
+        f1 = f
+        self.assertEqual(f1, [f])
 
 
 

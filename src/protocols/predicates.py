@@ -4,6 +4,7 @@ from dispatch import EXPR_GETTER_ID
 import protocols, operator
 from ast_builder import build
 from types import NoneType
+from protocols.advice import as
 
 __all__ = [
     'Call', 'Argument', 'Signature', 'PositionalSignature',
@@ -35,7 +36,6 @@ def add_dict(d1,d2):
 # XXX Order-preserving signatures
 # XXX Need ordering constraints
 # XXX var, let, ???
-
 
 
 
@@ -261,13 +261,13 @@ class OrExpr(LogicalExpr):
 
         return or_, (EXPR_GETTER_ID,)
 
+    [as(classmethod)]
     def immediate(klass,seq):
         for item in seq:
             if item:
                 break
         return item
 
-    immediate = classmethod(immediate)
 
 
 
@@ -302,13 +302,13 @@ class AndExpr(LogicalExpr):
 
         return and_, (EXPR_GETTER_ID,)
 
+    [as(classmethod)]
     def immediate(klass,seq):
         for item in seq:
             if not item:
                 break
         return item
 
-    immediate = classmethod(immediate)
 
 
 
