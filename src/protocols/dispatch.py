@@ -13,8 +13,6 @@
 
  TODO
 
-    * Express arbitrary predicates as Python expressions (in string form)
-
     * Expression/test ordering constraints
 
     * Convenience API using function decorators
@@ -34,6 +32,8 @@
 
     * Support DAG-walking for visualization, debugging, and ambiguity detection
 """
+
+
 
 
 

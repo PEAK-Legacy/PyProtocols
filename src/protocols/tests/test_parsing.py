@@ -1,11 +1,11 @@
 """Test generic functions expression parsing"""
 
 from unittest import TestCase, makeSuite, TestSuite
+from protocols.dispatch import *
 from protocols.predicates import *
 from protocols.ast_builder import *
-from protocols.dispatch import *
 from protocols import predicates
-import operator,sys
+import operator,sys,types
 MAXINT = `sys.maxint`
 
 class StringBuilder:
@@ -731,6 +731,88 @@ class PredicateTests(TestCase):
 
             self.assertEqual(pe('not x %s y' % op), x_cmp_y(not_name))
             self.assertEqual(pe('not x %s y' % not_op), x_cmp_y(name))
+
+
+
+
+
+    def testParseMembership(self):
+
+        parse = GenericFunction(['x','y','z']).parse
+        pe = lambda e: parse(e,locals(),globals())
+
+        in_test = lambda seq: OrTest(*[Inequality('==',v) for v in seq])
+
+        self.assertEqual(pe('x in int'), Signature(x=int))
+        self.assertEqual(pe('x not in int'), Signature(x=NotTest(int)))
+        self.assertEqual(pe('x in (1,2,3)'), Signature(x=in_test([1,2,3])))
+        self.assertEqual(pe('x not in (1,2,3)'),
+            Signature(x=NotTest(in_test([1,2,3]))))
+
+        self.assertEqual(pe('x is 1'),
+            Signature([(Call(predicates.is_,Argument(name='x'),Const(1)),
+                TruthTest())]))
+
+        self.assertEqual(pe('x is not 1'),
+            Signature([(Call(predicates.is_,Argument(name='x'),Const(1)),
+                TruthTest(False))]))
+
+        # optimization when 'is None' and type tests occur on an expression
+        self.assertEqual(pe('x is None'),Signature(x=types.NoneType))
+        self.assertEqual(pe('x is not None'),
+            Signature(x=NotTest(types.NoneType)))
+
+        self.assertEqual(pe('not (x is not None)'),Signature(x=types.NoneType))
+        self.assertEqual(pe('not (x is None)'),
+            Signature(x=NotTest(types.NoneType)))
+
+
+
+
+
+
+
+
+
+
+
+
+    def testParseDNF(self):
+
+        parse = GenericFunction(['x','y','z']).parse
+        pe = lambda e: parse(e,locals(),globals())
+
+        # and => Signature
+        self.assertEqual(pe('x in int and y in str'),Signature(x=int,y=str))
+
+        # or => Predicate
+        self.assertEqual(pe('x in int or  y in str'),Predicate([
+            Signature(x=int), Signature(y=str)
+        ]))
+
+        # Verify 'not' pushes down to the operators
+        self.assertEqual(
+            pe('not(x in int or y in str)'),
+            Signature(x=NotTest(int),y=NotTest(str))
+        )
+
+        self.assertEqual(pe('not( x in int and y in str)'),Predicate([
+            Signature(x=NotTest(int)), Signature(y=NotTest(str))
+        ]))
+
+        # ...and cancels out nested not's
+        self.assertEqual(
+            pe('not(x not in int or y not in str)'), Signature(x=int,y=str)
+        )
+
+        self.assertEqual(pe('not( x not in int and y not in str)'),Predicate([
+            Signature(x=int), Signature(y=str)
+        ]))
+
+        # mixed and/or
+        self.assertEqual(pe('x in int and y in int or z in str'),Predicate([
+            Signature(x=int,y=int), Signature(z=str)
+        ]))
 
 
 

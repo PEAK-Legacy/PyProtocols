@@ -1,6 +1,7 @@
 from dispatch import *
 import protocols, operator
 from ast_builder import build
+from types import NoneType
 
 __all__ = [
     'Call', 'Argument', 'Signature', 'PositionalSignature',
@@ -28,11 +29,10 @@ def add_dict(d1,d2):
 
 
 
-# XXX Inequality needs to support is/in/not, including 'in typeOrProto'
+
 # XXX Order-preserving signatures
 # XXX Need ordering constraints
 # XXX var, let, ???
-
 
 
 
@@ -744,17 +744,32 @@ class TestBuilder:
     }
 
     def Compare(self,initExpr,((op,other),)):
+
         left = build(self.expr_builder,initExpr)
         right = build(self.expr_builder,other)
+
         if isinstance(left,Const) and op in self._mirror_ops:
             left,right,op = right,left,self._mirror_ops[op]
+
         if isinstance(right,Const):
-            if op[0].isalpha():
-                right = Inequality(op,right.value)  # XXX put in/is stuff here
+            if op=='in' or op=='not in':
+                right = sequence_test(right.value) or ITest(right.value)
+                if op=='not in':
+                    right = NotTest(right)
+            elif op=='is' or op=='is not':
+                if right.value is None:
+                    right = ITest(NoneType)
+                    if op=='is not':
+                        right = NotTest(right)
+                else:
+                    left, right = Call(is_,left,right), TruthTest(op=='is')
             else:
                 right = Inequality(op,right.value)
+
             return Signature([(left, right)])
+
         else:
+            # Both sides involve variables, so it's a boolean test  :(
             return Signature([
                 (self.expr_builder.Compare(initExpr,((op,other),)),
                     TruthTest(True))
@@ -768,12 +783,38 @@ class TestBuilder:
             sig &= build(self,expr)
         return sig
 
-
     def Or(self,items):
         sig = build(self,items[0])
         for expr in items[1:]:
             sig |= build(self,expr)
         return sig
+
+
+
+def sequence_test(seq):
+    try:
+        iter(seq)
+    except TypeError:
+        return None
+    else:
+        return OrTest(*[Inequality('==',v) for v in seq])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
