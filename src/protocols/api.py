@@ -98,6 +98,7 @@ def declareAdapterForType(protocol, adapter, typ, depth=1):
 
 def declareAdapterForProtocol(protocol, adapter, proto, depth=1):
     """Declare that 'adapter' adapts 'proto' to 'protocol'"""
+    adapt(protocol, IOpenProtocol)  # src and dest must support IOpenProtocol
     adapt(proto, IOpenProtocol).addImpliedProtocol(protocol, adapter, depth)
 
 

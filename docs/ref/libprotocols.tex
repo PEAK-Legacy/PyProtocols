@@ -1258,8 +1258,8 @@ In the next section, we'll look more at the static nature of declarations,
 and explore what it means to make conflicting (or refining) protocol
 declarations.
 
-XXX This section seems awfully short; wasn't there more to say about this?
-Maybe it should be a subsubsection.
+
+
 
 
 
@@ -1409,30 +1409,6 @@ listed explicitly.  If class A provided protocol B, and protocol B derived
 from (i.e. implied) protocol C, then you must explicitly reject both B and C
 if you do not want your subclass to support them.
 
-This approach may not be ideal if you are creating such ``contextual''
-protocols dynamically.  Note that every protocol or object that implies
-protocol D in our example above will be holding a reference to D.  This means
-that even if we discard D when we are done with it, D itself will not be
-garbage collected until all the protocols that imply it are.
-
-Because most protocols are used to describe application behavior, this isn't an
-issue for most applications.  If you don't currently worry about making sure
-that your classes get garbage collected  -- not the instances, but the classes
-\emph{themselves} -- then you probably won't worry about it for protocols
-either.
-
-Only applications or frameworks that dynamically generate protocols (and
-declare adaptations to them) need to consider this issue. Such applications or
-frameworks may wish to implement their own custom protocol types for dealing
-with these issues, or to handle persistent storage of dynamically generated
-protocols, use weak references for adaptation registries, etc.  See section
-\ref{customizing-adaptation} for more information on customizing and extending
-the adaptation framework in these ways.
-
-
-
-
-
 \begin{seealso}
 
 The logic of composing and comparing adapter paths is implemented via the
@@ -1442,23 +1418,6 @@ for more details on these and other functions that relate to adapter paths.
 
 
 \end{seealso}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -2105,13 +2064,13 @@ determineMetaclass
 
 minimalBases
 
+mkRef
+
+StrongRef
 
 \subsubsection{\module{protocols.classic} --- Adapters to support built-in types
 and Zope Interfaces}
 \declaremodule{protocols-classic}{protocols.classic}
-
-
-
 
 
 

@@ -6,7 +6,7 @@ import sys
 __all__ = [
     'addClassAdvisor', 'isClassAdvisor', 'metamethod', 'supermeta',
     'minimalBases', 'determineMetaclass', 'getFrameInfo', 'getMRO',
-    'classicMRO',
+    'classicMRO', 'mkRef', 'StrongRef'
 ]
 
 
@@ -275,6 +275,49 @@ def minimalBases(classes):
 
 
 
+
+
+
+
+
+
+
+
+
+
+from weakref import ref
+
+class StrongRef(object):
+
+    """Like a weakref, but for non-weakrefable objects"""
+
+    __slots__ = 'referent'
+
+    def __init__(self,referent):
+        self.referent = referent
+
+    def __call__(self):
+        return self.referent
+
+    def __hash__(self):
+        return hash(self.referent)
+
+    def __eq__(self,other):
+        return self.referent==other
+
+    def __repr__(self):
+        return 'StrongRef(%r)' % self.referent
+
+
+def mkRef(ob,*args):
+    """Return either a weakref or a StrongRef for 'ob'
+
+    Note that extra args are forwarded to weakref.ref() if applicable."""
+
+    try:
+        return ref(ob,*args)
+    except TypeError:
+        return StrongRef(ob)
 
 
 

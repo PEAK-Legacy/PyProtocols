@@ -8,7 +8,7 @@ from adapters import *
 from api import declareImplementation, advise, declareAdapterForObject, adapt
 from interfaces import *
 from new import instancemethod
-from advice import getMRO, metamethod
+from advice import getMRO, metamethod, mkRef
 
 
 
@@ -213,16 +213,16 @@ class MiscObjectsAsOpenProvider(object):
         # Create a registry that's also set up for inheriting declarations
 
         reg = conformsRegistry()
-        from weakref import ref
-
-        try:
-            r = ref(subject)
-        except TypeError:
-            r = lambda: subject
-
-        reg.subject = r
+        reg.subject = mkRef(subject)
 
         return reg
+
+
+
+
+
+
+
 
 
 

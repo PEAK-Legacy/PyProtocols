@@ -1,5 +1,7 @@
 """Implement Interfaces and define the interfaces used by the package"""
 
+from __future__ import generators
+
 __all__ = [
     'Protocol', 'InterfaceClass', 'Interface',
     'IAdapterFactory', 'IProtocol',
@@ -8,7 +10,7 @@ __all__ = [
 ]
 
 import api
-from advice import metamethod, classicMRO
+from advice import metamethod, classicMRO, mkRef
 from adapters import composeAdapters, updateWithSimplestAdapter
 from adapters import NO_ADAPTER_NEEDED, DOES_NOT_SUPPORT
 
@@ -37,11 +39,10 @@ except ImportError:
 
 
 
-
-
 # Trivial interface implementation
 
 class Protocol:
+
     """Generic protocol w/type-based adapter registry"""
 
     def __init__(self):
@@ -50,8 +51,33 @@ class Protocol:
         self.__listeners = None
         self.__lock = allocate_lock()
 
+
     def getImpliedProtocols(self):
-        return self.__implies.items()
+
+        # This is messy so it can clean out weakrefs, but this method is only
+        # called for declaration activities and is thus not at all
+        # speed-critical.  It's more important that we support weak refs to
+        # implied protocols, so that dynamically created subset protocols can
+        # be garbage collected.
+
+        out = []
+        add = out.append
+
+        self.__lock.acquire()   # we might clean out dead weakrefs
+
+        try:
+            for k,v in self.__implies.items():
+                proto = k()
+                if proto is None:
+                    del self.__implies[k]
+                else:
+                    add((proto,v))
+
+            return out
+
+        finally:
+            self.__lock.release()
+
 
 
     def addImpliedProtocol(self,proto,adapter=NO_ADAPTER_NEEDED,depth=1):
@@ -59,7 +85,7 @@ class Protocol:
         self.__lock.acquire()
         try:
             if not updateWithSimplestAdapter(
-                self.__implies, proto, adapter, depth
+                self.__implies, mkRef(proto), adapter, depth
             ):
                 return self.__implies[proto][0]
         finally:
@@ -79,6 +105,21 @@ class Protocol:
         return adapter
 
     addImpliedProtocol = metamethod(addImpliedProtocol)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def registerImplementation(self,klass,adapter=NO_ADAPTER_NEEDED,depth=1):
 
