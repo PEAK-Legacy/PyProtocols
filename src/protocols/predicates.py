@@ -28,11 +28,11 @@ def add_dict(d1,d2):
 
 
 
-
-
-
-
-
+# XXX Inequality needs to support is/in/not, including 'in typeOrProto'
+# XXX Need and/or of Predicate/Signature
+# XXX Order-preserving signatures
+# XXX Need ordering constraints
+# XXX var, let, ???
 
 
 
@@ -688,6 +688,129 @@ class TruthTest(object):
 
     def __ne__(self,otherTest):
         return not self.__eq__(otherTest)
+
+
+
+
+
+
+
+class TestBuilder:
+
+    bind_globals = True
+    simplify_comparisons = True
+    mode = TruthTest(True)
+
+    def __init__(self,arguments,*namespaces):
+        self.expr_builder = ExprBuilder(arguments,*namespaces)
+
+    def mkOp(name):
+        op = getattr(ExprBuilder,name)
+        def method(self,*args):
+            return Signature([(op(self.expr_builder,*args), self.mode)])
+        return method
+
+    for opname in dir(ExprBuilder):
+        if opname[0]==opname[0].upper():
+            locals()[opname] = mkOp(opname)
+
+    def Not(self,expr):
+        try:
+            self.__class__ = NotBuilder
+            return build(self.not_builder,expr)
+        finally:
+            self.__class__ = TestBuilder
+
+    def Compare(self,initExpr,((op,other),)):
+        left = build(self.expr_builder,initExpr)
+        right = build(self.expr_builder,other)
+        if isinstance(left,Const):
+            left,right = right,left
+        if isinstance(right,Const):
+            return Signature([(left, Inequality(op,right.value))])
+        else:
+            return Signature(
+                [(Call(self._cmp_ops[op], left, right), TruthTest(True))]
+            )
+
+
+
+
+    def And(self,items):
+        sig = build(self,items[0])
+        for expr in items[1:]:
+            sig &= build(self,expr)
+        return sig
+
+    def Or(self,items):
+        sig = build(self,items[0])
+        for expr in items[1:]:
+            sig |= build(self,expr)
+        return sig
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class NotBuilder(TestBuilder):
+
+    mode = TruthTest(False)
+
+    def Not(self,expr):
+        try:
+            self.__class__ = TestBuilder
+            return build(self.not_builder,expr)
+        finally:
+            self.__class__ = NotBuilder
+
+    # Negative logic for and/or
+    And = TestBuilder.Or
+    Or  = TestBuilder.And
+
+    _rev_ops = {
+        '>': '<=', '>=': '<',
+        '<': '>=', '<=': '>',
+        '<>': '==', '!=': '==', '==':'!=',
+        'in': 'not in', 'not in': 'in',
+        'is': 'is not', 'is not': 'is'
+    }
+
+    def Compare(self,initExpr,((op,other),)):
+        op = self._rev_ops[op]
+        try:
+            self.__class__ = TestBuilder
+            return TestBuilder.Compare(self,initExpr,((op,other),))
+        finally:
+            self.__class__ = NotBuilder
+
+
+
+
 
 
 
