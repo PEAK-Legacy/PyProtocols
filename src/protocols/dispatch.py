@@ -14,15 +14,7 @@
 
  TODO
 
-    * Functional expressions
-
-    * Boolean terms
-
-    * Expression/term ordering constraints
-
-    * Support costs on expressions
-
-    * Add C speedups
+    * Argument enhancements: Lazy-get for and/or, variadic args, kw args, etc.
 
     * Express arbitrary predicates as Python expressions (in string form)
 
@@ -30,9 +22,17 @@
 
     * Support before/after/around methods, and result combination ala CLOS
 
+    * Expression/test ordering constraints
+
+    * Support costs on expressions
+
+    * Misc. optimizations (sets of cases instead of lists, fewer tuples, etc.,
+      truth table by test)
+
+    * Add C speedups
+
     * Support DAG-walking for visualization, debugging, and ambiguity detection
 """
-
 
 
 
@@ -50,11 +50,11 @@ from sys import _getframe
 from weakref import WeakKeyDictionary
 
 __all__ = [
-    'IDispatchFunction', 'ITerm', 'ISignature', 'IDispatchPredicate',
-    'AmbiguousMethod', 'NoApplicableMethods', 'NullTerm', 'ProtocolTerm',
-    'GenericFunction', 'chained_methods', 'ClassTerm', 'Signature',
-    'PositionalSignature', 'most_specific_signatures', 'ordered_signatures',
-    'dispatch_by_mro', 'next_method', 'Argument', 'IDispatchableExpression',
+    'IDispatchFunction', 'ITest', 'ISignature', 'IDispatchPredicate',
+    'AmbiguousMethod', 'NoApplicableMethods', 'NullTest', 'ProtocolTest',
+    'GenericFunction', 'chained_methods', 'ClassTest',
+    'most_specific_signatures', 'ordered_signatures',
+    'dispatch_by_mro', 'next_method', 'IDispatchableExpression',
     'IGenericFunction', 'Min', 'Max', 'Inequality', 'IDispatchTable',
 ]
 
@@ -80,17 +80,17 @@ class NoApplicableMethods(Exception):
 
 
 
-class ITerm(Interface):
-    """A test+value combination to be applied to an expression
+class ITest(Interface):
+    """A test to be applied to an expression
 
-    A term comprises a "dispatch function" (the kind of test to be applied,
+    A test comprises a "dispatch function" (the kind of test to be applied,
     such as an 'isinstance()' test or range comparison) and a value or values
-    that the expression must match.  Note that a term describes only the
+    that the expression must match.  Note that a test describes only the
     test(s) to be performed, not the expression to be tested.
     """
 
     dispatch_function = Attribute(
-        """'IDispatchFunction' that should be used for testing this term"""
+        """'IDispatchFunction' that should be used for dispatching this test"""
     )
 
     def seeds(table):
@@ -101,22 +101,22 @@ class ITerm(Interface):
         'dispatch_function' for interpretation."""
 
     def __contains__(key):
-        """Return true if term applies to 'key'
+        """Return true if test is true for 'key'
 
         This method will be passed each seed provided by this or any other
-        terms with the same 'dispatch_function' that are being applied to the
+        tests with the same 'dispatch_function' that are being applied to the
         same expression."""
 
-    def implies(otherTerm):
-        """Return true if this term implies 'otherTerm'"""
+    def implies(otherTest):
+        """Return true if truth of this test implies truth of 'otherTest'"""
 
     def subscribe(listener):
-        """Call 'listener.termChanged()' if term's applicability changes
+        """Call 'listener.testChanged()' if test's applicability changes
 
         Multiple calls with the same listener should be treated as a no-op."""
 
     def unsubscribe(listener):
-        """Stop calling 'listener.termChanged()'
+        """Stop calling 'listener.testChanged()'
 
         Unsubscribing a listener that was not subscribed should be a no-op."""
 
@@ -128,7 +128,7 @@ class IDispatchFunction(Interface):
     def __call__(ob,table):
         """Return entry from 'table' that matches 'ob' ('None' if not found)
 
-        'table' is an 'IDispatchTable' mapping term seeds to dispatch nodes.
+        'table' is an 'IDispatchTable' mapping test seeds to dispatch nodes.
         The dispatch function should return the appropriate entry from the
         dictionary.
         """
@@ -170,10 +170,10 @@ class ISignature(Interface):
     """
 
     def items():
-        """Iterable of all '(id,term)' pairs for this signature"""
+        """Iterable of all '(id,test)' pairs for this signature"""
 
     def get(expr_id):
-        """Return this signature's 'ITerm' for 'expr_id'"""
+        """Return this signature's 'ITest' for 'expr_id'"""
 
     def implies(otherSig):
         """Return true if this signature implies 'otherSig'"""
@@ -223,11 +223,11 @@ class IGenericFunction(Interface):
     def getExpressionId(expr):
         """Return an expression ID for use in 'asFuncAndIds()' 'idtuple'"""
 
-    def termChanged():
-        """Notify that a term has changed meaning, invalidating any indexes"""
+    def testChanged():
+        """Notify that a test has changed meaning, invalidating any indexes"""
 
     def clear():
-        """Empty all signatures, methods, terms, expressions, etc."""
+        """Empty all signatures, methods, tests, expressions, etc."""
 
     # copy() ?
 
@@ -285,11 +285,11 @@ def dispatch_by_mro(ob,table):
 
 
 
-class ClassTerm(Adapter):
+class ClassTest(Adapter):
 
-    """Term that indicates expr is of a particular class"""
+    """Test that indicates expr is of a particular class"""
 
-    protocols.advise(instancesProvide=[ITerm], asAdapterForTypes=ClassTypes)
+    protocols.advise(instancesProvide=[ITest], asAdapterForTypes=ClassTypes)
 
     dispatch_function = staticmethod(dispatch_by_mro)
 
@@ -305,8 +305,8 @@ class ClassTerm(Adapter):
             )
         return False
 
-    def implies(self,otherTerm):
-        return self.subject in ITerm(otherTerm) or otherTerm is NullTerm
+    def implies(self,otherTest):
+        return self.subject in ITest(otherTest) or otherTest is NullTest
 
     def __repr__(self):
         return self.subject.__name__
@@ -369,15 +369,16 @@ def dispatch_by_inequalities(ob,table):
 
 class Inequality(object):
 
-    """Term that indicates target matches specified constant inequalities"""
+    """Test that indicates target matches specified constant inequalities"""
 
-    protocols.advise(instancesProvide=[ITerm])
+    protocols.advise(instancesProvide=[ITest])
 
     dispatch_function = staticmethod(dispatch_by_inequalities)
 
     def __init__(self,op,val):
         self.val = val
         self.ranges = ranges = []
+        self.op = op
         if '<' in op:  ranges.append((Min,val))
         if '=' in op:  ranges.append((val,val))
         if '>' in op:  ranges.append((val,Max))
@@ -407,15 +408,24 @@ class Inequality(object):
 
 
 
-
-    def implies(self,otherTerm):
+    def implies(self,otherTest):
         for r in self.ranges:
-            if not r in ITerm(otherTerm):
+            if not r in ITest(otherTest):
                 return False
         return True
 
     def subscribe(self,listener): pass
     def unsubscribe(self,listener): pass
+
+    def __repr__(self):
+        return 'Inequality(%s%r)' % (self.op, self.val)
+
+    def __eq__(self,other):
+        return self.__class__ is other.__class__ and self.op==other.op and \
+            self.val==other.val
+
+    def __ne__(self,other):
+        return not self.__eq__(other)
 
 
 def concatenate_ranges(range_map):
@@ -428,16 +438,6 @@ def concatenate_ranges(range_map):
         output.append((l,h))
         last = h
     return output
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -483,23 +483,23 @@ class _Notifier(Protocol):
         try:
             if self.__subscribers:
                 for subscriber in self.__subscribers.keys():
-                    subscriber.termChanged()
+                    subscriber.testChanged()
         finally:
             self._Protocol__lock.release()
 
         return result
 
 
-class ProtocolTerm(StickyAdapter):
+class ProtocolTest(StickyAdapter):
 
-    """Term that indicates instances of expr's class provide a protocol"""
+    """Test that indicates instances of expr's class provide a protocol"""
 
     protocols.advise(
-        instancesProvide=[ITerm],
+        instancesProvide=[ITest],
         asAdapterForTypes=[Protocol]
     )
 
-    attachForProtocols = (ITerm,)
+    attachForProtocols = (ITest,)
     dispatch_function  = staticmethod(dispatch_by_mro)
 
     def __init__(self,ob,proto=None):
@@ -531,15 +531,15 @@ class ProtocolTerm(StickyAdapter):
 
 
 
-    def implies(self,otherTerm):
+    def implies(self,otherTest):
 
-        otherTerm = ITerm(otherTerm)
+        otherTest = ITest(otherTest)
 
-        if otherTerm is NullTerm:
+        if otherTest is NullTest:
             return True
 
         for base in self.notifier._Protocol__adapters.keys():
-            if base not in otherTerm:
+            if base not in otherTest:
                 return False
 
         return True
@@ -572,70 +572,11 @@ class ProtocolTerm(StickyAdapter):
 
 
 
-class Signature(object):
+class NullTest:
 
-    """Simple 'ISignature' implementation"""
+    """Test that is always true"""
 
-    protocols.advise(instancesProvide=[ISignature])
-
-    __slots__ = 'data'
-
-    def __init__(self, __id_to_term=(), **kw):
-        self.data = dict(__id_to_term)
-        if kw:
-            for k,v in kw.items():
-                self.data[Argument(name=k)] = ITerm(v)
-
-    def implies(self,otherSig):
-        otherSig = ISignature(otherSig)
-        for expr_id,otherTerm in otherSig.items():
-            if not self.get(expr_id).implies(otherTerm):
-                return False
-        return True
-
-    def items(self):
-        return self.data.items()
-
-    def get(self,expr_id):
-        return self.data.get(expr_id,NullTerm)
-
-    def __repr__(self):
-        return 'Signature(%s)' % (','.join(
-            [('%r=%r' % (k,v)) for k,v in self.data.items()]
-        ),)
-
-
-
-
-
-
-
-
-
-
-class PositionalSignature(Signature):
-
-    protocols.advise(
-        instancesProvide=[ISignature],
-        asAdapterForProtocols=[protocols.sequenceOf(ITerm)]
-    )
-
-    __slots__ = ()
-
-    def __init__(self,terms,proto=None):
-        Signature.__init__(self, zip(map(Argument,range(len(terms))), terms))
-
-    def __repr__(self):
-        return 'PositionalSignature%r' % (tuple(
-            [`self.data[k]` for k in range(len(self.data))]
-        ),)
-
-
-class NullTerm:
-
-    """Test that applies to all cases"""
-
-    protocols.advise(instancesProvide=[ITerm])
+    protocols.advise(instancesProvide=[ITest])
 
     dispatch_function = staticmethod(lambda ob,table: None)
 
@@ -643,14 +584,32 @@ class NullTerm:
         return ()
 
     def __contains__(self,ob):   return True
-    def implies(self,otherTerm): return False
+    def implies(self,otherTest): return False
 
-    def __repr__(self): return "NullTerm"
+    def __repr__(self): return "NullTest"
 
     def subscribe(self,listener): pass
     def unsubscribe(self,listener): pass
 
-NullTerm = NullTerm()
+NullTest = NullTest()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -777,47 +736,6 @@ def chained_methods(cases):
             raise NoApplicableMethods
     return method
 
-class Argument(object):
-
-    """The most basic kind of dispatch expression: an argument specifier"""
-
-    protocols.advise(instancesProvide=[IDispatchableExpression])
-
-    def __init__(self,pos=None,name=None):
-        if pos is None and name is None:
-            raise ValueError("Argument name or position must be specified")
-
-        self.pos = pos
-        self.name = name
-        self.hash = hash((type(self),self.pos,self.name))
-
-
-    def __eq__(self,other):
-        return isinstance(other,Argument) and \
-            (other.pos==self.pos) and \
-            (other.name==self.name)
-
-    def __ne__(self,other):
-        return not self.__eq__(other)
-
-
-    def __hash__(self):
-        return self.hash
-
-    def asFuncAndIds(self,generic):
-        byName = byPos = None
-        if self.name:
-            byName = generic.argByName(self.name)
-            if self.pos:
-                byPos = generic.argByPos(self.pos)
-                # check name/pos equal
-            else:
-                return byName
-        else:
-            return generic.argByPos(self.pos)
-
-
-
 class DispatchNode(dict):
 
     """A mapping w/lazily population and supporting 'reseed()' operations"""
@@ -887,7 +805,7 @@ class GenericFunction:
             self[signature] = function
 
 
-    def termChanged(self):
+    def testChanged(self):
         self.dirty = True
         self._dispatcher = None
 
@@ -991,23 +909,23 @@ class GenericFunction:
 
     def __setitem__(self,signature,method):
         """Update indexes to include 'signature'->'method'"""
+        from predicates import Signature
         signature = Signature(
-            [(self._dispatch_id(expr,term),term)
-                for expr,term in ISignature(signature).items()
-                    if term is not NullTerm
+            [(self._dispatch_id(expr,test),test)
+                for expr,test in ISignature(signature).items()
+                    if test is not NullTest
             ]
         )
         self._addCase((signature, method))
-
 
     def _addCase(self,case):
         (signature,method) = case
 
         for disp_id, caselists in self.disp_indexes.items():
 
-            term = signature.get(disp_id)
+            test = signature.get(disp_id)
 
-            for key in term.seeds(caselists):
+            for key in test.seeds(caselists):
                 if key not in caselists:
                     # Add in cases that didn't test this key  :(
                     caselists[key] = [
@@ -1016,7 +934,7 @@ class GenericFunction:
                     ]
 
             for key,lst in caselists.items():
-                if key in term:
+                if key in test:
                     lst.append(case)
 
         self.cases.append(case)
@@ -1064,11 +982,11 @@ class GenericFunction:
         return best_id, best_map, tuple(remaining_ids)
 
 
-    def _dispatch_id(self,expr,term):
-        """Replace expr/term with a local key"""
+    def _dispatch_id(self,expr,test):
+        """Replace expr/test with a local key"""
 
-        term.subscribe(self)
-        dispid = self.getExpressionId(expr), term.dispatch_function
+        test.subscribe(self)
+        dispid = self.getExpressionId(expr), test.dispatch_function
         self.disp_indexes.setdefault(dispid,{})
         return dispid
 

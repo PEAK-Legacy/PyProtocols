@@ -6,6 +6,7 @@ import operator, string
 from types import ClassType, InstanceType
 
 from protocols.dispatch import *
+from protocols.predicates import *
 from protocols import Interface,advise,declareImplementation
 import protocols.dispatch
 
@@ -32,18 +33,17 @@ class Bicycle(HumanPowered,LandVehicle): advise(instancesProvide=[TwoWheeled])
 class Hummer(GasPowered,LandVehicle): advise(instancesProvide=[FourWheeled])
 class Speedboat(GasPowered,WaterVehicle): pass
 class PaddleBoat(HumanPowered,WaterVehicle): pass
+class RiverBoat(WaterVehicle):
+    advise(instancesProvide=[TwoWheeled])
 
 
 
 
+class TestTests(TestCase):
 
+    def testClassTestMembership(self):
 
-
-class TermTests(TestCase):
-
-    def testClassTermMembership(self):
-
-        hp = ITerm(HumanPowered)
+        hp = ITest(HumanPowered)
 
         self.failUnless(PaddleBoat in hp)
         self.failUnless(Bicycle in hp)
@@ -53,8 +53,8 @@ class TermTests(TestCase):
         self.failIf(Hummer in hp)
         self.failIf(object in hp)
 
-        it = ITerm(InstanceType)
-        ob = ITerm(object)
+        it = ITest(InstanceType)
+        ob = ITest(object)
 
         for klass in (GasPowered,HumanPowered):
             self.failUnless(klass in it)
@@ -67,66 +67,66 @@ class TermTests(TestCase):
             self.failUnless(klass in ob)
 
 
-    def testTermImplication(self):
-        self.failUnless(ITerm(Bicycle).implies(Wheeled))
-        self.failUnless(ITerm(PaddleBoat).implies(HumanPowered))
-        self.failUnless(ITerm(Hummer).implies(FourWheeled))
-        self.failUnless(ITerm(Hummer).implies(LandVehicle))
-        self.failUnless(ITerm(Speedboat).implies(Vehicle))
-        self.failUnless(ITerm(Wheeled).implies(object))
-        self.failUnless(ITerm(GasPowered).implies(InstanceType))
-        self.failUnless(ITerm(Wheeled).implies(Vehicle))
-        self.failIf(ITerm(object).implies(Speedboat))
+    def testTestImplication(self):
+        self.failUnless(ITest(Bicycle).implies(Wheeled))
+        self.failUnless(ITest(PaddleBoat).implies(HumanPowered))
+        self.failUnless(ITest(Hummer).implies(FourWheeled))
+        self.failUnless(ITest(Hummer).implies(LandVehicle))
+        self.failUnless(ITest(Speedboat).implies(Vehicle))
+        self.failUnless(ITest(Wheeled).implies(object))
+        self.failUnless(ITest(GasPowered).implies(InstanceType))
+        self.failUnless(ITest(Wheeled).implies(Vehicle))
+        self.failIf(ITest(object).implies(Speedboat))
 
 
 
-    def testNullTerm(self):
-        # Null term has no seeds
-        self.failIf(list(NullTerm.seeds({})))
+    def testNullTest(self):
+        # Null test has no seeds
+        self.failIf(list(NullTest.seeds({})))
 
         # and it matches anything
-        self.failUnless(object in NullTerm)
-        self.failUnless(Speedboat in NullTerm)
+        self.failUnless(object in NullTest)
+        self.failUnless(Speedboat in NullTest)
 
         # is implied by everything
-        self.failUnless(ITerm(Vehicle).implies(NullTerm))
+        self.failUnless(ITest(Vehicle).implies(NullTest))
 
         # and implies nothing
-        self.failIf(NullTerm.implies(object))
+        self.failIf(NullTest.implies(object))
 
 
-    def testClassTermSeedsAndDispatchFunctions(self):
+    def testClassTestSeedsAndDispatchFunctions(self):
         for klass in (Vehicle,LandVehicle,WaterVehicle,HumanPowered,GasPowered):
-            seeds = list(ITerm(klass).seeds({}))
+            seeds = list(ITest(klass).seeds({}))
             self.failUnless(klass in seeds)
             self.failUnless(object in seeds)
             self.failIf(len(seeds)<>2)
             self.failUnless(
-                ITerm(klass).dispatch_function is dispatch_by_mro
+                ITest(klass).dispatch_function is dispatch_by_mro
             )
 
-    def testTermAdaptation(self):
-        self.failUnless(Hummer in ITerm(Wheeled))
-        self.failIf(ITerm(Hummer).implies(Speedboat))
-        self.failUnless(ITerm(Speedboat).implies(WaterVehicle))
-        self.failUnless(object in list(ITerm(InstanceType).seeds({})))
+    def testTestAdaptation(self):
+        self.failUnless(Hummer in ITest(Wheeled))
+        self.failIf(ITest(Hummer).implies(Speedboat))
+        self.failUnless(ITest(Speedboat).implies(WaterVehicle))
+        self.failUnless(object in list(ITest(InstanceType).seeds({})))
 
-    def testProtocolTerm(self):
-        self.failUnless(Bicycle in ITerm(Wheeled))
-        seeds = list(ITerm(Wheeled).seeds({}))
+    def testProtocolTest(self):
+        self.failUnless(Bicycle in ITest(Wheeled))
+        seeds = list(ITest(Wheeled).seeds({}))
         self.failUnless(Hummer in seeds)
         self.failUnless(Bicycle in seeds)
         self.failUnless(object in seeds)
-        self.failUnless(len(seeds)==3)
+        self.failUnless(len(seeds)==4)
         class BrokenBike(Bicycle): advise(instancesDoNotProvide=[Wheeled])
-        self.failIf(BrokenBike in ITerm(Wheeled))
+        self.failIf(BrokenBike in ITest(Wheeled))
 
     def testSignatures(self):
         a0 = Argument(0); a1 = Argument(1)
-        d1 = {a0:ITerm(LandVehicle), a1:ITerm(WaterVehicle)}
-        d2 = {a0:ITerm(Hummer), a1:ITerm(Speedboat)}
-        d3 = {a0:ITerm(WaterVehicle), a1:ITerm(LandVehicle)}
-        d4 = {a0:ITerm(LandVehicle), a1:ITerm(LandVehicle)}
+        d1 = {a0:ITest(LandVehicle), a1:ITest(WaterVehicle)}
+        d2 = {a0:ITest(Hummer), a1:ITest(Speedboat)}
+        d3 = {a0:ITest(WaterVehicle), a1:ITest(LandVehicle)}
+        d4 = {a0:ITest(LandVehicle), a1:ITest(LandVehicle)}
 
         for d in d1,d2,d3,d4:
             self.assertEqual( dict(Signature(d.items()).items()), d )
@@ -136,7 +136,7 @@ class TermTests(TestCase):
         s3 = Signature(d3.items())
         s4 = Signature(d4.items())
         s5 = PositionalSignature(
-            (ITerm(LandVehicle),ITerm(WaterVehicle),ITerm(object))
+            (ITest(LandVehicle),ITest(WaterVehicle),ITest(object))
         )
 
         self.failUnless(s2.implies(s1)); self.failIf(s1.implies(s2))
@@ -245,9 +245,7 @@ class TermTests(TestCase):
 
 
     def testInequalityDispatch(self):
-
         classify = GenericFunction(args=['age'])
-
         classify[(Inequality('<',2),)]   = lambda age:"infant"
         classify[(Inequality('<',13),)]  = lambda age:"preteen"
         classify[(Inequality('<',5),)]   = lambda age:"preschooler"
@@ -272,7 +270,132 @@ class TermTests(TestCase):
         self.assertEqual(classify(Max),"senior")
 
 
+    def testTruth(self):
+        self.assertEqual(TruthTest(27), TruthTest("abc"))
+        self.assertNotEqual(TruthTest(1), TruthTest(False))
+        self.failUnless(True in TruthTest(1))
+        self.failUnless(False not in TruthTest(1))
+        self.failUnless(True not in TruthTest(0))
+        self.failUnless(False in TruthTest(0))
+        self.failIf(TruthTest(1).implies(TruthTest(0)))
+        self.failIf(TruthTest(0).implies(TruthTest(1)))
+        self.failUnless(TruthTest(0).implies(TruthTest(0)))
+        self.failUnless(TruthTest(1).implies(TruthTest(1)))
+        self.assertEqual(TruthTest(42).seeds({}), (True,False))
+        self.assertEqual(TruthTest(None).seeds({}), (True,False))
 
+
+    def testAndOr(self):
+        def is_in(items):
+            return OrTest(*[Inequality('==',x) for x in items])
+
+        equals_two = Inequality('==',2)
+        odd_primes = is_in([3,5,7,11,13,19])
+        lo_primes = OrTest(equals_two, odd_primes)
+        self.assertEqual(lo_primes.tests[1:], odd_primes.tests) # flattening
+        self.failIf((4,4) in lo_primes)
+        self.failUnless((11,11) in lo_primes)
+
+        # Rephrase as And(Not(), Or(...)), so we can confirm other implications
+        lo_primes = is_in([2,3,5,7,11,13,19])
+        odd_primes = AndTest(NotTest(equals_two), lo_primes)
+        self.failIf((4,4) in lo_primes)
+        self.failUnless((11,11) in lo_primes)
+
+        odd_nums  = is_in([1,3,5,7,9,11,13,15,19])
+        even_nums = is_in([2,4,6,8,10,12,14])
+        even_primes = AndTest(lo_primes,even_nums)
+
+        self.failIf((3,3) in even_nums)
+        self.failUnless((4,4) in even_nums)
+
+        self.failIf((3,3) in even_primes)
+        self.failUnless((2,2) in even_primes)
+
+        self.failUnless(odd_primes.implies(odd_nums))
+        self.failUnless(odd_primes.implies(lo_primes))
+        self.failUnless(even_primes.implies(even_nums))
+
+        self.failIf(lo_primes.implies(even_nums))
+        self.failIf(odd_primes.implies(even_nums))
+
+        self.failUnless(odd_primes.implies(NullTest))
+        self.failUnless(even_primes.implies(NullTest))
+        self.failUnless(lo_primes.implies(NullTest))
+        self.assertRaises(ValueError, AndTest, Inequality('==',1), TruthTest(1))
+        self.assertRaises(ValueError, OrTest, Inequality('==',1), HumanPowered)
+
+
+    def testRangeIntersection(self):
+        ten_to_twenty = AndTest(Inequality('>=',10), Inequality('<=',20))
+        fifteen_to_nineteen = AndTest(Inequality('>=',15), Inequality('<=',19))
+
+        self.failUnless( (5,5) not in ten_to_twenty )
+        self.failUnless( (5,5) not in fifteen_to_nineteen )
+        self.failUnless( (15,15) in ten_to_twenty )
+        self.failUnless( (15,15) in fifteen_to_nineteen )
+        self.failUnless( (10,10) in ten_to_twenty )
+        self.failUnless( (16,17) in fifteen_to_nineteen)
+
+        self.failUnless( fifteen_to_nineteen.implies(ten_to_twenty) )
+        self.failIf(ten_to_twenty.implies(fifteen_to_nineteen))
+
+        self.failUnless(
+            NotTest(ten_to_twenty).implies(NotTest(fifteen_to_nineteen))
+        )
+        self.failIf(
+            NotTest(fifteen_to_nineteen).implies(NotTest(ten_to_twenty))
+        )
+
+        either = OrTest(fifteen_to_nineteen,ten_to_twenty)
+        for item in fifteen_to_nineteen, ten_to_twenty:
+            self.failUnless( item.implies(either) )
+            self.failUnless( item.implies(NullTest) )
+            self.failUnless( NotTest(item).implies(NullTest) )
+
+
+    def testClassIntersections(self):
+        self.failUnless( Hummer in AndTest(LandVehicle,GasPowered) )
+        self.failUnless( Speedboat in NotTest(LandVehicle) )
+        self.failUnless( Bicycle in OrTest(NotTest(HumanPowered),LandVehicle) )
+        self.failUnless( AndTest(LandVehicle,GasPowered).implies(GasPowered) )
+
+        # This implication doesn't hold true because RiverBoat is a Wheeled
+        # non-LandVehicle; if Riverboat didn't exist the implication would hold
+        self.failIf( NotTest(LandVehicle).implies(NotTest(Wheeled)) )
+
+
+
+
+    def testSimplifications(self):
+
+        self.assertEqual(NotTest(TruthTest(1)), TruthTest(0))
+
+        self.assertEqual(NotTest(NotTest(TruthTest(1))), TruthTest(27))
+
+        self.assertEqual(
+            NotTest(AndTest(Inequality('>=',10),Inequality('<=',20))),
+            OrTest(NotTest(Inequality('>=',10)),NotTest(Inequality('<=',20)))
+        )
+
+        self.assertEqual(
+            NotTest(OrTest(Inequality('>=',10),Inequality('<=',20))),
+            AndTest(NotTest(Inequality('>=',10)),NotTest(Inequality('<=',20)))
+        )
+
+        self.assertEqual(
+            AndTest(AndTest(Inequality('>=',10),Inequality('<=',20)),
+                Inequality('==',15)
+            ),
+            AndTest(Inequality('>=',10),Inequality('<=',20),Inequality('==',15))
+        )
+
+        self.assertEqual(
+            OrTest(OrTest(Inequality('>=',10),Inequality('<=',20)),
+                Inequality('==',15)
+            ),
+            OrTest(Inequality('>=',10),Inequality('<=',20),Inequality('==',15))
+        )
 
 
 
@@ -367,6 +490,47 @@ class ExpressionTests(TestCase):
 
 
 
+    def testCalls(self):
+        self.assertEqual(Call(operator.add,1,2), Call(operator.add,1,2))
+        self.assertNotEqual(Call(operator.sub,1,2), Call(operator.add,1,2))
+        self.assertNotEqual(Call(operator.add,2,1), Call(operator.add,1,2))
+
+        c1 = Call(operator.add, Argument(name='x'), Argument(name='y'))
+        c2 = Call(operator.add, Argument(name='x'), Argument(name='y'))
+        self.assertEqual(hash(c1), hash(c2))
+
+        c3 = Call(operator.sub, Argument(name='x'), Argument(name='y'))
+        self.assertNotEqual(hash(c1), hash(c3))
+
+        f = GenericFunction(args=['x','y'])
+        self.assertEqual(f.getExpressionId(c1), f.getExpressionId(c2))
+        self.assertNotEqual(f.getExpressionId(c1), f.getExpressionId(c3))
+        self.assertEqual(
+            f.getExpressionId(c3),
+            f.getExpressionId(
+                Call(operator.sub, Argument(name='x'), Argument(name='y'))
+            )
+        )
+
+        # Make the function handle 'x+y > 100'
+        f[Signature([(c1,Inequality('>',100))])] = lambda x,y: "yes"
+        f[Signature([])] = lambda x,y: "no"
+
+        self.assertEqual(f(51,49), "no")
+        self.assertEqual(f(99,10), "yes")
+        self.assertEqual(f(27,89), "yes")
+
+
+
+
+
+
+
+
+
+
+
+
 class GenericTests(TestCase):
 
     def testBasicSingleDispatch(self):
@@ -406,8 +570,6 @@ class GenericTests(TestCase):
         t[Signature(vehicle=HumanPowered,num=Inequality('<',10))]=lambda v,n:False
         t[Signature(vehicle=WaterVehicle,num=Inequality('<',5))]=lambda v,n:True
         self.assertRaises(AmbiguousMethod, t, PaddleBoat(), 4)
-
-
 
 
     def testSimpleChaining(self):
@@ -472,9 +634,9 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
 
         # f1, f1.x, f2, f1.x@!B, f1.y=f2.y
 
-        g.addMethod([(A,A,NullTerm,T,T)], m1)
+        g.addMethod([(A,A,NullTest,T,T)], m1)
         g.addMethod([(B,B),(C,B,A)], m2)
-        g.addMethod([(C,NullTerm,C)], m3)
+        g.addMethod([(C,NullTest,C)], m3)
         g.addMethod([(C,)], m4)
         g.addMethod([(T,)], m5)
 
@@ -493,7 +655,7 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
 
 
 TestClasses = (
-    TermTests, ExpressionTests, GenericTests,
+    TestTests, ExpressionTests, GenericTests,
 )
 
 def test_suite():
