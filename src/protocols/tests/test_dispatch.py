@@ -757,24 +757,24 @@ class ExpressionTests(TestCase):
             self.assertNotEqual(xy, item)
             self.assertNotEqual(hash(xy), hash(item))
 
-    def testVar(self):
-        d1={}; d2={}
-        x = Var('x',d1,d2)
-        foo = GenericFunction(lambda:None)
-        foo[Signature([(x,Inequality('==',"foo"))])] = lambda: True
-        foo[Signature([])] = lambda: False
 
-        d2['x']="foo"; self.failUnless(foo())
-        d1['x']="bar"; self.failIf(foo())
-        del d2['x'];   self.failIf(foo())
-        del d1['x'];   self.assertRaises(NameError, foo)
 
-        x2 = Var('x',d1,d2)
-        self.assertEqual(x, x2)
-        self.assertEqual(hash(x), hash(x2))
-        for item in Var('y',d1,d2),Var('x',d1),Var('x',d1,{}),Var('x',d2,d1):
-            self.assertNotEqual(x, item)
-            self.assertNotEqual(hash(x), hash(item))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     def testOrExpr(self):

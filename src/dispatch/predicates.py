@@ -10,7 +10,7 @@ from types import NoneType
 __all__ = [
     'Call',
     'AndTest', 'OrTest', 'NotTest', 'TruthTest', 'ExprBuilder',
-    'Const', 'Getattr', 'Tuple', 'Var', 'dispatch_by_truth',
+    'Const', 'Getattr', 'Tuple', 'dispatch_by_truth',
     'OrExpr', 'AndExpr', 'TestBuilder', 'expressionSignature',
 ]
 
@@ -41,7 +41,6 @@ def add_dict(d1,d2):
 
 class ExprBuilder:
 
-    bind_globals = True
     simplify_comparisons = True
 
     def __init__(self,arguments,*namespaces):
@@ -52,12 +51,11 @@ class ExprBuilder:
         if name in self.arguments:
             return self.arguments[name]
 
-        if self.bind_globals:
-            for ns in self.namespaces[1:]:
-                if name in ns:
-                    return Const(ns[name])
+        for ns in self.namespaces:
+            if name in ns:
+                return Const(ns[name])
 
-        return Var(name,*self.namespaces)
+        raise NameError(name) #return Var(name,*self.namespaces)
 
     def Const(self,value):
         return Const(value)
@@ -74,6 +72,8 @@ class ExprBuilder:
         return Call(
             self._cmp_ops[op], build(self,initExpr), build(self,other)
         )
+
+
 
 
 
@@ -276,47 +276,6 @@ class AndExpr(LogicalExpr):
 
 
 
-
-
-
-
-
-
-
-
-
-class Var(ExprBase):
-
-    """Look up a variable in a sequence of namespaces"""
-
-    def __init__(self,var_name,*namespaces):
-        self.namespaces = namespaces
-        self.var_name = var_name
-        self.hash = hash((type(self),tuple(map(id,namespaces)),var_name))
-
-
-    def __eq__(self,other):
-
-        if (not isinstance(other,Var) or self.namespaces!=other.namespaces
-            or other.var_name!=self.var_name
-        ):
-            return False
-
-        for myns,otherns in zip(self.namespaces,other.namespaces):
-            if myns is not otherns:
-                return False
-
-        return True
-
-
-    def asFuncAndIds(self,generic):
-        namespaces, var_name = self.namespaces, self.var_name
-        def get_var():
-            for ns in namespaces:
-                if var_name in ns:
-                    return ns[var_name]
-            raise NameError, var_name
-        return get_var, ()
 
 
 
@@ -767,14 +726,14 @@ class TestBuilder:
         )
 
     def And(self,items):
-        sig = build(self,items[0])
-        for expr in items[1:]: sig &= build(self,expr)
-        return sig
+        return reduce(operator.and_,[build(self,expr) for expr in items])
 
     def Or(self,items):
-        sig = build(self,items[0])
-        for expr in items[1:]: sig |= build(self,expr)
-        return sig
+        return reduce(operator.or_,[build(self,expr) for expr in items])
+
+
+
+
 
 
 def compileIn(expr,test,truth):
@@ -790,7 +749,7 @@ def compileIn(expr,test,truth):
         test = AndTest(*[Inequality('<>',v) for v in test])
 
     return Signature([(expr,test)])
-        
+
 
 [dispatch.on('test')]
 def applyTest(expr,test,truth):

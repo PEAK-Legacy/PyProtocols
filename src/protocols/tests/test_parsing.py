@@ -348,14 +348,6 @@ class ExprBuilderTests(TestCase):
             # If bind_globals is true, return a constant for the current value
             self.assertEqual(self.builder.Name(name),Const(val),name)
 
-        self.builder.bind_globals = False
-        for name,val in items:
-            # If bind_globals is false, return a variable
-            self.assertEqual(
-                self.builder.Name(name),Var(name,*self.namespaces),name
-            )
-
-
     def testTokens(self):
         self.assertEqual(self.builder.Const(123), Const(123))
         for arg in self.arguments:
@@ -363,6 +355,14 @@ class ExprBuilderTests(TestCase):
         self.assertEqual(self.parse("123"), Const(123))
         self.assertEqual(self.parse("'xyz'"), Const('xyz'))
         self.assertEqual(self.parse("'abc' 'xyz'"), Const('abcxyz'))
+
+
+
+
+
+
+
+
 
 
 
@@ -493,8 +493,7 @@ class ExprBuilderTests(TestCase):
     def testCalls(self):
         pe = self.parse
 
-        a,b,c = Argument(name='a'), Argument(name='b'), Argument(name='c')
-        x,y = Var('x',*self.namespaces), Var('y',*self.namespaces)
+        a,b,c,d = map(self.arguments.__getitem__, "abcd")
 
         md = lambda k,v: Call(dict,Call(zip,Tuple(tuple,*k),Tuple(tuple,*v)))
 
@@ -512,36 +511,37 @@ class ExprBuilderTests(TestCase):
 
         self.assertEqual(pe("a(1,2,b=3)"), Call(apply,a,one_two,b_three))
 
-        self.assertEqual(pe("a(*x)"), Call(apply,a,x))
-        self.assertEqual(pe("a(1,2,*x)"),
-            Call(apply,a,Call(operator.add,one_two,Call(tuple,x))))
-        self.assertEqual(pe("a(b=3,*x)"), Call(apply,a,x,b_three))
+        self.assertEqual(pe("a(*b)"), Call(apply,a,b))
+        self.assertEqual(pe("a(1,2,*b)"),
+            Call(apply,a,Call(operator.add,one_two,Call(tuple,b))))
+        self.assertEqual(pe("a(b=3,*c)"), Call(apply,a,c,b_three))
 
-        self.assertEqual(pe("a(1,2,b=3,*x)"),
-            Call(apply,a,Call(operator.add,one_two,Call(tuple,x)),b_three))
+        self.assertEqual(pe("a(1,2,b=3,*c)"),
+            Call(apply,a,Call(operator.add,one_two,Call(tuple,c)),b_three))
 
-        self.assertEqual(pe("a(**y)"),  Call(apply,a,Const(()),y))
-        self.assertEqual(pe("a(1,2,**y)"), Call(apply,a,one_two,y))
+        self.assertEqual(pe("a(**c)"),  Call(apply,a,Const(()),c))
+        self.assertEqual(pe("a(1,2,**c)"), Call(apply,a,one_two,c))
 
-        self.assertEqual(pe("a(b=3,**y)"),
-            Call(apply,a,Const(()),Call(predicates.add_dict, b_three, y)))
+        self.assertEqual(pe("a(b=3,**c)"),
+            Call(apply,a,Const(()),Call(predicates.add_dict, b_three, c)))
 
-        self.assertEqual(pe("a(1,2,b=3,**y)"),
-            Call(apply,a,one_two,Call(predicates.add_dict, b_three, y)))
+        self.assertEqual(pe("a(1,2,b=3,**c)"),
+            Call(apply,a,one_two,Call(predicates.add_dict, b_three, c)))
 
 
 
-        self.assertEqual(pe("a(b=3,*x,**y)"),
-            Call(apply,a,x,Call(predicates.add_dict,b_three,y)))
 
-        self.assertEqual(pe("a(1,2,b=3,*x,**y)"),
-            Call(apply,a,Call(operator.add,one_two,Call(tuple,x)),
-                Call(predicates.add_dict, b_three, y)))
+        self.assertEqual(pe("a(b=3,*c,**d)"),
+            Call(apply,a,c,Call(predicates.add_dict,b_three,d)))
 
-        self.assertEqual(pe("a(*x,**y)"), Call(apply,a,x,y))
+        self.assertEqual(pe("a(1,2,b=3,*c,**d)"),
+            Call(apply,a,Call(operator.add,one_two,Call(tuple,c)),
+                Call(predicates.add_dict, b_three, d)))
 
-        self.assertEqual(pe("a(1,2,*x,**y)"),
-            Call(apply,a,Call(operator.add,one_two,Call(tuple,x)),y))
+        self.assertEqual(pe("a(*c,**d)"), Call(apply,a,c,d))
+
+        self.assertEqual(pe("a(1,2,*c,**d)"),
+            Call(apply,a,Call(operator.add,one_two,Call(tuple,c)),d))
 
 
     def testMultiOps(self):
@@ -661,11 +661,11 @@ class ExprBuilderTests(TestCase):
             self.assertEqual(self.builder.Name(arg), Argument(name=arg))
 
         # check locals
-        for name in self.namespaces[0]:
-            if name not in self.arguments:
-                self.assertEqual(
-                    self.builder.Name(name), Var(name,*self.namespaces), name
-                )
+        self.checkConstOrVar(
+            [(name,const) for name,const in self.namespaces[0].items()
+                if name not in self.arguments
+            ]
+        )
 
         # check globals
         self.checkConstOrVar(
@@ -686,7 +686,7 @@ class ExprBuilderTests(TestCase):
 
         # check non-existent
         name = 'no$such$thing'
-        self.assertEqual(self.builder.Name(name),Var(name,*self.namespaces))
+        self.assertRaises(NameError, self.builder.Name, name)
 
 
 
