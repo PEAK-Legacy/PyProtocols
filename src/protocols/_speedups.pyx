@@ -54,6 +54,8 @@ cdef extern from "Python.h":
     PyTypeObject PyInstance_Type
     PyTypeObject PyBaseObject_Type
 
+    void Py_DECREF(PyObject *p)
+
 
 cdef object _marker, __conform, __adapt, __mro
 from sys import exc_info
@@ -63,8 +65,6 @@ __conform  = PyString_InternFromString("__conform__")
 __adapt    = PyString_InternFromString("__adapt__")
 __class    = PyString_InternFromString("__class__")
 __mro      = PyString_InternFromString("__mro__")
-
-
 
 
 
@@ -145,8 +145,10 @@ def adapt(obj, protocol, default=_marker, factory=IMPLEMENTATION_ERROR):
 
     tmp = PyObject_GetAttr(obj, __conform)
     if tmp:
+        meth = <object> tmp
+        Py_DECREF(<PyObject *>tmp)
         try:
-            result = (<object> tmp)(protocol)
+            result = meth(protocol)
             if result is not None:
                 return result
         except TypeError:
@@ -160,12 +162,12 @@ def adapt(obj, protocol, default=_marker, factory=IMPLEMENTATION_ERROR):
 
 
 
-
-
     tmp = PyObject_GetAttr(protocol, __adapt)
     if tmp:
+        meth = <object> tmp
+        Py_DECREF(<PyObject *>tmp)
         try:
-            result = (<object> tmp)(obj)
+            result = meth(obj)
             if result is not None:
                 return result
         except TypeError:
@@ -180,8 +182,6 @@ def adapt(obj, protocol, default=_marker, factory=IMPLEMENTATION_ERROR):
         return factory(obj, protocol)
 
     return default
-
-
 
 
 
@@ -255,6 +255,7 @@ def Protocol__adapt__(self, obj):
         tmp = PyObject_GetAttr(obj, __class)
         if tmp:
             cls = <object> tmp
+            Py_DECREF(<PyObject *>tmp)
         elif PyErr_ExceptionMatches(PyExc_AttributeError):
             PyErr_Clear()
             cls = <object> (<PyObject *>obj).ob_type
@@ -277,12 +278,11 @@ def Protocol__adapt__(self, obj):
         tmp = PyObject_GetAttr(cls, __mro)
         if tmp:
             mro = <object> tmp
+            Py_DECREF(<PyObject *>tmp)
         else:
             raise
 
     get = self._Protocol__adapters.get
-
-
 
 
     if PyTuple_Check(mro):
