@@ -162,7 +162,6 @@ def dispatch_by_subclass(ob,table):
                 break
     return table[None]
 
-
 class ClassTest(Adapter):
     """Test that indicates expr is of a particular class"""
 
@@ -305,11 +304,11 @@ def dispatch_by_inequalities(ob,table):
             else:
                 return table[ranges[mid]]
 
-
-
-
-
-
+try:
+    from protocols._speedups import \
+        concatenate_ranges, dispatch_by_inequalities, Min, Max
+except ImportError:
+    pass
 
 
 

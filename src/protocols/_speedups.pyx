@@ -45,11 +45,14 @@ cdef extern from "Python.h":
     int PyList_GET_SIZE(PyListObject *p)
     int PyTuple_Check(object op)
     int PyList_Check(object op)
+    int len "PyObject_Length" (object o) except -1
+    object type "PyObject_Type" (object o)
 
     # These macros return borrowed references, so we make them void *
     # When Pyrex casts them to objects, it will incref them
     void * PyTuple_GET_ITEM(PyTupleObject *p, int pos)
     void * PyList_GET_ITEM(PyListObject *p, int pos)
+    void * PyDict_GetItem(object dict,object key)
 
     PyTypeObject PyInstance_Type
     PyTypeObject PyBaseObject_Type
@@ -65,16 +68,13 @@ try:
     from ExtensionClass import ExtensionClass
     __ECType = ExtensionClass
 except ImportError:
-    __ECType = type
+    __ECType = type(object)
 
 _marker    = object()
 __conform  = PyString_InternFromString("__conform__")
 __adapt    = PyString_InternFromString("__adapt__")
 __class    = PyString_InternFromString("__class__")
 __mro      = PyString_InternFromString("__mro__")
-
-
-
 
 
 
@@ -283,6 +283,88 @@ def getMRO(ob, extendedClassic=False):
 
 
 
+
+
+cdef class _ExtremeType:     # Courtesy of PEP 326
+
+    cdef int _cmpr
+    cdef object _rep
+
+    def __init__(self, cmpr, rep):
+        self._cmpr = cmpr
+        self._rep = rep
+
+    def __hash__(self):
+        return object.__hash__(self)
+
+    def __cmp__(self, other):
+        if type(other) is type(self) and (<_ExtremeType>other)._cmpr==self._cmpr:
+            return 0
+        return self._cmpr
+
+    def __repr__(self):
+        return self._rep
+
+    def __richcmp__(_ExtremeType self, other, int op):
+        if type(other) is type(self) and (<_ExtremeType>other)._cmpr==self._cmpr:
+            cmp = 0
+        else:
+            cmp = self._cmpr
+        if op==0:
+            return cmp<0
+        elif op==1:
+            return cmp<=0
+        elif op==2:
+            return cmp==0
+        elif op==3:
+            return cmp!=0
+        elif op==4:
+            return cmp>0
+        elif op==5:
+            return cmp>=0
+
+Max = _ExtremeType(1, "Max")
+Min = _ExtremeType(-1, "Min")
+
+def concatenate_ranges(range_map):
+    ranges = range_map.keys(); ranges.sort()
+    output = []
+    last = Min
+    for (l,h) in ranges:
+        if l<last or l==h:
+            continue
+        output.append((l,h))
+        last = h
+    return output
+
+
+def dispatch_by_inequalities(ob,table):
+
+    cdef int lo, hi, mid
+    cdef void *tmp
+    
+    key = ob,ob
+    tmp = PyDict_GetItem(table,key)
+    if tmp:
+        return <object>tmp
+    else:
+        tmp = PyDict_GetItem(table,None)
+        if tmp:
+            ranges = <object>tmp
+        else:
+            table[None] = ranges = concatenate_ranges(table)
+
+        lo = 0
+        hi = len(ranges)
+        while lo<hi:
+            mid = (lo+hi)/2
+            t = <object> PyList_GET_ITEM(<PyListObject *> ranges,mid)
+            if ob < <object> PyTuple_GET_ITEM(<PyTupleObject *> t,0):
+                hi = mid
+            elif ob > <object> PyTuple_GET_ITEM(<PyTupleObject *> t,1):
+                lo = mid+1
+            else:
+                return table[t]
 
 
 def Protocol__adapt__(self, obj):
