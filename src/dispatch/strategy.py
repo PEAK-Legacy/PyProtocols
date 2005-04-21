@@ -680,7 +680,7 @@ except ImportError:
     pass
 
 class InequalityIndex(SeededIndex):
-    dispatch_function = dispatch_by_inequalities
+    dispatch_function = staticmethod(dispatch_by_inequalities)
 
     def __init__(self):
         self.clear()
