@@ -41,7 +41,7 @@
 
 from __future__ import generators
 from protocols import Protocol, Adapter, StickyAdapter
-from protocols.advice import getMRO
+from protocols.advice import getMRO, metamethod
 import protocols, operator, inspect
 from types import ClassType, InstanceType
 ClassTypes = (ClassType, type)
@@ -80,8 +80,10 @@ rev_ops = {
 
 
 
-class SeededIndex:
+class SeededIndex(object):
     """Index connecting seeds and results"""
+
+    __slots__ = 'dispatch_function', 'allSeeds', 'matchingSeeds', 'criteria'
 
     def __init__(self,dispatch_function):
         self.dispatch_function = dispatch_function
@@ -90,23 +92,20 @@ class SeededIndex:
     def clear(self):
         """Reset index to empty"""
         self.allSeeds = {}          # set of all seeds
-        self.matchingSeeds = {}     # applicable seeds for each case
-        self.criteria = {}          # criterion each value was saved under
-
+        self.matchingSeeds = {}     # case -> applicable seeds
+        self.criteria = {}          # criterion -> applicable seeds
 
     def __setitem__(self,criterion,case):
         """Register 'value' under each of the criterion's seeds"""
 
-        seeds = self.allSeeds
-        caseItems = self.matchingSeeds.setdefault(case,[])
+        if criterion not in self.criteria:
+            seeds = self.allSeeds
+            for key in list(criterion.seeds(seeds)):    # avoid iter corruption
+                if key not in seeds:
+                    self.addSeed(key)
+            self.criteria[criterion] = list(criterion.matches(seeds))
 
-        for key in list(criterion.seeds(seeds)):    # avoid iter corruption
-            if key not in seeds:
-                self.addSeed(key)
-
-        caseItems.extend(criterion.matches(seeds))
-        self.criteria[case] = criterion
-
+        self.matchingSeeds[case] = self.criteria[criterion]
 
     def __iter__(self):
         return iter(self.allSeeds)
@@ -120,6 +119,7 @@ class SeededIndex:
         get = self.matchingSeeds.get
         dflt = self.allSeeds
         return sum([len(get(case,dflt)) for case in cases])
+
 
     def casemap_for(self,cases):
         """Return a mapping from seeds->caselists for the given cases"""
@@ -140,10 +140,8 @@ class SeededIndex:
         if seed in self.allSeeds:
             return  # avoid duping entries if this is a reseed via dispatcher
 
-        criteria = self.criteria
-
-        for case,itsSeeds in self.matchingSeeds.items():
-            if case in criteria and seed in criteria[case]:
+        for criterion,itsSeeds in self.criteria.items():
+            if seed in criterion:
                 itsSeeds.append(seed)
 
         self.allSeeds[seed] = None
@@ -152,6 +150,8 @@ class SeededIndex:
     def mkNode(self,*args):
         node = DispatchNode(*args)
         return instancemethod(self.dispatch_function,node,DispatchNode)
+
+
 
 
 
@@ -206,7 +206,7 @@ def make_node_type(dispatch_function):
 def validateCriterion(criterion, node_type, seeded=True):
     """Does 'criterion' have a sane implementation?"""
 
-    criterion = ICriterion(criterion)
+    criterion = ICriterion(criterion); hash(criterion)
     assert criterion.node_type is node_type
 
     assert criterion==criterion, (criterion, "should equal itself")
@@ -326,54 +326,27 @@ def dispatch_by_subclass(table,ob):
     return table[None]
 
 
-class CriterionClass(type):
-
-    def __init__(cls,name,bases,cdict):
-
-        if 'dispatch_function' in cdict:
-            cls.node_type = make_node_type(cls.dispatch_function)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 class AbstractCriterion(object):
     """Common behaviors for typical criteria"""
 
-    __metaclass__ = CriterionClass
-    __slots__ = ()
+    class __metaclass__(type):  
+        def __init__(cls,name,bases,cdict):
+            if 'dispatch_function' in cdict:
+                cls.node_type = make_node_type(cls.dispatch_function)
+
+    __slots__ = 'hash','subject'
 
     protocols.advise(instancesProvide=[ISeededCriterion])
+
+    def __init__(self,subject=None):
+        self.subject = subject
+        self.hash = hash(subject)
+
+    def __eq__(self,other):
+        return type(self) is type(other) and self.subject==other.subject
+
+    def __ne__(self,other):
+        return not self==other
 
     def matches(self,table):
         for key in table:
@@ -394,19 +367,9 @@ class AbstractCriterion(object):
         raise NotImplementedError
 
 
-    def __eq__(self,other):
-        other = ISeededCriterion(other,None)
-        return other is not None and \
-            self.node_type is other.node_type \
-            and _seedMap(self)==_seedMap(other)
-
-    def __ne__(self,other):
-        return not self.__eq__(other)
-
     def __and__(self,other):
         from predicates import AndCriterion
         return AndCriterion(self,other)
-
 
     def implies(self,other):
         other = ISeededCriterion(other)
@@ -419,15 +382,11 @@ class AbstractCriterion(object):
         return True
 
 
+# Hack to make hashing faster, by bypassing function call and attr lookup
 
-
-
-def _seedMap(ob):
-    return dict([(seed,seed in ob) for seed in ob.seeds({})])
-
-
-
-
+AbstractCriterion.__hash__ = instancemethod(
+    AbstractCriterion.hash.__get__, None, AbstractCriterion
+)
 
 
 
@@ -452,7 +411,7 @@ def _seedMap(ob):
 class ClassCriterion(AbstractCriterion):
     """Criterion that indicates expr is of a particular class"""
 
-    __slots__ = 'subject'
+    __slots__ = ()
 
     protocols.advise(
         instancesProvide=[ISeededCriterion], asAdapterForTypes=ClassTypes
@@ -461,7 +420,7 @@ class ClassCriterion(AbstractCriterion):
     dispatch_function = staticmethod(dispatch_by_mro)
 
     def __init__(self,cls):
-        self.subject = cls
+        AbstractCriterion.__init__(self,cls)
 
     def seeds(self,table):
         return [self.subject,object]
@@ -482,8 +441,8 @@ class ClassCriterion(AbstractCriterion):
     def __repr__(self):
         return self.subject.__name__
 
-    def __eq__(self,other):
-        return type(self) is type(other) and self.subject is other.subject
+
+
 
 
 
@@ -537,26 +496,26 @@ class IdentityCriterion(AbstractCriterion):
     protocols.advise(
         instancesProvide=[ISeededCriterion],asAdapterForTypes=[Pointer]
     )
-    __slots__ = 'ptr'
+    __slots__ = ()
     dispatch_function = staticmethod(dispatch_by_identity)
 
     def __init__(self,ptr):
-        self.ptr = ptr
+        AbstractCriterion.__init__(self,ptr)
 
     def seeds(self,table):
-        return None,self.ptr
+        return None,self.subject
 
     def matches(self,table):
-        return self.ptr,
+        return self.subject,
 
     def implies(self,other):
-        return self.ptr in ISeededCriterion(other)
+        return self.subject in ISeededCriterion(other)
 
     def __contains__(self,ob):
-        return ob==self.ptr
+        return ob==self.subject
 
     def __repr__(self):
-        return `self.ptr`
+        return `self.subject`
 
 
 class NullCriterion(AbstractCriterion):
@@ -575,28 +534,28 @@ NullCriterion = NullCriterion()
 class SubclassCriterion(AbstractCriterion):
     """Criterion that indicates expr is a subclass of a particular class"""
 
-    __slots__ = 'klass'
+    __slots__ = ()
 
     dispatch_function = staticmethod(dispatch_by_subclass)
 
     def __init__(self,klass):
-        self.klass = klass
+        AbstractCriterion.__init__(self,klass)
 
     def seeds(self,table):
-        return [self.klass,None]
+        return [self.subject,None]
 
     def __contains__(self,ob):
-        if isinstance(ob,ClassTypes) and issubclass(ob,self.klass):
+        if isinstance(ob,ClassTypes) and issubclass(ob,self.subject):
             return True
 
     def implies(self,other):
-        return self.klass in ISeededCriterion(other)
+        return self.subject in ISeededCriterion(other)
 
     def __repr__(self):
-        return "SubclassCriterion(%s)" % (self.klass.__name__,)
+        return "SubclassCriterion(%s)" % (self.subject.__name__,)
 
-    def __eq__(self,other):
-        return type(self) is type(other) and self.klass is other.klass
+
+
 
 
 
@@ -679,7 +638,9 @@ try:
 except ImportError:
     pass
 
+
 class InequalityIndex(SeededIndex):
+    __slots__ = ()   
     dispatch_function = staticmethod(dispatch_by_inequalities)
 
     def __init__(self):
@@ -693,20 +654,17 @@ class InequalityNode(DispatchNode):
 
 
 
-
-
 class Inequality(AbstractCriterion):
     """Criterion that indicates target matches specified const. inequalities"""
 
-    __slots__ = 'val','ranges','op'
-    node_type = InequalityNode #dispatch_function = staticmethod(dispatch_by_inequalities)
+    __slots__ = 'ranges'
+    node_type = InequalityNode
 
     def __init__(self,op,val):
-        self.val = val
         self.ranges = ranges = []
         if op=='!=':
             op = '<>'   # easier to process this way
-        self.op = op
+        AbstractCriterion.__init__(self,(op,val))
         if '<' in op:  ranges.append((Min,val))
         if '=' in op:  ranges.append((val,val))
         if '>' in op:  ranges.append((val,Max))
@@ -714,7 +672,7 @@ class Inequality(AbstractCriterion):
             raise ValueError("Invalid inequality operator", op)
 
     def seeds(self,table):
-        lo = Min; hi = Max; val = self.val
+        lo = Min; hi = Max; op,val = self.subject
         for l,h in table.keys():
             if l>lo and l<=val:
                 lo = l
@@ -734,7 +692,8 @@ class Inequality(AbstractCriterion):
         return False
 
     def __invert__(self):
-        return Inequality(rev_ops[self.op], self.val)
+        op,val = self.subject
+        return Inequality(rev_ops[op], val)
 
     def implies(self,other):
         for r in self.ranges:
@@ -743,16 +702,12 @@ class Inequality(AbstractCriterion):
         return True
 
     def __repr__(self):
-        return 'Inequality(%s%r)' % (self.op, self.val)
-
-    def __eq__(self,other):
-        return self.__class__ is other.__class__ and self.op==other.op and \
-            self.val==other.val
+        return 'Inequality(%s%r)' % self.subject
 
     def matches(self,table):
-        eq = (self.val,self.val)
-        if self.ranges == [eq]:
-            yield eq    # only one matching key possible
+        op,val = self.subject
+        if op == "==":
+            yield (val,val)    # only one matching key possible
         else:
             for key in table:
                 if key in self:
@@ -769,6 +724,10 @@ def concatenate_ranges(range_map):
         output.append((l,h))
         last = h
     return output
+
+
+
+
 
 
 
@@ -833,7 +792,8 @@ class ProtocolCriterion(StickyAdapter,AbstractCriterion):
     def __init__(self,ob):
         self.notifier = _Notifier(ob)
         StickyAdapter.__init__(self,ob)
-
+        AbstractCriterion.__init__(self,ob)
+        
     def subscribe(self,listener):
         self.notifier.subscribe(listener)
 
@@ -850,7 +810,6 @@ class ProtocolCriterion(StickyAdapter,AbstractCriterion):
                 if base in bases:
                     return bases[base][0] is not protocols.DOES_NOT_SUPPORT
         return False
-
 
 
 

@@ -13,7 +13,7 @@ class DispatchError(Exception):
 
     def __call__(self,*args,**kw):
         raise self.__class__(*self.args+(args,kw))
-    
+
 
 class AmbiguousMethod(DispatchError):
     """More than one choice of method is possible"""
@@ -46,8 +46,7 @@ class ICriterion(Interface):
     criterion will be checked, such as an 'isinstance()' check or range
     comparison) and a value or values that the expression must match.  Note
     that a criterion describes only the check(s) to be performed, not the
-    expression to be checked.
-    """
+    expression to be checked."""
 
     node_type = Attribute(
         """The type of object that will actually do the dispatching"""
@@ -55,6 +54,9 @@ class ICriterion(Interface):
 
     def __and__(other):
         """Apply multiple criteria of the same node type to the same expr"""
+
+    def __hash__():
+        """Equal criteria should have equal hashes"""
 
     def __eq__(other):
         """Return true if equal"""
@@ -77,8 +79,6 @@ class ICriterion(Interface):
         """Stop calling 'listener.criterionChanged()'
 
         Unsubscribing a listener that was not subscribed should be a no-op."""
-
-
 
 class ISeededCriterion(ICriterion):
     """A criterion that works with a SeededIndex"""

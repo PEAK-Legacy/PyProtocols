@@ -34,9 +34,9 @@ def add_dict(d1,d2):
     d1.update(d2)
     return d1
 
-
+try: frozenset
+except NameError: from sets import ImmutableSet as frozenset
 # XXX var, let, ???
-
 
 
 class ExprBuilder:
@@ -411,8 +411,8 @@ class Call(ExprBase):
 class MultiCriterion(AbstractCriterion):
     """Abstract base for boolean combinations of criteria"""
 
-    elim_single = True
-    __slots__ = 'node_type','criteria'
+    __slots__ = 'node_type'
+    criteria = AbstractCriterion.subject    # alias criteria <-> subject
 
     def __new__(klass,*criteria):
         criteria, all = map(ISeededCriterion,criteria), []
@@ -420,16 +420,16 @@ class MultiCriterion(AbstractCriterion):
         for c in criteria:
             if c.node_type is not nt:
                 raise ValueError("Mismatched dispatch types", criteria)
-            if c.__class__ is klass and klass.elim_single:
+            if c.__class__ is klass:
                 # flatten nested criteria
                 all.extend([c for c in c.criteria if c not in all])
             elif c not in all:
                 all.append(c)
-        if klass.elim_single and len(all)==1:
+        if len(all)==1:
             return all[0]
         self = object.__new__(klass)
         self.node_type = nt
-        self.criteria = tuple(all)
+        AbstractCriterion.__init__(self,frozenset(all))
         return self
 
     def seeds(self,table):
@@ -455,10 +455,11 @@ class MultiCriterion(AbstractCriterion):
     def __invert__(self):
         raise NotImplementedError
 
+    def __init__(self,*criteria):
+        pass
 
 class AndCriterion(MultiCriterion):
     """All criteria must return true for expression"""
-
     __slots__ = ()
 
     def __contains__(self,key):
@@ -470,13 +471,12 @@ class AndCriterion(MultiCriterion):
 
 class NotCriterion(MultiCriterion):
 
-    elim_single = False
-
     __slots__ = ()
+    __new__ = AbstractCriterion.__new__
 
     def __init__(self, criterion):
         criterion = ISeededCriterion(criterion)
-        self.criteria = criterion,
+        AbstractCriterion.__init__(self,(criterion,))
         self.node_type = criterion.node_type
 
     def __invert__(self):
@@ -493,12 +493,13 @@ def dispatch_by_truth(table,ob):
 class TruthCriterion(AbstractCriterion):
     """Criterion representing truth or falsity of an expression"""
 
-    __slots__ = 'truth'
+    __slots__ = ()
+    truth = AbstractCriterion.subject
 
     dispatch_function = staticmethod(dispatch_by_truth)
 
     def __init__(self,truth=True):
-        self.truth = bool(truth)
+        AbstractCriterion.__init__(self,bool(truth))
 
     def seeds(self,table):
         return True,False
@@ -508,9 +509,6 @@ class TruthCriterion(AbstractCriterion):
 
     def implies(self,other):
         return self.truth in ISeededCriterion(other)
-
-    def __eq__(self,other):
-        return isinstance(other,TruthCriterion) and self.truth==other.truth
 
     def __invert__(self):
         return TruthCriterion(not self.truth)
@@ -529,6 +527,8 @@ def expressionSignature(expr,criterion):
 [expressionSignature.when(default)]
 def expressionSignature(expr,criterion):
     return Signature([(expr,criterion)])
+
+
 
 
 class CriteriaBuilder:
