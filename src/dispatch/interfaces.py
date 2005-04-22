@@ -83,8 +83,12 @@ class ICriterion(Interface):
 class ISeededCriterion(ICriterion):
     """A criterion that works with a SeededIndex"""
 
-    dispatch_function = Attribute(
-        """'IDispatchFunction' that should be used for checking"""
+    enumerable = Attribute(
+        """Can criterion enumerate its implications via ``parent_seeds()``?"""
+    )
+
+    leaf_seed = Attribute(
+        """If ``enumerable``, this must be the most-specific parent seed"""
     )
 
     def seeds(table):
@@ -104,12 +108,8 @@ class ISeededCriterion(ICriterion):
     def matches(table):
         """Return iterable of keys from 'table' that this criterion matches"""
 
-
-
-
-
-
-
+    def parent_criteria():
+        """Iterable of all the criteria implied by this criterions"""
 
 
 

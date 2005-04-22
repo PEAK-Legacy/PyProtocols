@@ -41,7 +41,7 @@
 
 from __future__ import generators
 from protocols import Protocol, Adapter, StickyAdapter
-from protocols.advice import getMRO, metamethod
+from protocols.advice import getMRO
 import protocols, operator, inspect
 from types import ClassType, InstanceType
 ClassTypes = (ClassType, type)
@@ -66,10 +66,10 @@ rev_ops = {
     '<>': '==', '!=': '==', '==':'!='
 }
 
-
-
-
-
+try:
+    set
+except NameError:
+    from sets import Set as set
 
 
 
@@ -96,7 +96,7 @@ class SeededIndex(object):
         self.criteria = {}          # criterion -> applicable seeds
 
     def __setitem__(self,criterion,case):
-        """Register 'value' under each of the criterion's seeds"""
+        """Register 'case' under each of the criterion's seeds"""
 
         if criterion not in self.criteria:
             seeds = self.allSeeds
@@ -203,12 +203,13 @@ def make_node_type(dispatch_function):
         _memo[dispatch_function] = Node
     return _memo[dispatch_function]
 
-def validateCriterion(criterion, node_type, seeded=True):
+def validateCriterion(criterion, node_type, seeded=True, parents=None):
     """Does 'criterion' have a sane implementation?"""
 
-    criterion = ICriterion(criterion); hash(criterion)
-    assert criterion.node_type is node_type
+    criterion = ICriterion(criterion)
+    hash(criterion)
 
+    assert criterion.node_type is node_type
     assert criterion==criterion, (criterion, "should equal itself")
     assert criterion!=NullCriterion,(criterion,"shouldn't equal NullCriterion")
     assert criterion!=~criterion,(criterion,"shouldn't equal its inverse")
@@ -242,6 +243,46 @@ def validateCriterion(criterion, node_type, seeded=True):
 
         for value in d.values():
             assert not value,(criterion,"should've included",seed,"in matches")
+
+        _parents = set(criterion.parent_criteria())
+
+        if parents is not None:
+            # check specific parent assertion
+            assert _parents == set(parents), (_parents,set(parents))
+            
+        elif criterion.enumerable:
+            assert _parents, (
+                criterion,"is enumerable and so should have parents"
+            )
+            assert criterion in _parents, (
+                criterion,"does not include itself in its parent criteria"
+            )
+            assert _parents == set([criterion]), (
+                criterion,"has too many parents, or you should be specifying"
+                " the `parents` argument to ``validateCriterion()``", _parents
+            )
+
+        else:
+            assert not _parents, (
+                criterion, "is not enumerable and so should not have parents",
+                _parents
+            )
+
+        for parent in _parents:
+            assert criterion.leaf_seed in parent
+            assert criterion.implies(parent)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class TGraph:
@@ -329,13 +370,13 @@ def dispatch_by_subclass(table,ob):
 class AbstractCriterion(object):
     """Common behaviors for typical criteria"""
 
-    class __metaclass__(type):  
+    class __metaclass__(type):
         def __init__(cls,name,bases,cdict):
             if 'dispatch_function' in cdict:
                 cls.node_type = make_node_type(cls.dispatch_function)
 
     __slots__ = 'hash','subject'
-
+    enumerable = True
     protocols.advise(instancesProvide=[ISeededCriterion])
 
     def __init__(self,subject=None):
@@ -373,6 +414,9 @@ class AbstractCriterion(object):
 
     def implies(self,other):
         other = ISeededCriterion(other)
+        if self.enumerable:
+            return self.leaf_seed in other
+
         for seed in self.seeds({}):
             if seed in self and seed not in other:
                 return False
@@ -381,22 +425,19 @@ class AbstractCriterion(object):
                 return False
         return True
 
+    def parent_criteria(self):
+        if self.enumerable:
+            yield self
+
+
+# Alias subject -> leaf_seed by default
+AbstractCriterion.leaf_seed = AbstractCriterion.subject
+
 
 # Hack to make hashing faster, by bypassing function call and attr lookup
-
 AbstractCriterion.__hash__ = instancemethod(
     AbstractCriterion.hash.__get__, None, AbstractCriterion
 )
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -434,12 +475,12 @@ class ClassCriterion(AbstractCriterion):
             )
         return False
 
-    def implies(self,other):
-        return self.subject in ISeededCriterion(other) \
-            or other is NullCriterion
-
     def __repr__(self):
         return self.subject.__name__
+
+    def parent_criteria(self):
+        for cls in getMRO(self.subject,True):
+            yield self.__class__(cls)
 
 
 
@@ -508,9 +549,6 @@ class IdentityCriterion(AbstractCriterion):
     def matches(self,table):
         return self.subject,
 
-    def implies(self,other):
-        return self.subject in ISeededCriterion(other)
-
     def __contains__(self,ob):
         return ob==self.subject
 
@@ -531,28 +569,31 @@ class NullCriterion(AbstractCriterion):
 
 NullCriterion = NullCriterion()
 
-class SubclassCriterion(AbstractCriterion):
+
+
+
+class SubclassCriterion(ClassCriterion):
     """Criterion that indicates expr is a subclass of a particular class"""
 
     __slots__ = ()
 
     dispatch_function = staticmethod(dispatch_by_subclass)
 
-    def __init__(self,klass):
-        AbstractCriterion.__init__(self,klass)
-
     def seeds(self,table):
         return [self.subject,None]
 
-    def __contains__(self,ob):
-        if isinstance(ob,ClassTypes) and issubclass(ob,self.subject):
-            return True
-
-    def implies(self,other):
-        return self.subject in ISeededCriterion(other)
-
     def __repr__(self):
         return "SubclassCriterion(%s)" % (self.subject.__name__,)
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -640,7 +681,7 @@ except ImportError:
 
 
 class InequalityIndex(SeededIndex):
-    __slots__ = ()   
+    __slots__ = ()
     dispatch_function = staticmethod(dispatch_by_inequalities)
 
     def __init__(self):
@@ -657,10 +698,11 @@ class InequalityNode(DispatchNode):
 class Inequality(AbstractCriterion):
     """Criterion that indicates target matches specified const. inequalities"""
 
-    __slots__ = 'ranges'
+    __slots__ = 'ranges','enumerable','leaf_seed'
     node_type = InequalityNode
 
     def __init__(self,op,val):
+        self.enumerable = False
         self.ranges = ranges = []
         if op=='!=':
             op = '<>'   # easier to process this way
@@ -670,6 +712,9 @@ class Inequality(AbstractCriterion):
         if '>' in op:  ranges.append((val,Max))
         if not ranges or [c for c in op if c not in '<=>']:
             raise ValueError("Invalid inequality operator", op)
+        if ranges==[(val,val)]:
+            self.leaf_seed, = ranges
+            self.enumerable = True
 
     def seeds(self,table):
         lo = Min; hi = Max; op,val = self.subject
@@ -696,8 +741,9 @@ class Inequality(AbstractCriterion):
         return Inequality(rev_ops[op], val)
 
     def implies(self,other):
+        other = ISeededCriterion(other)
         for r in self.ranges:
-            if not r in ISeededCriterion(other):
+            if not r in other:
                 return False
         return True
 
@@ -724,11 +770,6 @@ def concatenate_ranges(range_map):
         output.append((l,h))
         last = h
     return output
-
-
-
-
-
 
 
 
@@ -789,11 +830,13 @@ class ProtocolCriterion(StickyAdapter,AbstractCriterion):
     attachForProtocols = (ICriterion,ISeededCriterion)
     dispatch_function  = staticmethod(dispatch_by_mro)
 
+    enumerable = False  # Just to be safe
+
     def __init__(self,ob):
         self.notifier = _Notifier(ob)
         StickyAdapter.__init__(self,ob)
         AbstractCriterion.__init__(self,ob)
-        
+
     def subscribe(self,listener):
         self.notifier.subscribe(listener)
 
@@ -810,8 +853,6 @@ class ProtocolCriterion(StickyAdapter,AbstractCriterion):
                 if base in bases:
                     return bases[base][0] is not protocols.DOES_NOT_SUPPORT
         return False
-
-
 
 
 

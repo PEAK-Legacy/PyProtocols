@@ -410,9 +410,9 @@ class Call(ExprBase):
 
 class MultiCriterion(AbstractCriterion):
     """Abstract base for boolean combinations of criteria"""
-
     __slots__ = 'node_type'
     criteria = AbstractCriterion.subject    # alias criteria <-> subject
+    enumerable = False
 
     def __new__(klass,*criteria):
         criteria, all = map(ISeededCriterion,criteria), []
@@ -507,9 +507,6 @@ class TruthCriterion(AbstractCriterion):
     def __contains__(self,key):
         return key==self.truth
 
-    def implies(self,other):
-        return self.truth in ISeededCriterion(other)
-
     def __invert__(self):
         return TruthCriterion(not self.truth)
 
@@ -527,6 +524,9 @@ def expressionSignature(expr,criterion):
 [expressionSignature.when(default)]
 def expressionSignature(expr,criterion):
     return Signature([(expr,criterion)])
+
+
+
 
 
 

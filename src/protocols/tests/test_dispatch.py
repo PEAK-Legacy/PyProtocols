@@ -9,6 +9,7 @@ import dispatch,protocols
 from dispatch import *
 from dispatch.predicates import *; from dispatch.functions import *
 from protocols import Interface,advise,declareImplementation
+from protocols.advice import getMRO
 from dispatch import strategy, functions
 from dispatch.strategy import *
 
@@ -37,7 +38,6 @@ class Speedboat(GasPowered,WaterVehicle): pass
 class PaddleBoat(HumanPowered,WaterVehicle): pass
 class RiverBoat(WaterVehicle):
     advise(instancesProvide=[TwoWheeled])
-
 
 class TestGraph(TestCase):
 
@@ -143,7 +143,8 @@ class CriteriaTests(TestCase):
             self.failUnless(object in seeds)
             self.failIf(len(seeds)<>2)
             validateCriterion(klass,
-                strategy.make_node_type(strategy.dispatch_by_mro))
+                strategy.make_node_type(strategy.dispatch_by_mro),
+                parents=[ICriterion(cls) for cls in getMRO(klass,True)])
 
     def testCriterionAdaptation(self):
         self.failUnless(Hummer in ISeededCriterion(Wheeled))
@@ -160,7 +161,6 @@ class CriteriaTests(TestCase):
         self.failUnless(len(seeds)==4)
         class BrokenBike(Bicycle): advise(instancesDoNotProvide=[Wheeled])
         self.failIf(BrokenBike in ISeededCriterion(Wheeled))
-
 
     def testSignatures(self):
         a0 = Argument(0); a1 = Argument(1)
@@ -288,7 +288,9 @@ class CriteriaTests(TestCase):
     def testSubclassCriterion(self):
         s = SubclassCriterion(Vehicle)
         validateCriterion(s,
-            strategy.make_node_type(strategy.dispatch_by_subclass))
+            strategy.make_node_type(strategy.dispatch_by_subclass),
+            parents=[SubclassCriterion(c) for c in getMRO(Vehicle,True)]
+        )
 
         # seeds()
         self.assertEqual( s.seeds({}), [Vehicle,None])
@@ -323,9 +325,7 @@ class CriteriaTests(TestCase):
         self.assertRaises(AttributeError,
             strategy.dispatch_by_subclass, table, Bicycle)
 
-
-
-
+        
     def testInequalities(self):
         self.assertRaises(ValueError, Inequality, '', 1)
         self.assertRaises(ValueError, Inequality, 'xyz', 2)
@@ -349,13 +349,13 @@ class CriteriaTests(TestCase):
         t4 = Inequality('<',"abc")
         self.failUnless(("a","a") in t4); self.failIf(("b","b") in t4)
 
+        t5 = Inequality('==',99)
+        self.failUnless(t5.enumerable)
         for t in t1,t2,t3,t4:
+            self.failIf(t.enumerable)
+
+        for t in t1,t2,t3,t4,t5:
             validateCriterion(t,strategy.InequalityNode)
-
-
-
-
-
 
 
 
