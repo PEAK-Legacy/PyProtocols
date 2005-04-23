@@ -604,14 +604,14 @@ class CriteriaTests(TestCase):
         )
         # sig & pred
         self.assertEqual((x_gt_10 & Predicate([y_in_LandVehicle])),
-            Predicate([x_gt_10 & y_in_LandVehicle])
-        )
-
+            Predicate([x_gt_10 & y_in_LandVehicle]))
+        # pred & sig
+        self.assertEqual((Predicate([y_in_LandVehicle]) & x_gt_10),
+            Predicate([x_gt_10 & y_in_LandVehicle]))
         # pred | pred
         self.assertEqual((Predicate([x_gt_10]) | Predicate([y_in_LandVehicle])),
             Predicate([x_gt_10, y_in_LandVehicle])
         )
-
 
         # pred & pred
         self.assertEqual((Predicate([x_gt_10]) & Predicate([y_in_LandVehicle])),

@@ -249,7 +249,7 @@ def validateCriterion(criterion, node_type, seeded=True, parents=None):
         if parents is not None:
             # check specific parent assertion
             assert _parents == set(parents), (_parents,set(parents))
-            
+
         elif criterion.enumerable:
             assert _parents, (
                 criterion,"is enumerable and so should have parents"
@@ -1164,7 +1164,8 @@ class Predicate(object):
         return iter(self.items)
 
     def __and__(self,other):
-        return Predicate([ (a & b) for a in self for b in other ])
+        return Predicate(
+            [(a & b) for a in self for b in IDispatchPredicate(other)])
 
     def __or__(self,other):
 
@@ -1185,7 +1186,6 @@ class Predicate(object):
 
     def __repr__(self):
         return `self.items`
-
 
 protocols.declareAdapter(
     lambda ob: Predicate([ob]), [IDispatchPredicate], forProtocols=[ISignature]
