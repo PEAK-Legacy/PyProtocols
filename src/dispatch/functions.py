@@ -17,10 +17,10 @@ __all__ = [
 _NF = (0,None, NoApplicableMethods, (None,None))
 
 
-
-
-
-
+try:
+    frozenset
+except NameError:
+    from sets import ImmutableSet as frozenset
 
 
 
@@ -327,19 +327,23 @@ class Dispatcher(BaseDispatcher):
 
 
     def _build_dispatcher(self, memo=None, disp_ids=None, cases=None):
-
         if memo is None:
             self._rebuild_indexes()
-            cases = tuple(range(len(self.cases)))
+            cases = frozenset(range(len(self.cases)))
             disp_ids = tuple(self.disp_indexes)
             memo = {}
 
-        key = (cases, disp_ids)
+        if not isinstance(cases,frozenset):
+            cases = frozenset(cases)
+        if not cases:
+            disp_ids = ()   # Skip further analysis, if it comes down to empty
 
+        key = (cases, disp_ids)
         if key in memo:
             return memo[key]
         elif not disp_ids:
             # No more criteria, so make a leaf node
+            cases = list(cases); cases.sort()   # restore original order
             node = [0, None, self.combine([self.cases[n] for n in cases]),None]
         else:
             best_id, remaining_ids = self._best_split(cases,disp_ids)
@@ -362,10 +366,6 @@ class Dispatcher(BaseDispatcher):
 
         memo[key] = node
         return node
-
-
-
-
 
     def _rebuild_indexes(self):
         if self.dirty:
