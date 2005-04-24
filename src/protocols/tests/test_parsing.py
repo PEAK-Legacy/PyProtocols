@@ -821,15 +821,42 @@ class PredicateTests(TestCase):
     def testCompileIn(self):
         x = Argument(name='x')
         in_expr = predicates.compileIn(x,[1,2,3],True)
-        not_in = predicates.compileIn(x,[1,2,3],False)           
+        not_in = predicates.compileIn(x,[1,2,3],False)
         self.failUnless(isinstance(not_in,Signature))
         self.failUnless(isinstance(in_expr,Predicate))
         self.assertEqual(in_expr,
             Predicate([Signature(x=Inequality('==',v)) for v in 1,2,3])
         )
         self.assertEqual(not_in,
-            Signature([(x,AndCriterion(*[Inequality('<>',v) for v in 1,2,3]))])
+            Signature([
+                (x,reduce(operator.and_,[Inequality('<>',v) for v in 1,2,3]))
+            ])
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     def testParseDNF(self):
@@ -889,7 +916,6 @@ class PredicateTests(TestCase):
         defmethod(classify,'not age<20',lambda age:"adult")
         defmethod(classify,'age>=55',lambda age:"senior")
         defmethod(classify,'age==16',lambda age:"sweet sixteen")
-
         self.assertEqual(classify(25),"adult")
         self.assertEqual(classify(17),"teenager")
         self.assertEqual(classify(13),"teenager")
@@ -904,6 +930,7 @@ class PredicateTests(TestCase):
         self.assertEqual(classify(99),"senior")
         self.assertEqual(classify(Min),"infant")
         self.assertEqual(classify(Max),"senior")
+
 
 
 
