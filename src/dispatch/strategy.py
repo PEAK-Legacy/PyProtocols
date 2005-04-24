@@ -70,7 +70,7 @@ try:
     set
 except NameError:
     from sets import Set as set
-
+    from sets import ImmutableSet as frozenset
 
 
 
@@ -83,7 +83,10 @@ except NameError:
 class SeededIndex(object):
     """Index connecting seeds and results"""
 
-    __slots__ = 'dispatch_function', 'allSeeds', 'matchingSeeds', 'criteria'
+    __slots__ = (
+        'dispatch_function', 'allSeeds', 'matchingSeeds', 'criteria',
+        'enumerables'
+    )
 
     def __init__(self,dispatch_function):
         self.dispatch_function = dispatch_function
@@ -94,18 +97,29 @@ class SeededIndex(object):
         self.allSeeds = {}          # set of all seeds
         self.matchingSeeds = {}     # case -> applicable seeds
         self.criteria = {}          # criterion -> applicable seeds
+        self.enumerables = {}       # enumerable -> applicable seeds
 
     def __setitem__(self,criterion,case):
         """Register 'case' under each of the criterion's seeds"""
 
-        if criterion not in self.criteria:
+        if criterion.enumerable:
+            maps = self.enumerables
+        else:
+            maps = self.criteria
+
+        if criterion not in maps:
             seeds = self.allSeeds
             for key in list(criterion.seeds(seeds)):    # avoid iter corruption
                 if key not in seeds:
-                    self.addSeed(key)
-            self.criteria[criterion] = list(criterion.matches(seeds))
+                    self.addSeed(key,False)
+            if criterion.enumerable:
+                seed = criterion.leaf_seed
+                for cri in criterion.parent_criteria():
+                    maps.setdefault(cri,[]).append(seed)
+            else:
+                maps[criterion] = list(criterion.matches(seeds))
 
-        self.matchingSeeds[case] = self.criteria[criterion]
+        self.matchingSeeds[case] = maps[criterion]
 
     def __iter__(self):
         return iter(self.allSeeds)
@@ -113,28 +127,23 @@ class SeededIndex(object):
     def __len__(self):
         return len(self.allSeeds)
 
-
     def count_for(self,cases):
         """Get the total count of outgoing branches, given incoming cases"""
         get = self.matchingSeeds.get
         dflt = self.allSeeds
         return sum([len(get(case,dflt)) for case in cases])
 
-
     def casemap_for(self,cases):
         """Return a mapping from seeds->caselists for the given cases"""
         get = self.matchingSeeds.get
         dflt = self.allSeeds
         casemap = dict([(key,[]) for key in dflt])
-
         for case in cases:
             for key in get(case,dflt):
                 casemap[key].append(case)
-
         return casemap
 
-
-    def addSeed(self,seed):
+    def addSeed(self,seed, reseed=True):
         """Add a previously-missing seed"""
 
         if seed in self.allSeeds:
@@ -143,28 +152,19 @@ class SeededIndex(object):
         for criterion,itsSeeds in self.criteria.items():
             if seed in criterion:
                 itsSeeds.append(seed)
-
+        if reseed:
+            for criterion,itsSeeds in self.enumerables.items():
+                if seed in criterion:
+                    itsSeeds.append(seed)
         self.allSeeds[seed] = None
-
 
     def mkNode(self,*args):
         node = DispatchNode(*args)
         return instancemethod(self.dispatch_function,node,DispatchNode)
 
-
-
-
-
-
-
-
-
-
-
-
 class DispatchNode(dict):
 
-    """A mapping w/lazily population and supporting 'reseed()' operations"""
+    """A mapping w/lazy population and supporting 'reseed()' operations"""
 
     protocols.advise(instancesProvide=[IDispatchTable])
 
@@ -177,7 +177,7 @@ class DispatchNode(dict):
         self.lock = lock
         dict.__init__(
             self,
-            [(key,build(tuple(subcases)))   # XXX use a set?
+            [(key,build(subcases))
                 for key,subcases in index.casemap_for(cases).items()]
         )
 
@@ -186,7 +186,7 @@ class DispatchNode(dict):
         try:
             self.index.addSeed(key)
             self[key] = retval = self.build(
-                tuple(self.index.casemap_for(self.cases)[key])  # XXX set?
+                self.index.casemap_for(self.cases)[key]
             )
             return retval
         finally:
@@ -197,9 +197,9 @@ _memo = {}
 def make_node_type(dispatch_function):
     if dispatch_function not in _memo:
         class Node(DispatchNode):
-            [dispatch.as(classmethod)]
             def make_index(cls):
                 return SeededIndex(dispatch_function)
+            make_index = classmethod(make_index)    # XXX can't use disp.as!
         _memo[dispatch_function] = Node
     return _memo[dispatch_function]
 
@@ -673,6 +673,17 @@ def dispatch_by_inequalities(table,ob):
             else:
                 return table[ranges[mid]]
 
+def concatenate_ranges(range_map):
+    ranges = range_map.keys(); ranges.sort()
+    output = []
+    last = Min
+    for (l,h) in ranges:
+        if l<last or l==h:
+            continue
+        output.append((l,h))
+        last = h
+    return output
+
 try:
     from _speedups import \
         concatenate_ranges, dispatch_by_inequalities, Min, Max
@@ -680,50 +691,132 @@ except ImportError:
     pass
 
 
+
+
+
+
 class InequalityIndex(SeededIndex):
-    __slots__ = ()
+
+    __slots__ = ('last_cases','last_out')
+
     dispatch_function = staticmethod(dispatch_by_inequalities)
 
     def __init__(self):
         self.clear()
 
-class InequalityNode(DispatchNode):
-    make_index = InequalityIndex
+
+    def count_for(self,cases):
+        """Get the total count of outgoing branches, given incoming cases"""
+        return sum([len(x) for x in self.casemap_for(cases).itervalues()])
+
+    def clear(self):
+        """Reset index to empty"""
+        self.allSeeds = {}            # set of all seeds
+        self.criteria = {}            # criterion -> applicable seeds
+        self.last_cases = None
+        self.last_out = None
+
+    def __setitem__(self,criterion,case):
+        """Register 'case' under each of the criterion's seeds"""
+        self.criteria[case] = criterion
+        for (lo,hi) in criterion.ranges:
+            self.allSeeds[lo] = self.allSeeds[hi] = None
+
+    def addSeed(self,seed):
+        raise NotImplementedError
 
 
 
 
 
 
-class Inequality(AbstractCriterion):
+
+
+
+
+
+
+    def casemap_for(self,cases):
+        """Return a mapping from seeds->caselists for the given cases"""
+        if cases is self.last_cases or cases==self.last_cases:
+            return self.last_out
+        tmp = {}
+        out = {}
+        get = self.criteria.get
+        all = Inequality('..',[(Min,Max)])
+        have_ineq = False
+        for case in cases:
+            for (lo,hi) in get(case,all).ranges:
+                if lo not in tmp:
+                    tmp[lo] = [],[],[]
+                if lo==hi:
+                    tmp[lo][2].append(case)
+                else:
+                    have_ineq = True
+                    if hi not in tmp:
+                        tmp[hi] = [],[],[]
+                    tmp[lo][0].append(case)
+                    if hi is not Max: tmp[hi][1].append(case)
+        if have_ineq:
+            keys = tmp.keys()
+            keys.sort()
+            current = frozenset(tmp.get(Min,[[]])[0])
+            hi = Min
+            for val in keys:
+                add,remove,eq = tmp[val]
+                lo,hi = hi,val
+                out[lo,hi] = current
+                current = current.difference(remove)
+                out[val,val] = current.union(eq)
+                current = current.union(add)
+        else:
+            out[Min,Max] = []   # default
+            for val,(add,remove,eq) in tmp.items():
+                out[val,val] = eq
+        self.last_out = out
+        self.last_cases = cases
+        return out
+
+class Inequality(object):
     """Criterion that indicates target matches specified const. inequalities"""
 
-    __slots__ = 'ranges','enumerable','leaf_seed'
-    node_type = InequalityNode
+    __slots__ = 'hash','ranges'
+    protocols.advise(instancesProvide=[ICriterion])
+
+    class node_type(DispatchNode):
+        make_index = InequalityIndex
 
     def __init__(self,op,val):
-        self.enumerable = False
-        self.ranges = ranges = []
-        if op=='!=':
-            op = '<>'   # easier to process this way
-        AbstractCriterion.__init__(self,(op,val))
-        if '<' in op:  ranges.append((Min,val))
-        if '=' in op:  ranges.append((val,val))
-        if '>' in op:  ranges.append((val,Max))
-        if not ranges or [c for c in op if c not in '<=>']:
-            raise ValueError("Invalid inequality operator", op)
-        if ranges==[(val,val)]:
-            self.leaf_seed, = ranges
-            self.enumerable = True
+        ranges = []
+        if op=='..':
+            ranges.extend(val)
+        else:
+            if op=='!=':
+                op = '<>'   # easier to process this way
+            if '<' in op:  ranges.append((Min,val))
+            if '=' in op:  ranges.append((val,val))
+            if '>' in op:  ranges.append((val,Max))
+            if not ranges or [c for c in op if c not in '<=>']:
+                raise ValueError("Invalid inequality operator", op)
 
-    def seeds(self,table):
-        lo = Min; hi = Max; op,val = self.subject
-        for l,h in table.keys():
-            if l>lo and l<=val:
-                lo = l
-            if h<hi and h>=val:
-                hi = h
-        return [(lo,val),(val,val),(val,hi)]
+        self.ranges = ranges = tuple(ranges)
+        self.hash = hash(ranges)
+
+
+    def implies(self,other):
+        for r in self.ranges:
+            if not r in other:
+                return False
+        return True
+
+
+    def __repr__(self):
+        return 'Inequality("..",%r)' % (self.subject,)
+
+
+
+
+
 
     def __contains__(self,ob):
         for r in self.ranges:
@@ -736,40 +829,70 @@ class Inequality(AbstractCriterion):
                 return True
         return False
 
-    def __invert__(self):
-        op,val = self.subject
-        return Inequality(rev_ops[op], val)
-
-    def implies(self,other):
-        other = ISeededCriterion(other)
+    def __and__(self, other):
+        ranges = []
         for r in self.ranges:
-            if not r in other:
-                return False
-        return True
+            if r in other:
+                ranges.append(r)
+            else:
+                l1, h1 = r
+                for l2,h2 in other.ranges:
+                    if l2>h1 or h2<l1:
+                        break
+                    l = max(l1,l2)
+                    h = min(h1,h2)
+                    if l<=h:
+                        ranges.append((l,h))
+                        break
+        return self.__class__('..',ranges)
 
-    def __repr__(self):
-        return 'Inequality(%s%r)' % self.subject
+    def __eq__(self,other):
+        return type(self) is type(other) and self.ranges==other.ranges
 
-    def matches(self,table):
-        op,val = self.subject
-        if op == "==":
-            yield (val,val)    # only one matching key possible
-        else:
-            for key in table:
-                if key in self:
-                    yield key
+    def __ne__(self,other):
+        return not self==other
+
+    def subscribe(self,listener):
+        pass
+
+    def unsubscribe(self,listener):
+        pass
 
 
-def concatenate_ranges(range_map):
-    ranges = range_map.keys(); ranges.sort()
-    output = []
-    last = Min
-    for (l,h) in ranges:
-        if l<last or l==h:
-            continue
-        output.append((l,h))
-        last = h
-    return output
+    def __invert__(self):
+        ranges = {}
+        last = Min
+        for lo,hi in self.ranges:
+            if lo<>Min and (last,lo) not in self:
+                ranges[last,lo] = 1
+            last = hi
+            if lo<>hi and lo<>Min and (lo,lo) not in self:
+                ranges[lo,lo] = 1
+        if last is not Max:
+            if (last,last) not in self:
+                ranges[last,last]=1
+            ranges[last,Max]=1
+        ranges = list(ranges); ranges.sort()
+        return self.__class__('..',ranges)
+
+
+
+# Hack to make hashing faster, by bypassing function call and attr lookup
+Inequality.__hash__ = instancemethod(
+    Inequality.hash.__get__, None, Inequality
+)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

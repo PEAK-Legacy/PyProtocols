@@ -280,6 +280,7 @@ class CriteriaTests(TestCase):
         self.assertEqual(i.casemap_for([42]), {int:[42],None:[]})
         i.addSeed(int)  # make sure seed isn't duplicated
         self.assertEqual(i.casemap_for([42]), {int:[42],None:[]})
+        i = SeededIndex(None)  # XXX
 
 
 
@@ -350,12 +351,12 @@ class CriteriaTests(TestCase):
         self.failUnless(("a","a") in t4); self.failIf(("b","b") in t4)
 
         t5 = Inequality('==',99)
-        self.failUnless(t5.enumerable)
-        for t in t1,t2,t3,t4:
-            self.failIf(t.enumerable)
 
         for t in t1,t2,t3,t4,t5:
-            validateCriterion(t,strategy.InequalityNode)
+            validateCriterion(t,Inequality.node_type,seeded=False)
+
+
+
 
 
 
@@ -368,18 +369,6 @@ class CriteriaTests(TestCase):
 
 
     def testInequalitySeeds(self):
-        t1 = Inequality('>',27); t2 = Inequality('<=',19)
-        self.assertEqual(t1.seeds({}), [(Min,27),(27,27),(27,Max)])
-        self.assertEqual(t2.seeds({}), [(Min,19),(19,19),(19,Max)])
-        self.assertEqual(
-            t1.seeds({(Min,19):[], (19,19):[], (19,Max):[]}),
-            [(19,27),(27,27),(27,Max)]
-        )
-        self.assertEqual(
-            t2.seeds({(Min,27):[], (27,27):[], (27,Max):[]}),
-            [(Min,19),(19,19),(19,27)]
-        )
-
         self.assertEqual(
             strategy.concatenate_ranges(
                 {(Min,27):[], (27,27):[], (27,Max):[],
@@ -400,6 +389,18 @@ class CriteriaTests(TestCase):
     def testClasslessDispatch(self):
         class Classic: pass # Classic classes have no __class_ attribute
         strategy.dispatch_by_mro({},Classic)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -470,8 +471,8 @@ class CriteriaTests(TestCase):
 
         self.failUnless(even_primes.implies(NullCriterion))
 
-        self.assertRaises(ValueError,
-            lambda: Inequality('==',1) & TruthCriterion(1))
+        self.assertRaises(protocols.AdaptationFailure,
+            lambda: TruthCriterion(1) & Inequality('==',1) )
 
 
 
@@ -505,18 +506,12 @@ class CriteriaTests(TestCase):
         self.failUnless( fifteen_to_nineteen.implies(ten_to_twenty) )
         self.failIf(ten_to_twenty.implies(fifteen_to_nineteen))
 
-        self.failUnless(
-            NotCriterion(ten_to_twenty).implies(
-                NotCriterion(fifteen_to_nineteen))
-        )
-        self.failIf(
-            NotCriterion(fifteen_to_nineteen).implies(
-                NotCriterion(ten_to_twenty))
-        )
+        self.failUnless( (~ten_to_twenty).implies(~fifteen_to_nineteen) )
+        self.failIf( (~fifteen_to_nineteen).implies(~ten_to_twenty) )
 
         for item in fifteen_to_nineteen, ten_to_twenty:
             self.failUnless( item.implies(NullCriterion) )
-            self.failUnless( NotCriterion(item).implies(NullCriterion) )
+            self.failUnless( (~item).implies(NullCriterion) )
 
 
     def testClassIntersections(self):
@@ -531,15 +526,26 @@ class CriteriaTests(TestCase):
 
 
 
+
+
+
+
+
+
     def testSimplifications(self):
         self.assertEqual((~TruthCriterion(1)), TruthCriterion(0))
         self.assertEqual((~(~TruthCriterion(1))), TruthCriterion(27))
 
         self.assertEqual(
             Inequality('>=',10) & Inequality('<=',20) & Inequality('==',15),
-            AndCriterion(
-                Inequality('>=',10),Inequality('<=',20),Inequality('==',15))
+            Inequality('..', [(15,15)])
         )
+
+    def testInequalityInverses(self):
+        self.assertEqual(~Inequality(">=",27), Inequality("<",27))
+        for op,rev in strategy.rev_ops.items():
+            self.assertEqual(Inequality(op,27), ~Inequality(rev,27))
+            
 
 
     def testTruthDispatch(self):
@@ -551,11 +557,6 @@ class CriteriaTests(TestCase):
         self.failIf(greater(1,10))
         self.failIf(greater(1,1))
         self.failUnless(greater(2,1))
-
-
-
-
-
 
 
 
@@ -1151,13 +1152,13 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
         g = GenericFunction(lambda x,y:None)
         self.assertEqual(g.constraints.items(),[])
 
-        df = strategy.InequalityNode
+        df = Inequality.node_type
         yx = Call(operator.div, Argument(name='y'), Argument(name='x'))
         yxid = g.getExpressionId(yx), df
         xid = g.getExpressionId(Argument(name='x')), df
         yid = g.getExpressionId(Argument(name='y')), df
 
-        [g.when('x>0 and y>10')]
+        [g.when('x==2 and y>10 and x<27')]
         def x(x,y):
             return "foo"
 
@@ -1169,7 +1170,7 @@ One vehicle is a land vehicle, the other is a sea vehicle.")
 
         self.assertEqual(g.constraints.items(),[(xid,yxid)])
 
-        [g.when('x>0 and y>0 and y/x>10')]
+        [g.when('x==1 and y>0 and y/x>10')]
         def x(x,y):
             return "bar"
 
