@@ -124,14 +124,11 @@ class SeededIndex(object):
     def __iter__(self):
         return iter(self.allSeeds)
 
-    def __len__(self):
-        return len(self.allSeeds)
-
     def count_for(self,cases):
         """Get the total count of outgoing branches, given incoming cases"""
         get = self.matchingSeeds.get
         dflt = self.allSeeds
-        return sum([len(get(case,dflt)) for case in cases])
+        return len(self.allSeeds), sum([len(get(case,dflt)) for case in cases])
 
     def casemap_for(self,cases):
         """Return a mapping from seeds->caselists for the given cases"""
@@ -161,6 +158,9 @@ class SeededIndex(object):
     def mkNode(self,*args):
         node = DispatchNode(*args)
         return instancemethod(self.dispatch_function,node,DispatchNode)
+
+
+
 
 class DispatchNode(dict):
 
@@ -707,7 +707,8 @@ class InequalityIndex(SeededIndex):
 
     def count_for(self,cases):
         """Get the total count of outgoing branches, given incoming cases"""
-        return sum([len(x) for x in self.casemap_for(cases).itervalues()])
+        casemap = self.casemap_for(cases)
+        return len(casemap), sum([len(x) for x in casemap.itervalues()])
 
     def clear(self):
         """Reset index to empty"""
@@ -724,7 +725,6 @@ class InequalityIndex(SeededIndex):
 
     def addSeed(self,seed):
         raise NotImplementedError
-
 
 
 
@@ -811,7 +811,7 @@ class Inequality(object):
 
 
     def __repr__(self):
-        return 'Inequality("..",%r)' % (self.subject,)
+        return 'Inequality("..",%r)' % (self.ranges,)
 
 
 

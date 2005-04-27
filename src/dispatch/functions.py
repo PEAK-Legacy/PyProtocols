@@ -468,8 +468,7 @@ class Dispatcher(BaseDispatcher):
                 continue
 
             index = self.disp_indexes[disp_id]
-            total_cases = index.count_for(cases)
-            lindex = len(index)
+            lindex, total_cases = index.count_for(cases)
 
             if total_cases == active_cases * lindex:
                 # None of the index keys for this expression eliminate any
@@ -488,6 +487,7 @@ class Dispatcher(BaseDispatcher):
             remaining_ids.remove(best_id)
 
         return best_id, tuple(remaining_ids)
+
 
 
     def _dispatch_id(self,(expr,disp_func),criterion):

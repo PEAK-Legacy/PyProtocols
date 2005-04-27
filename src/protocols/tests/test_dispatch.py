@@ -285,7 +285,6 @@ class CriteriaTests(TestCase):
 
 
 
-
     def testSubclassCriterion(self):
         s = SubclassCriterion(Vehicle)
         validateCriterion(s,
@@ -352,18 +351,18 @@ class CriteriaTests(TestCase):
 
         t5 = Inequality('==',99)
 
+        i = strategy.InequalityIndex()
         for t in t1,t2,t3,t4,t5:
             validateCriterion(t,Inequality.node_type,seeded=False)
+            i[t] = repr(t)
 
+        ct, size = i.count_for(map(repr,[t1,t2,t3,t4,t5]))
 
+        # Min, ..., 55, ..., 99, ..., 100, ..., 'abc', ..., Max
+        self.assertEqual(ct, 11)
 
-
-
-
-
-
-
-
+        # >55: 8, >=100: 5, <99: 4, <'abc': 8, ==99: 1  ---> 26
+        self.assertEqual(size,26)
 
 
 
