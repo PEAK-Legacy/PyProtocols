@@ -91,7 +91,7 @@ class ISeededCriterion(ICriterion):
         """If ``enumerable``, this must be the most-specific parent seed"""
     )
 
-    def seeds(table):
+    def seeds():
         """Return iterable of known-good keys
 
         The keys returned will be used to build outgoing edges in generic

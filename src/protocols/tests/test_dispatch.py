@@ -123,7 +123,7 @@ class CriteriaTests(TestCase):
 
     def testNullCriterion(self):
         # Null test has no seeds
-        self.failIf(list(NullCriterion.seeds({})))
+        self.failIf(list(NullCriterion.seeds()))
 
         # and it matches anything
         self.failUnless(object in NullCriterion)
@@ -138,7 +138,7 @@ class CriteriaTests(TestCase):
 
     def testClassCriteriaSeedsAndDispatchFunctions(self):
         for klass in (Vehicle,LandVehicle,WaterVehicle,HumanPowered,GasPowered):
-            seeds = list(ISeededCriterion(klass).seeds({}))
+            seeds = list(ISeededCriterion(klass).seeds())
             self.failUnless(klass in seeds)
             self.failUnless(object in seeds)
             self.failIf(len(seeds)<>2)
@@ -150,11 +150,11 @@ class CriteriaTests(TestCase):
         self.failUnless(Hummer in ISeededCriterion(Wheeled))
         self.failIf(ICriterion(Hummer).implies(Speedboat))
         self.failUnless(ICriterion(Speedboat).implies(WaterVehicle))
-        self.failUnless(object in list(ISeededCriterion(InstanceType).seeds({})))
+        self.failUnless(object in list(ISeededCriterion(InstanceType).seeds()))
 
     def testProtocolCriterion(self):
         self.failUnless(Bicycle in ISeededCriterion(Wheeled))
-        seeds = list(ISeededCriterion(Wheeled).seeds({}))
+        seeds = list(ISeededCriterion(Wheeled).seeds())
         self.failUnless(Hummer in seeds)
         self.failUnless(Bicycle in seeds)
         self.failUnless(object in seeds)
@@ -272,7 +272,7 @@ class CriteriaTests(TestCase):
         validateCriterion(i,
             strategy.make_node_type(strategy.dispatch_by_identity))
         i = ISeededCriterion(i)
-        self.assertEqual(list(i.seeds({})),[None,id(ob)])
+        self.assertEqual(list(i.seeds()),[None,id(ob)])
 
     def testSeededIndex(self):
         i = SeededIndex(None)  # XXX
@@ -293,7 +293,7 @@ class CriteriaTests(TestCase):
         )
 
         # seeds()
-        self.assertEqual( s.seeds({}), [Vehicle,None])
+        self.assertEqual( s.seeds(), [Vehicle,None])
 
         # __contains__
         for klass in Vehicle,LandVehicle,WaterVehicle:
@@ -445,8 +445,8 @@ class CriteriaTests(TestCase):
         self.failIf(TruthCriterion(0).implies(TruthCriterion(1)))
         self.failUnless(TruthCriterion(0).implies(TruthCriterion(0)))
         self.failUnless(TruthCriterion(1).implies(TruthCriterion(1)))
-        self.assertEqual(TruthCriterion(42).seeds({}), (True,False))
-        self.assertEqual(TruthCriterion(None).seeds({}), (True,False))
+        self.assertEqual(TruthCriterion(42).seeds(), (True,False))
+        self.assertEqual(TruthCriterion(None).seeds(), (True,False))
 
 
     def testAndOr(self):
@@ -639,6 +639,51 @@ class CriteriaTests(TestCase):
                 self.assertEqual(s.items(),
                     [((k,v.node_type),v) for k,v in data]
                 )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def testIndexEnumerables(self):
+        i = SeededIndex(strategy.dispatch_by_mro)
+
+        i[ClassCriterion(LandVehicle)] = 1
+        self.assertEqual(i.casemap_for([1]),
+            {LandVehicle:[1], object:[]})
+
+        i[ClassCriterion(Bicycle)] = 2
+        self.assertEqual(i.casemap_for([2]),
+            {Bicycle:[2], object:[], LandVehicle:[]})
+
+        i[ClassCriterion(HumanPowered)] = 3
+        self.assertEqual(i.casemap_for([3]),
+            {Bicycle:[3], object:[], LandVehicle:[], HumanPowered:[3]})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

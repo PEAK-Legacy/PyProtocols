@@ -85,7 +85,7 @@ class SeededIndex(object):
 
     __slots__ = (
         'dispatch_function', 'allSeeds', 'matchingSeeds', 'criteria',
-        'enumerables'
+        'enumerables','impliedSeeds'
     )
 
     def __init__(self,dispatch_function):
@@ -97,28 +97,28 @@ class SeededIndex(object):
         self.allSeeds = {}          # set of all seeds
         self.matchingSeeds = {}     # case -> applicable seeds
         self.criteria = {}          # criterion -> applicable seeds
-        self.enumerables = {}       # enumerable -> applicable seeds
+        self.enumerables = {}       # enumerable -> applicable seeds (reg'd)
+        self.impliedSeeds = {}      # enumerable -> applicable seeds (all)
 
     def __setitem__(self,criterion,case):
         """Register 'case' under each of the criterion's seeds"""
-
         if criterion.enumerable:
             maps = self.enumerables
         else:
             maps = self.criteria
-
         if criterion not in maps:
             seeds = self.allSeeds
-            for key in list(criterion.seeds(seeds)):    # avoid iter corruption
+            for key in criterion.seeds():
                 if key not in seeds:
                     self.addSeed(key,False)
             if criterion.enumerable:
                 seed = criterion.leaf_seed
+                impliedSeeds = self.impliedSeeds
                 for cri in criterion.parent_criteria():
-                    maps.setdefault(cri,[]).append(seed)
+                    impliedSeeds.setdefault(cri,[]).append(seed)
+                maps[criterion] = impliedSeeds[criterion]
             else:
                 maps[criterion] = list(criterion.matches(seeds))
-
         self.matchingSeeds[case] = maps[criterion]
 
     def __iter__(self):
@@ -233,7 +233,7 @@ def validateCriterion(criterion, node_type, seeded=True, parents=None):
 
     if seeded:
         criterion = ISeededCriterion(criterion)
-        for seed in criterion.seeds(d):
+        for seed in criterion.seeds():
             d[seed] = seed in criterion
 
         matches = list(criterion.matches(d))
@@ -417,10 +417,10 @@ class AbstractCriterion(object):
         if self.enumerable:
             return self.leaf_seed in other
 
-        for seed in self.seeds({}):
+        for seed in self.seeds():
             if seed in self and seed not in other:
                 return False
-        for seed in other.seeds({}):
+        for seed in other.seeds():
             if seed in self and seed not in other:
                 return False
         return True
@@ -463,7 +463,7 @@ class ClassCriterion(AbstractCriterion):
     def __init__(self,cls):
         AbstractCriterion.__init__(self,cls)
 
-    def seeds(self,table):
+    def seeds(self):
         return [self.subject,object]
 
     def __contains__(self,ob):
@@ -543,7 +543,7 @@ class IdentityCriterion(AbstractCriterion):
     def __init__(self,ptr):
         AbstractCriterion.__init__(self,ptr)
 
-    def seeds(self,table):
+    def seeds(self):
         return None,self.subject
 
     def matches(self,table):
@@ -561,7 +561,7 @@ class NullCriterion(AbstractCriterion):
 
     node_type = None
 
-    def seeds(self,table):      return ()
+    def seeds(self):            return ()
     def __contains__(self,ob):  return True
     def implies(self,other):    return False
     def __repr__(self):         return "NullCriterion"
@@ -579,7 +579,7 @@ class SubclassCriterion(ClassCriterion):
 
     dispatch_function = staticmethod(dispatch_by_subclass)
 
-    def seeds(self,table):
+    def seeds(self):
         return [self.subject,None]
 
     def __repr__(self):
@@ -966,7 +966,7 @@ class ProtocolCriterion(StickyAdapter,AbstractCriterion):
     def unsubscribe(self,listener):
         self.notifier.unsubscribe(listener)
 
-    def seeds(self,table):
+    def seeds(self):
         return self.notifier._Protocol__adapters.keys() + [object]
 
     def __contains__(self,ob):

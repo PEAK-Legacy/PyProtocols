@@ -432,14 +432,13 @@ class MultiCriterion(AbstractCriterion):
         AbstractCriterion.__init__(self,frozenset(all))
         return self
 
-    def seeds(self,table):
-        seeds, mytable = {}, table.copy()
+    def seeds(self):
+        seeds = {}
         for criterion in self.criteria:
-            new_seeds = criterion.seeds(mytable)
-            for seed in new_seeds:
-                mytable[seed]=[]
+            for seed in criterion.seeds():
                 seeds[seed]=True
         return seeds.keys()
+
 
     def subscribe(self,listener):
         for criterion in self.criteria:
@@ -448,6 +447,7 @@ class MultiCriterion(AbstractCriterion):
     def unsubscribe(listener):
         for criterion in self.criteria:
             criterion.unsubscribe(listener)
+
 
     def __repr__(self):
         return '%s%r' % (self.__class__.__name__,tuple(self.criteria))
@@ -501,7 +501,7 @@ class TruthCriterion(AbstractCriterion):
     def __init__(self,truth=True):
         AbstractCriterion.__init__(self,bool(truth))
 
-    def seeds(self,table):
+    def seeds(self):
         return True,False
 
     def __contains__(self,key):
