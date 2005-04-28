@@ -100,29 +100,67 @@ class SeededIndex(object):
         self.enumerables = {}       # enumerable -> applicable seeds (reg'd)
         self.impliedSeeds = {}      # enumerable -> applicable seeds (all)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     def __setitem__(self,criterion,case):
         """Register 'case' under each of the criterion's seeds"""
-        if criterion.enumerable:
-            maps = self.enumerables
-        else:
-            maps = self.criteria
-        if criterion not in maps:
-            seeds = self.allSeeds
-            for key in criterion.seeds():
-                if key not in seeds:
-                    self.addSeed(key,False)
-            if criterion.enumerable:
-                seed = criterion.leaf_seed
-                impliedSeeds = self.impliedSeeds
-                for cri in criterion.parent_criteria():
-                    impliedSeeds.setdefault(cri,[]).append(seed)
-                maps[criterion] = impliedSeeds[criterion]
-            else:
-                maps[criterion] = list(criterion.matches(seeds))
-        self.matchingSeeds[case] = maps[criterion]
 
-    def __iter__(self):
-        return iter(self.allSeeds)
+        if criterion.enumerable:
+
+            enumerables = self.enumerables
+
+            if criterion not in enumerables:
+
+                seed = criterion.leaf_seed
+                seeds = self.allSeeds
+                new_seed = seed not in seeds
+                impliedSeeds = self.impliedSeeds
+
+                for cri in criterion.parent_criteria():
+                    if new_seed or cri not in enumerables:
+                        impliedSeeds.setdefault(cri,[]).append(seed)
+
+                enumerables[criterion] = impliedSeeds[criterion]
+
+                add = self.addSeed
+                for key in criterion.seeds():
+                    if key not in seeds: add(key,False)
+
+            self.matchingSeeds[case] = enumerables[criterion]
+            return
+
+        criteria = self.criteria
+
+        if criterion not in criteria:
+            seeds = self.allSeeds
+            add = self.addSeed
+            for key in criterion.seeds():
+                if key not in seeds: add(key)
+
+            criteria[criterion] = list(criterion.matches(seeds))
+
+        self.matchingSeeds[case] = criteria[criterion]
+
+
 
     def count_for(self,cases):
         """Get the total count of outgoing branches, given incoming cases"""
@@ -158,6 +196,9 @@ class SeededIndex(object):
     def mkNode(self,*args):
         node = DispatchNode(*args)
         return instancemethod(self.dispatch_function,node,DispatchNode)
+
+
+
 
 
 

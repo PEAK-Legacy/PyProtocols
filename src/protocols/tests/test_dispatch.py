@@ -669,34 +669,30 @@ class CriteriaTests(TestCase):
         self.assertEqual(i.casemap_for([3]),
             {Bicycle:[3], object:[], LandVehicle:[], HumanPowered:[3]})
 
+    def testIndexAnd(self):
+        i = SeededIndex(strategy.dispatch_by_mro)
 
+        i[ClassCriterion(LandVehicle) & ClassCriterion(HumanPowered)] = 1
+        self.assertEqual(i.casemap_for([1]),
+            {HumanPowered:[], object:[], LandVehicle:[]})
 
+        i[ClassCriterion(Bicycle)] = 2
+        self.assertEqual(i.casemap_for([1,2]),
+            {HumanPowered:[], object:[], LandVehicle:[], Bicycle:[1,2]})
 
+        i[ClassCriterion(LandVehicle)] = 3
+        self.assertEqual(i.casemap_for([1,2,3]),
+            {HumanPowered:[], object:[], LandVehicle:[3], Bicycle:[1,2,3]})
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    def testIndexNot(self):
+        i = SeededIndex(strategy.dispatch_by_mro)
+        i[ClassCriterion(LandVehicle)] = 1
+        i[~ClassCriterion(Bicycle)] = 2
+        self.assertEqual(i.casemap_for([1,2]),
+            {object:[2], LandVehicle:[1,2], Bicycle:[1]})
+        i[ClassCriterion(Bicycle)] = 3
+        self.assertEqual(i.casemap_for([1,2,3]),
+            {object:[2], LandVehicle:[1,2], Bicycle:[1,3]})
 
 
 class ExpressionTests(TestCase):
