@@ -16,7 +16,7 @@ if 'HAPPYDOC_TITLE' not in globals():
 
 
 from setuptools import Command
-from distutils.command.sdist import sdist as old_sdist
+from setuptools.command.sdist import sdist as old_sdist
 
 
 

@@ -1,5 +1,0 @@
-global-include *.pyx *.c *.h *.ini *.txt *.xml *.css *.html *.pdf *.tex
-recursive-include docs *.*
-recursive-include src/setup *.py
-recursive-include setuptools *.py
-global-exclude *.l2h *.toc *.ind *.how *.syn .cvsignore

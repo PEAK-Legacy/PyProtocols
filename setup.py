@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 """Distutils setup file"""
-
+import ez_setup
+ez_setup.use_setuptools()
 from setuptools import setup, Feature, Extension, find_packages
 
 # Metadata
@@ -23,7 +24,6 @@ speedups = Feature(
 setup(
     name=PACKAGE_NAME,
     version=PACKAGE_VERSION,
-
     description="Open Protocols and Component Adaptation for Python",
     author="Phillip J. Eby",
     author_email="peak@eby-sarna.com",
