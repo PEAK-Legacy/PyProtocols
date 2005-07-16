@@ -17,7 +17,6 @@ speedups = Feature(
     standard = True,
     ext_modules = [
         Extension("protocols._speedups", ["src/protocols/_speedups.pyx"]),
-        Extension("dispatch._speedups", ["src/dispatch/_speedups.pyx"]),
     ]
 )
 
@@ -30,7 +29,7 @@ setup(
     license="PSF or ZPL",
 
     url="http://peak.telecommunity.com/PyProtocols.html",
-
+    zip_safe    = True,
     test_suite  = 'protocols.tests.test_suite',
     package_dir = {'':'src'},
     package_data = {'': ['*.txt']},

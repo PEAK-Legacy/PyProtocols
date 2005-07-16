@@ -247,11 +247,8 @@ class GenerationTests(TestCase):
 def test_suite():
 
     from protocols.tests import test_advice, test_direct, test_classes
-    from protocols.tests import test_dispatch, test_parsing
 
     tests = [
-        test_dispatch.test_suite(),
-        test_parsing.test_suite(),
         test_advice.test_suite(),
         test_classes.test_suite(),
         test_direct.test_suite(),
@@ -278,6 +275,9 @@ def test_suite():
     return TestSuite(
         tests
     )
+
+
+
 
 
 

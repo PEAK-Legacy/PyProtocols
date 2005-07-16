@@ -2,10 +2,8 @@
 
 from unittest import TestCase, makeSuite, TestSuite
 from protocols.advice import *
-import dispatch
 import sys
 from types import InstanceType
-
 
 def ping(log, value):
 
@@ -15,28 +13,30 @@ def ping(log, value):
 
     addClassAdvisor(pong)
 
+def as_(*decorators):
+    """Use Python 2.4 decorators w/Python 2.2+
 
+    Example::
 
+        import dispatch
 
+        class Foo(object):
+            [dispatch.as(classmethod)]
+            def something(cls,etc):
+                \"""This is a classmethod\"""
+    """
 
+    if len(decorators)>1:
+        decorators = list(decorators)
+        decorators.reverse()
 
+    def callback(frame,k,v,old_locals):
+        for d in decorators:
+            v = d(v)
+        return v
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    from protocols.advice import add_assignment_advisor
+    return add_assignment_advisor(callback)
 
 
 class SuperTest(TestCase):
@@ -152,12 +152,12 @@ class DecoratorTests(TestCase):
 
         def f(): pass
 
-        [dispatch.as(lambda x: [x])]
+        [as_(lambda x: [x])]
         f1 = f
 
         self.assertEqual(f1, [f])
 
-        [dispatch.as(list, lambda x: (x,))]
+        [as_(list, lambda x: (x,))]
         f1 = f
         self.assertEqual(f1, [f])
 
