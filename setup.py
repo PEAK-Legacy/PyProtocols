@@ -35,6 +35,7 @@ setup(
     package_data = {'': ['*.txt']},
     packages    = find_packages('src'),
     cmdclass    = SETUP_COMMANDS,
-    features    = {'speedups': speedups}
+    features    = {'speedups': speedups},
+    install_requires = ['DecoratorTools>=1.3'],
 )
 

@@ -14,7 +14,7 @@ ClassTypes = ClassType, type
 
 from adapters import NO_ADAPTER_NEEDED, DOES_NOT_SUPPORT, AdaptationFailure
 from adapters import bindAdapter
-from advice import addClassAdvisor, getFrameInfo
+from peak.util.decorators import decorate_class, frameinfo
 from interfaces import IOpenProtocol, IOpenProvider, IOpenImplementor
 from interfaces import Protocol, InterfaceClass
 
@@ -167,7 +167,7 @@ def adviseObject(ob, provides=(), doesNotProvide=()):
 def advise(**kw):
     kw = kw.copy()
     frame = _getframe(1)
-    kind, module, caller_locals, caller_globals = getFrameInfo(frame)
+    kind, module, caller_locals, caller_globals = frameinfo(frame)
 
     if kind=="module":
         moduleProvides = kw.setdefault('moduleProvides',())
@@ -264,7 +264,7 @@ def advise(**kw):
 
         return klass
 
-    addClassAdvisor(callback)
+    decorate_class(callback)
 
 
 
