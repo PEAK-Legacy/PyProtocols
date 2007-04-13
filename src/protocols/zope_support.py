@@ -27,40 +27,41 @@ else:
     try:
         from zope.interface import adapter_hooks
     except ImportError:
-        zi.Interface.__class__.__adapt__ = __adapt__
-    else:
-        adapter_hooks.append(__adapt__)
+        try:
+            from zope.interface.interface import adapter_hooks
+        except ImportError:
+            zi.Interface.__class__.__adapt__ = __adapt__
+            adapter_hooks = []
 
+    adapter_hooks.append(__adapt__)
     ZopeInterfaceTypes = [zi.Interface.__class__]
 
-    del __adapt__
-
-
-
+    del __adapt__, adapter_hooks
 
 
 # Adapter for Zope X3 Interfaces
 
 class ZopeInterfaceAsProtocol(StickyAdapter, Protocol):
-
     advise(
         instancesProvide=[IOpenProtocol],
         asAdapterForTypes=ZopeInterfaceTypes,
     )
-
-    attachToProtocols = IOpenProtocol,
-
+    attachForProtocols = IOpenProtocol,
 
     def __init__(self, ob):
         StickyAdapter.__init__(self,ob)
         Protocol.__init__(self)
 
-
-    def __adapt__(self, obj):
-        if self.subject.isImplementedBy(obj):
-            return obj
-        return supermeta(ZopeInterfaceAsProtocol,self).__adapt__(obj)
-
+    if ZopeInterfaceTypes and hasattr(ZopeInterfaceTypes[0],'providedBy'):
+        def __adapt__(self, obj):
+            if self.subject.providedBy(obj):
+                return obj
+            return supermeta(ZopeInterfaceAsProtocol,self).__adapt__(obj)
+    else:
+        def __adapt__(self, obj):
+            if self.subject.isImplementedBy(obj):
+                return obj
+            return supermeta(ZopeInterfaceAsProtocol,self).__adapt__(obj)
 
     def registerImplementation(self,klass,adapter=NO_ADAPTER_NEEDED,depth=1):
 
@@ -78,7 +79,6 @@ class ZopeInterfaceAsProtocol(StickyAdapter, Protocol):
         )
 
     registerImplementation = metamethod(registerImplementation)
-
 
     def registerObject(self, ob, adapter=NO_ADAPTER_NEEDED, depth=1):
 

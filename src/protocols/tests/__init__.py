@@ -265,8 +265,8 @@ def test_suite():
         tests.append( test_zope.test_suite() )
 
     try:
-        import twisted.python.components
-    except ImportError:
+        from twisted.python.components import Interface
+    except (ImportError, SystemError):
         pass
     else:
         from protocols.tests import test_twisted

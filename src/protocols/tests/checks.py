@@ -215,17 +215,17 @@ class AdaptiveChecks(SimpleAdaptiveChecks):
 
     def checkOverrideDepth(self):
         self.declareObAdapts(self.a1,[self.IB])
-        assert self.IA(self.ob,None) == ('a1',self.ob)
+        self.assertEquals(self.IA(self.ob,None), ('a1',self.ob))
 
         self.declareObAdapts(self.a2,[self.IA])
-        assert self.IA(self.ob,None) == ('a2',self.ob)
+        self.assertEquals(self.IA(self.ob,None), ('a2',self.ob))
 
 
     def checkComposed(self):
         class IC(self.Interface): pass
         declareAdapter(self.a2,provides=[IC],forProtocols=[self.IA])
         self.declareObAdapts(self.a1,[self.IA])
-        assert IC(self.ob,None) == ('a2',('a1',self.ob))
+        self.assertEqual(IC(self.ob,None), ('a2',('a1',self.ob)))
 
 
     def checkLateDefinition(self):
@@ -372,17 +372,23 @@ def makeInstanceTests(base,Picklable,NewStyle):
     """Generate a set of instance-oriented test classes using 'base'"""
 
     class AdviseFunction(base):
+        __module__ = base.__module__
         def setUp(self):
             def aFunc(foo,bar):
                 pass
             self.ob = aFunc
+    AdviseFunction.__name__ = base.__name__+'.AdviseFunction'
 
     class AdviseModule(base):
+        __module__ = base.__module__
         def setUp(self):
             from types import ModuleType
             self.ob = ModuleType('x')
+    AdviseModule.__name__ = base.__name__+'.AdviseModule'
 
     class AdviseInstance(base):
+        __module__ = base.__module__
+        
         def setUp(self):
             self.ob = Picklable()
 
@@ -391,21 +397,15 @@ def makeInstanceTests(base,Picklable,NewStyle):
             adviseObject(self.ob, provides=[self.IPure])
             newOb = loads(dumps(self.ob))
             assert self.IPure(newOb,None) is newOb
+    AdviseInstance.__name__ = base.__name__+'.AdviseInstance'
 
     class AdviseNewInstance(AdviseInstance):
+        __module__ = base.__module__
         def setUp(self):
             self.ob = NewStyle()
+    AdviseNewInstance.__name__ = base.__name__+'.AdviseNewInstance'
 
     return AdviseFunction, AdviseModule, AdviseInstance, AdviseNewInstance
-
-
-
-
-
-
-
-
-
 
 
 def makeClassProvidesTests(base):
@@ -450,26 +450,25 @@ def makeMetaClassProvidesTests(base):
 
 
 def makeClassTests(base):
-
     """Generate a set of class-oriented test classes using 'base'"""
 
     class TestClassic(base):
-
+        __module__ = base.__module__
         def setUp(self):
             class Classic: pass
             self.klass = Classic
             self.ob = Classic()
-
+    TestClassic.__name__ = base.__name__+'.TestClassic'
     class TestBuiltin(base):
-
+        __module__ = base.__module__
         def setUp(self):
             # Note: We need a type with a no-arguments constructor
             class Newstyle(list): __slots__ = ()
             self.klass = Newstyle
             self.ob = Newstyle()
-
+    TestBuiltin.__name__ = base.__name__+'.TestBuiltin'
     class TestMetaclass(base):
-
+        __module__ = base.__module__
         def setUp(self):
             class Meta(type): pass
             self.klass = Meta
@@ -478,14 +477,15 @@ def makeClassTests(base):
 
         def make(self,klass):
             return klass('Dummy',(object,),{})
-
+    TestMetaclass.__name__ = base.__name__+'.TestMetaclass'
     class TestMetaInstance(base):
-
+        __module__ = base.__module__
         def setUp(self):
             class Meta(type): pass
             class Base(object): __metaclass__ = Meta
             self.klass = Base
             self.ob = Base()
+    TestMetaInstance.__name__ = base.__name__+'.TestMetaInstance'
 
     return TestClassic, TestBuiltin, TestMetaclass, TestMetaInstance
 
